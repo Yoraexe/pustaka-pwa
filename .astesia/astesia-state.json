@@ -128,6 +128,12 @@
       "timestamp": "2026-09-22T20:23:40+08:00",
       "action": "Astesia pipeline completed",
       "agent_note": "Production multi-stage Dockerfile, docker-compose, CI/CD pipeline, and deployment documentation finalized."
+    },
+    {
+      "layer": "design",
+      "timestamp": "2026-09-22T22:04:00+08:00",
+      "action": "UI/UX Modernization executed (Anti-AI Slop)",
+      "agent_note": "Integrated Shadcn UI primitives (Dialog, AlertDialog, Tabs, Sonner, Command Palette) with tactile Aceternity accents (CardSpotlight, BentoGrid). Eliminated native alert/confirm."
     }
   ],
   "decisions": [
@@ -150,6 +156,11 @@
       "id": "DEC-004",
       "title": "Modern Academic Minimalist Theme",
       "rationale": "Palette ramah mata untuk sesi membaca panjang (Sepia/Dark mode) dan Bottom Navigation mobile-first."
+    },
+    {
+      "id": "DEC-005",
+      "title": "Anti-AI Slop Hybrid UI Architecture (Shadcn + Aceternity Accents)",
+      "rationale": "Menggunakan Radix UI (Shadcn) untuk fondasi aksesibilitas WCAG AA, Sonner Toast non-blocking, cmdk Command Palette, dan CardSpotlight berbasis CSS radial-gradient tanpa overhead WebGL/Three.js."
     },
     {
       "id": "ADR-001",
