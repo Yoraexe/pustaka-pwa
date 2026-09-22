@@ -17,7 +17,7 @@ export const createApp = () => {
 
   // Global Middleware
   app.use(cors({
-    origin: '*',
+    origin: true,
     credentials: true
   }));
   app.use(express.json());

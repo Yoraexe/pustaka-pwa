@@ -10,7 +10,31 @@ import { eq, and, sql } from 'drizzle-orm';
 import type { Loan, LoanType, LoanStatus } from '../../shared/types/index.js';
 
 export class LoanRepository {
+  /**
+   * Secara otomatis menandai pinjaman e-book yang telah melewati jatuh tempo sebagai RETURNED
+   */
+  async autoExpireDigitalLoans(): Promise<number> {
+    const nowIso = new Date().toISOString();
+    const result = await db.update(loans)
+      .set({
+        status: 'RETURNED',
+        returnDate: nowIso
+      })
+      .where(
+        and(
+          eq(loans.loanType, 'DIGITAL'),
+          eq(loans.status, 'BORROWED'),
+          sql`${loans.dueDate} < ${nowIso}`
+        )
+      );
+    return result.changes;
+  }
+
   async findActiveLoan(userId: number, bookId: number, loanType: LoanType): Promise<Loan | null> {
+    if (loanType === 'DIGITAL') {
+      await this.autoExpireDigitalLoans();
+    }
+
     const rows = await db.select({
       loan: loans,
       bookTitle: books.title,
@@ -32,6 +56,7 @@ export class LoanRepository {
       )
     )
     .limit(1);
+
 
     if (rows.length === 0) return null;
     const r = rows[0];
@@ -65,6 +90,10 @@ export class LoanRepository {
   }
 
   async countActiveUserLoans(userId: number, loanType: LoanType): Promise<number> {
+    if (loanType === 'DIGITAL') {
+      await this.autoExpireDigitalLoans();
+    }
+
     const rows = await db.select({ id: loans.id })
       .from(loans)
       .where(
@@ -78,6 +107,8 @@ export class LoanRepository {
   }
 
   async countActiveDigitalLoansForBook(bookId: number): Promise<number> {
+    await this.autoExpireDigitalLoans();
+
     const rows = await db.select({ id: loans.id })
       .from(loans)
       .where(
@@ -91,7 +122,10 @@ export class LoanRepository {
   }
 
   async findUserLoans(userId: number, activeOnly = false): Promise<Loan[]> {
+    await this.autoExpireDigitalLoans();
+
     let query = db.select({
+
       loan: loans,
       bookTitle: books.title,
       bookCover: books.coverUrl,

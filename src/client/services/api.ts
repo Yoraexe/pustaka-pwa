@@ -46,12 +46,16 @@ class ApiClient {
     const json: ApiResponse<T> = await res.json();
 
     if (!res.ok || !json.success) {
+      if (res.status === 401) {
+        this.setToken(null);
+      }
       const errorMsg = json.error?.message || 'Terjadi kesalahan pada server.';
       throw new Error(errorMsg);
     }
 
     return json.data as T;
   }
+
 
   // --- Auth Endpoints ---
   async login(input: LoginInput): Promise<AuthSession> {

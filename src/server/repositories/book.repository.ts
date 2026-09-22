@@ -85,6 +85,10 @@ export class BookRepository {
   }
 
   async create(data: CreateBookInput): Promise<Book> {
+    const isDigitalOnly = data.bookType === 'DIGITAL_ONLY';
+    const totalCopies = isDigitalOnly ? 0 : (data.totalPhysicalCopies ?? 1);
+    const availableCopies = isDigitalOnly ? 0 : totalCopies;
+
     const inserted = await db.insert(books).values({
       categoryId: data.categoryId,
       title: data.title,
@@ -96,10 +100,11 @@ export class BookRepository {
       coverUrl: data.coverUrl || null,
       ebookFilePath: data.ebookFilePath || null,
       digitalLicenseCount: data.digitalLicenseCount,
-      totalPhysicalCopies: data.totalPhysicalCopies,
-      availablePhysicalCopies: data.totalPhysicalCopies,
-      shelfLocation: data.shelfLocation || null
+      totalPhysicalCopies: totalCopies,
+      availablePhysicalCopies: availableCopies,
+      shelfLocation: isDigitalOnly ? null : (data.shelfLocation || null)
     }).returning();
+
 
     const cat = await db.select().from(categories).where(eq(categories.id, data.categoryId)).limit(1);
     return this.mapToDomain(inserted[0], cat[0]?.name || 'Umum');

@@ -7,6 +7,7 @@
 import { loanRepository, type LoanRepository } from '../repositories/loan.repository.js';
 import { bookRepository, type BookRepository } from '../repositories/book.repository.js';
 import { userRepository, type UserRepository } from '../repositories/user.repository.js';
+import { sqlite } from '../db/index.js';
 import { config } from '../config/index.js';
 import type { Loan, User } from '../../shared/types/index.js';
 
@@ -110,22 +111,32 @@ export class CirculationService {
       throw new Error(`Anggota telah mencapai batas peminjaman fisik (${limit} buku).`);
     }
 
-    // 4. Update status eksemplar & stok buku
-    await this.bookRepo.updateCopyStatus(copyData.id, 'BORROWED');
-    await this.bookRepo.updateAvailableCopies(copyData.bookId, -1);
-
-    // 5. Hitung tanggal jatuh tempo
+    // 4. Update status eksemplar & stok buku dan catat peminjaman secara atomik
     const loanDays = borrower.role === 'TEACHER' ? config.TEACHER_LOAN_DAYS : config.STUDENT_LOAN_DAYS;
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + loanDays);
+    // Set batas jatuh tempo hingga akhir hari (23:59:59) agar siswa dapat mengembalikan kapan saja di hari tersebut
+    dueDate.setHours(23, 59, 59, 999);
 
-    return this.loanRepo.create({
-      userId: borrower.id,
-      bookId: copyData.bookId,
-      copyId: copyData.id,
-      loanType: 'PHYSICAL',
-      dueDate: dueDate.toISOString()
-    });
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      await this.bookRepo.updateCopyStatus(copyData.id, 'BORROWED');
+      await this.bookRepo.updateAvailableCopies(copyData.bookId, -1);
+
+      const createdLoan = await this.loanRepo.create({
+        userId: borrower.id,
+        bookId: copyData.bookId,
+        copyId: copyData.id,
+        loanType: 'PHYSICAL',
+        dueDate: dueDate.toISOString()
+      });
+
+      sqlite.exec('COMMIT');
+      return createdLoan;
+    } catch (err) {
+      sqlite.exec('ROLLBACK');
+      throw err;
+    }
   }
 
   /**
@@ -151,19 +162,28 @@ export class CirculationService {
       throw new Error(`Tidak ada transaksi peminjaman aktif untuk eksemplar ${copyBarcode}.`);
     }
 
-    // Hitung keterlambatan (overdue)
+    // Hitung keterlambatan berdasarkan batas hari kalender (Fair Calendar Day Overdue)
     const now = new Date();
     const dueDate = new Date(activeLoan.dueDate);
-    const diffTime = now.getTime() - dueDate.getTime();
-    const overdueDays = diffTime > 0 ? Math.ceil(diffTime / (1000 * 60 * 60 * 24)) : 0;
+
+    // Normalisasi ke tanggal kalender (midnight) waktu lokal
+    const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+    const diffTime = nowDateOnly.getTime() - dueDateOnly.getTime();
+    const overdueDays = diffTime > 0 ? Math.floor(diffTime / (1000 * 60 * 60 * 24)) : 0;
     const fineAmount = overdueDays * config.DAILY_FINE_AMOUNT;
 
-    // Update status peminjaman
-    await this.loanRepo.updateReturn(activeLoan.id, now.toISOString(), fineAmount, finePaid || fineAmount === 0);
-
-    // Kembalikan status eksemplar dan ketersediaan buku
-    await this.bookRepo.updateCopyStatus(copyData.id, 'AVAILABLE');
-    await this.bookRepo.updateAvailableCopies(copyData.bookId, 1);
+    // Mutasi status pengembalian secara atomik
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      await this.loanRepo.updateReturn(activeLoan.id, now.toISOString(), fineAmount, finePaid || fineAmount === 0);
+      await this.bookRepo.updateCopyStatus(copyData.id, 'AVAILABLE');
+      await this.bookRepo.updateAvailableCopies(copyData.bookId, 1);
+      sqlite.exec('COMMIT');
+    } catch (err) {
+      sqlite.exec('ROLLBACK');
+      throw err;
+    }
 
     let message = 'Buku fisik berhasil dikembalikan tepat waktu.';
     if (overdueDays > 0) {
@@ -183,6 +203,7 @@ export class CirculationService {
       message
     };
   }
+
 
   async getUserLoans(userId: number, activeOnly = false): Promise<Loan[]> {
     return this.loanRepo.findUserLoans(userId, activeOnly);

@@ -20,14 +20,16 @@
 | `tests/unit/circulation.service.test.ts` | Mengembalikan e-book digital & merilis lisensi | AC-2.2 (Pengembalian e-book) | ✅ PASSED |
 | `tests/unit/circulation.service.test.ts` | Menolak siswa melakukan sirkulasi fisik mandiri | AC-3.1 (Hanya pustakawan/admin yang berwenang) | ✅ PASSED |
 | `tests/unit/circulation.service.test.ts` | Check-out dan pengembalian buku fisik di meja perpus | AC-3.1 & AC-3.2 (Sirkulasi fisik & stok eksemplar) | ✅ PASSED |
+| `tests/unit/circulation.service.test.ts` | Fair Calendar Day Overdue calculation (0 denda pada hari jatuh tempo) | AC-3.2 (Kalkulasi denda kalender hari adil) | ✅ PASSED |
 | `tests/integration/api.test.ts` | `GET /api/health` healthcheck | NFR-5.1 (Reliability & liveness probe) | ✅ PASSED |
 | `tests/integration/api.test.ts` | `POST /api/auth/login` endpoint | AC-4.1 (Endpoint otentikasi) | ✅ PASSED |
 | `tests/integration/api.test.ts` | `GET /api/books/categories` | AC-1.1 (Kategori taksonomi buku) | ✅ PASSED |
 | `tests/integration/api.test.ts` | `GET /api/books` filter format & kategori | AC-1.1 & AC-1.2 (Pencarian katalog < 500ms) | ✅ PASSED |
 | `tests/integration/api.test.ts` | `POST /api/circulation/digital/borrow` flow | CUJ 1 (Alur pinjam siswa via API) | ✅ PASSED |
 
-**Total Tests:** 15 Passing | 0 Failing (100% Success Rate)  
+**Total Tests:** 16 Passing | 0 Failing (100% Success Rate)  
 **Test Runner:** Vitest v3.2.7
+
 
 ---
 

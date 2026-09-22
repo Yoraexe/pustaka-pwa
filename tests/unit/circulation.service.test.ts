@@ -80,10 +80,23 @@ describe('CirculationService Unit Tests', () => {
     expect(loan.loanType).toBe('PHYSICAL');
     expect(loan.status).toBe('BORROWED');
 
-    // Pengembalian buku fisik
+    // Pengembalian buku fisik tepat waktu
     const returnResult = await circulationService.returnPhysicalBook(librarianUser, barcode);
     expect(returnResult.loan.status).toBe('RETURNED');
     expect(returnResult.overdueDays).toBe(0);
     expect(returnResult.fineAmount).toBe(0);
   });
+
+  it('harus secara adil menganggap pengembalian di hari jatuh tempo sebagai 0 hari denda (Fair Calendar Day)', async () => {
+    const barcode = 'BK-0001-02';
+    // Peminjaman
+    await circulationService.checkOutPhysicalBook(librarianUser, studentUser.identityNumber, barcode);
+    
+    // Pengembalian di hari yang sama
+    const returnResult = await circulationService.returnPhysicalBook(librarianUser, barcode);
+    expect(returnResult.overdueDays).toBe(0);
+    expect(returnResult.fineAmount).toBe(0);
+    expect(returnResult.message).toContain('tepat waktu');
+  });
 });
+

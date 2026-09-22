@@ -8,7 +8,11 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { App } from './App.js';
 import { AuthProvider } from './hooks/useAuth.js';
+import { registerSW } from 'virtual:pwa-register';
 import './index.css';
+
+// Registrasi Service Worker PWA
+registerSW({ immediate: true });
 
 const rootElement = document.getElementById('root');
 
