@@ -1,10 +1,10 @@
 /**
  * @file src/client/App.tsx
- * @description Komponen utama aplikasi PWA, mengelola routing internal dan wrapper layout global.
+ * @description Komponen utama aplikasi PWA dengan global Sonner Toaster, shortcut Command Palette (Ctrl+K), dan layout responsive.
  * @layer Application Root Component
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from './hooks/useAuth.js';
 import { Navbar } from './components/common/Navbar.js';
 import { BottomNav } from './components/common/BottomNav.js';
@@ -14,15 +14,62 @@ import { CatalogPage } from './pages/CatalogPage.js';
 import { MyBooksPage } from './pages/MyBooksPage.js';
 import { CirculationDesk } from './components/circulation/CirculationDesk.js';
 import { LoginPage } from './pages/LoginPage.js';
-import { Shield, User as UserIcon, BookOpen } from 'lucide-react';
+import { Toaster } from './components/ui/sonner.js';
+import { Button } from './components/ui/button.js';
+import { Badge } from './components/ui/badge.js';
+import {
+  CommandDialog,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+} from './components/ui/command.js';
+import { api } from './services/api.js';
+import type { Book } from '../shared/types/index.js';
+import { BookDetailModal } from './components/catalog/BookDetailModal.js';
+import { Shield, User as UserIcon, BookOpen, Layers, BookmarkCheck, LogIn } from 'lucide-react';
+import { toast } from 'sonner';
 
 export const App: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const [currentTab, setCurrentTab] = useState<string>('catalog');
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
 
+  // Command Palette State
+  const [isCommandOpen, setIsCommandOpen] = useState<boolean>(false);
+  const [commandBooks, setCommandBooks] = useState<Book[]>([]);
+  const [activeDetailBook, setActiveDetailBook] = useState<Book | null>(null);
+
+  // Keyboard shortcut listener for Command Palette (Ctrl+K / Cmd+K)
+  useEffect(() => {
+    const down = (e: KeyboardEvent) => {
+      if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        setIsCommandOpen((open) => !open);
+      }
+    };
+
+    document.addEventListener('keydown', down);
+    return () => document.removeEventListener('keydown', down);
+  }, []);
+
+  // Fetch quick search books list when command palette opens
+  useEffect(() => {
+    if (isCommandOpen && commandBooks.length === 0) {
+      api.getBooks().then((data) => {
+        setCommandBooks(data);
+      }).catch((err) => {
+        console.error('Gagal mengambil daftar buku untuk command palette:', err);
+      });
+    }
+  }, [isCommandOpen, commandBooks.length]);
+
   return (
-    <div className="min-h-screen flex flex-col bg-surface-bg text-text-main pb-20 md:pb-10">
+    <div className="min-h-screen flex flex-col bg-background text-foreground pb-20 md:pb-10 selection:bg-primary/20 selection:text-primary">
+      {/* Sonner Toast Notification Root */}
+      <Toaster richColors position="top-right" />
+
       {/* Offline Status Bar */}
       <OfflineBanner />
 
@@ -31,6 +78,7 @@ export const App: React.FC = () => {
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
         onOpenLogin={() => setIsLoginModalOpen(true)}
+        onOpenCommand={() => setIsCommandOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -39,6 +87,7 @@ export const App: React.FC = () => {
           <CatalogPage
             onOpenLogin={() => setIsLoginModalOpen(true)}
             onNavigateToMyBooks={() => setCurrentTab('my-books')}
+            onOpenCommand={() => setIsCommandOpen(true)}
           />
         )}
 
@@ -46,18 +95,21 @@ export const App: React.FC = () => {
           isAuthenticated && user ? (
             <MyBooksPage user={user} />
           ) : (
-            <div className="text-center py-20 bg-surface-card rounded-3xl border border-border-subtle p-8 max-w-md mx-auto">
-              <BookOpen size={48} className="mx-auto text-primary-600 mb-3" />
-              <h2 className="text-lg font-bold text-text-main">Masuk untuk Melihat Rak Buku</h2>
-              <p className="text-xs text-text-muted mt-1 mb-5">
-                Silakan masuk menggunakan NISN atau NIP Anda untuk mengakses buku yang sedang dipinjam.
+            <div className="text-center py-20 bg-card rounded-3xl border border-border p-8 max-w-md mx-auto shadow-xs">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
+                <BookOpen size={32} />
+              </div>
+              <h2 className="text-lg font-bold text-foreground">Masuk untuk Melihat Rak Buku</h2>
+              <p className="text-xs text-muted-foreground mt-1 mb-6 leading-relaxed">
+                Silakan masuk menggunakan Nomor Induk Siswa Nasional (NISN) atau NIP untuk mengakses buku yang sedang dipinjam.
               </p>
-              <button
+              <Button
                 onClick={() => setIsLoginModalOpen(true)}
-                className="w-full py-2.5 bg-primary-600 text-white rounded-xl text-xs font-semibold shadow-sm hover:bg-primary-700 transition-colors"
+                className="w-full gap-2 shadow-xs"
               >
-                Masuk Akun Sekarang
-              </button>
+                <LogIn size={15} />
+                <span>Masuk Akun Sekarang</span>
+              </Button>
             </div>
           )
         )}
@@ -66,10 +118,12 @@ export const App: React.FC = () => {
           isAuthenticated && (user?.role === 'LIBRARIAN' || user?.role === 'ADMIN') ? (
             <CirculationDesk />
           ) : (
-            <div className="text-center py-20 bg-surface-card rounded-3xl border border-border-subtle p-8 max-w-md mx-auto">
-              <Shield size={48} className="mx-auto text-amber-500 mb-3" />
-              <h2 className="text-lg font-bold text-text-main">Akses Terbatas</h2>
-              <p className="text-xs text-text-muted mt-1">
+            <div className="text-center py-20 bg-card rounded-3xl border border-border p-8 max-w-md mx-auto shadow-xs">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto mb-4">
+                <Shield size={32} />
+              </div>
+              <h2 className="text-lg font-bold text-foreground">Akses Terbatas</h2>
+              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                 Halaman Meja Sirkulasi hanya dapat diakses oleh akun Pustakawan atau Administrator sekolah.
               </p>
             </div>
@@ -77,44 +131,50 @@ export const App: React.FC = () => {
         )}
 
         {currentTab === 'profile' && (
-          <div className="max-w-md mx-auto bg-surface-card rounded-3xl border border-border-subtle shadow-sm p-6">
+          <div className="max-w-md mx-auto bg-card rounded-3xl border border-border shadow-xs p-6">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-primary-50 text-primary-600 flex items-center justify-center font-bold text-xl">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold text-xl">
                 <UserIcon size={32} />
               </div>
               <div>
-                <h3 className="font-bold text-base text-text-main">{user?.name}</h3>
-                <p className="text-xs text-text-muted font-mono">{user?.identityNumber}</p>
-                <span className="mt-1 inline-block bg-primary-50 text-primary-700 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
-                  {user?.role}
-                </span>
+                <h3 className="font-bold text-base text-foreground">{user?.name}</h3>
+                <p className="text-xs text-muted-foreground font-mono">{user?.identityNumber}</p>
+                <div className="mt-1">
+                  <Badge variant="outline">
+                    {user?.role}
+                  </Badge>
+                </div>
               </div>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-slate-100 space-y-3 text-xs">
+            <div className="mt-6 pt-4 border-t border-border space-y-3 text-xs">
               <div className="flex justify-between py-1">
-                <span className="text-text-muted">Kelas / Penugasan:</span>
-                <span className="font-semibold text-text-main">{user?.className || 'Staf Sekolah'}</span>
+                <span className="text-muted-foreground">Kelas / Penugasan:</span>
+                <span className="font-semibold text-foreground">{user?.className || 'Staf Sekolah'}</span>
               </div>
               <div className="flex justify-between py-1">
-                <span className="text-text-muted">Status Akun:</span>
-                <span className="font-semibold text-emerald-600">Aktif Terverifikasi</span>
+                <span className="text-muted-foreground">Status Akun:</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">Aktif Terverifikasi</span>
               </div>
               <div className="flex justify-between py-1">
-                <span className="text-text-muted">Penyimpanan Offline:</span>
-                <span className="font-semibold text-text-main">IndexedDB Siap</span>
+                <span className="text-muted-foreground">Penyimpanan Offline:</span>
+                <span className="font-semibold text-foreground">IndexedDB Siap</span>
               </div>
             </div>
 
-            <button
+            <Button
+              variant="destructive"
               onClick={() => {
                 logout();
                 setCurrentTab('catalog');
+                toast.info('Sesi Telah Berakhir', {
+                  description: 'Anda telah berhasil keluar dari akun perpustakaan.',
+                });
               }}
-              className="mt-6 w-full py-2.5 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl text-xs font-semibold transition-colors"
+              className="mt-6 w-full"
             >
               Keluar dari Akun
-            </button>
+            </Button>
           </div>
         )}
       </main>
@@ -134,6 +194,98 @@ export const App: React.FC = () => {
         <LoginPage
           onClose={() => setIsLoginModalOpen(false)}
           onSuccess={() => setIsLoginModalOpen(false)}
+        />
+      )}
+
+      {/* Global Command Palette (Ctrl+K / Cmd+K) */}
+      <CommandDialog open={isCommandOpen} onOpenChange={setIsCommandOpen}>
+        <CommandInput placeholder="Ketik judul buku, pengarang, kurikulum, atau navigasi..." />
+        <CommandList>
+          <CommandEmpty>Tidak ada hasil yang ditemukan.</CommandEmpty>
+          <CommandGroup heading="Navigasi Cepat">
+            <CommandItem
+              onSelect={() => {
+                setCurrentTab('catalog');
+                setIsCommandOpen(false);
+              }}
+            >
+              <BookOpen className="mr-2 h-4 w-4 text-primary" />
+              <span>Buka Katalog Utama</span>
+            </CommandItem>
+            {isAuthenticated && (
+              <CommandItem
+                onSelect={() => {
+                  setCurrentTab('my-books');
+                  setIsCommandOpen(false);
+                }}
+              >
+                <BookmarkCheck className="mr-2 h-4 w-4 text-emerald-600" />
+                <span>Buka Rak Buku Saya</span>
+              </CommandItem>
+            )}
+            {isAuthenticated && (user?.role === 'LIBRARIAN' || user?.role === 'ADMIN') && (
+              <CommandItem
+                onSelect={() => {
+                  setCurrentTab('circulation');
+                  setIsCommandOpen(false);
+                }}
+              >
+                <Layers className="mr-2 h-4 w-4 text-amber-600" />
+                <span>Buka Meja Sirkulasi Pustakawan</span>
+              </CommandItem>
+            )}
+          </CommandGroup>
+
+          <CommandGroup heading="Koleksi Buku Sekolah">
+            {commandBooks.map((book) => (
+              <CommandItem
+                key={book.id}
+                onSelect={() => {
+                  setActiveDetailBook(book);
+                  setIsCommandOpen(false);
+                }}
+              >
+                <div className="flex items-center justify-between w-full">
+                  <div className="truncate max-w-[280px] sm:max-w-md">
+                    <span className="font-semibold text-foreground">{book.title}</span>
+                    <span className="text-[11px] text-muted-foreground ml-2">by {book.author}</span>
+                  </div>
+                  <Badge variant="outline" className="text-[9px] shrink-0 ml-2">
+                    {book.bookType === 'DIGITAL_ONLY' ? 'E-Book' : book.bookType === 'PHYSICAL_ONLY' ? 'Fisik' : 'Hybrid'}
+                  </Badge>
+                </div>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </CommandDialog>
+
+      {/* Detail Book Modal triggered from Command Palette */}
+      {activeDetailBook && (
+        <BookDetailModal
+          book={activeDetailBook}
+          onClose={() => setActiveDetailBook(null)}
+          onBorrowDigital={async (book) => {
+            if (!isAuthenticated) {
+              toast.warning('Akses Dibatasi', {
+                description: 'Silakan masuk untuk meminjam buku.',
+                action: {
+                  label: 'Masuk Sekarang',
+                  onClick: () => setIsLoginModalOpen(true),
+                },
+              });
+              return;
+            }
+            try {
+              await api.borrowDigitalBook(book.id);
+              toast.success('Peminjaman Berhasil', {
+                description: `Buku "${book.title}" telah ditambahkan ke Rak Buku Saya.`,
+              });
+              setCurrentTab('my-books');
+            } catch (err: unknown) {
+              toast.error(err instanceof Error ? err.message : 'Gagal meminjam e-book.');
+            }
+          }}
         />
       )}
     </div>

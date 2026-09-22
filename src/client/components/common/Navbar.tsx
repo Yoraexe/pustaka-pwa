@@ -1,51 +1,59 @@
 /**
  * @file src/client/components/common/Navbar.tsx
- * @description Header navigasi desktop dengan logo sekolah, informasi pengguna, dan navigasi peran.
+ * @description Header navigasi desktop dengan logo sekolah, Command Palette trigger (Ctrl+K), dan peran pengguna.
  * @layer Presentation Component
  */
 
 import React from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
-import { BookOpen, LogOut, User as UserIcon, Shield, Layers } from 'lucide-react';
+import { Button } from '../ui/button.js';
+import { Badge } from '../ui/badge.js';
+import { BookOpen, LogOut, User as UserIcon, Shield, Layers, Search } from 'lucide-react';
 
 interface NavbarProps {
   currentTab: string;
   onSelectTab: (tab: string) => void;
   onOpenLogin: () => void;
+  onOpenCommand?: () => void;
 }
 
-export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab, onOpenLogin }) => {
+export const Navbar: React.FC<NavbarProps> = ({
+  currentTab,
+  onSelectTab,
+  onOpenLogin,
+  onOpenCommand,
+}) => {
   const { user, logout, isAuthenticated } = useAuth();
 
   return (
-    <header className="bg-surface-card border-b border-border-subtle sticky top-0 z-30 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <header className="bg-card border-b border-border sticky top-0 z-30 shadow-2xs backdrop-blur-md bg-opacity-95">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Brand & School Logo */}
         <div
           className="flex items-center gap-3 cursor-pointer select-none"
           onClick={() => onSelectTab('catalog')}
         >
-          <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center text-white shadow-md">
-            <BookOpen size={22} />
+          <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground shadow-xs">
+            <BookOpen size={20} />
           </div>
           <div>
-            <span className="font-bold text-lg text-primary-600 tracking-tight leading-none block">
+            <span className="font-extrabold text-base sm:text-lg text-foreground tracking-tight leading-none block">
               PustakaSekolah
             </span>
-            <span className="text-[11px] text-text-muted font-medium block">
+            <span className="text-[10px] sm:text-[11px] text-muted-foreground font-medium block">
               Digital & Physical PWA Library
             </span>
           </div>
         </div>
 
         {/* Desktop Navigation Links */}
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden md:flex items-center gap-1.5">
           <button
             onClick={() => onSelectTab('catalog')}
-            className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
               currentTab === 'catalog'
-                ? 'bg-primary-50 text-primary-600 font-semibold'
-                : 'text-text-muted hover:text-text-main hover:bg-slate-50'
+                ? 'bg-primary/10 text-primary'
+                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
             Katalog Buku
@@ -54,10 +62,10 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab, onOpenL
           {isAuthenticated && (
             <button
               onClick={() => onSelectTab('my-books')}
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
                 currentTab === 'my-books'
-                  ? 'bg-primary-50 text-primary-600 font-semibold'
-                  : 'text-text-muted hover:text-text-main hover:bg-slate-50'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
               Rak Buku Saya
@@ -67,48 +75,68 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab, onOpenL
           {isAuthenticated && (user?.role === 'LIBRARIAN' || user?.role === 'ADMIN') && (
             <button
               onClick={() => onSelectTab('circulation')}
-              className={`px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5 ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
                 currentTab === 'circulation'
-                  ? 'bg-primary-50 text-primary-600 font-semibold'
-                  : 'text-text-muted hover:text-text-main hover:bg-slate-50'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
-              <Layers size={16} />
+              <Layers size={15} />
               <span>Meja Sirkulasi</span>
             </button>
           )}
         </nav>
 
-        {/* User Profile / Login Action */}
-        <div className="flex items-center gap-3">
+        {/* Actions & Profile */}
+        <div className="flex items-center gap-2 sm:gap-3">
+          {/* Quick Search Button (Command Palette) */}
+          {onOpenCommand && (
+            <button
+              type="button"
+              onClick={onOpenCommand}
+              className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-border text-xs transition-colors"
+            >
+              <Search size={14} />
+              <span>Cari koleksi...</span>
+              <kbd className="text-[10px] font-mono bg-background border px-1.5 py-0.5 rounded shadow-2xs">
+                ⌘K
+              </kbd>
+            </button>
+          )}
+
           {isAuthenticated && user ? (
             <div className="flex items-center gap-3">
               <div className="hidden sm:block text-right">
-                <div className="text-xs font-bold text-text-main leading-tight flex items-center justify-end gap-1">
+                <div className="text-xs font-bold text-foreground leading-tight flex items-center justify-end gap-1">
                   <span>{user.name}</span>
-                  {user.role === 'ADMIN' && <Shield size={12} className="text-red-500" />}
+                  {user.role === 'ADMIN' && <Shield size={12} className="text-destructive" />}
                 </div>
-                <span className="text-[10px] text-primary-600 font-medium bg-primary-50 px-2 py-0.5 rounded-full inline-block mt-0.5">
-                  {user.role === 'STUDENT' ? `Siswa • ${user.className || 'Reguler'}` : user.role}
-                </span>
+                <div className="mt-0.5">
+                  <Badge variant="outline" className="text-[9px] py-0 px-1.5">
+                    {user.role === 'STUDENT' ? `Siswa • ${user.className || 'Reguler'}` : user.role}
+                  </Badge>
+                </div>
               </div>
-              <button
+              <Button
+                variant="ghost"
+                size="icon"
                 onClick={logout}
-                title="Keluar"
-                className="p-2 text-text-muted hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                aria-label="Logout"
+                title="Keluar dari Akun"
+                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10"
               >
-                <LogOut size={18} />
-              </button>
+                <LogOut size={16} />
+              </Button>
             </div>
           ) : (
-            <button
+            <Button
+              variant="default"
+              size="sm"
               onClick={onOpenLogin}
-              className="flex items-center gap-1.5 bg-primary-600 hover:bg-primary-700 text-white text-xs md:text-sm font-semibold px-4 py-2 rounded-lg transition-colors shadow-sm"
+              className="gap-1.5 shadow-xs"
             >
-              <UserIcon size={16} />
+              <UserIcon size={14} />
               <span>Masuk (NISN/NIP)</span>
-            </button>
+            </Button>
           )}
         </div>
       </div>
