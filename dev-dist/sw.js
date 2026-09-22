@@ -67,7 +67,7 @@ if (!self.define) {
     });
   };
 }
-define(['./workbox-bd5fa0a7'], (function (workbox) { 'use strict';
+define(['./workbox-61be8b72'], (function (workbox) { 'use strict';
 
   self.skipWaiting();
   workbox.clientsClaim();
@@ -78,7 +78,7 @@ define(['./workbox-bd5fa0a7'], (function (workbox) { 'use strict';
    */
   workbox.precacheAndRoute([{
     "url": "index.html",
-    "revision": "0.k8b0jfv6dbo"
+    "revision": "0.mmn6hcb23u"
   }], {});
   workbox.cleanupOutdatedCaches();
   workbox.registerRoute(new workbox.NavigationRoute(workbox.createHandlerBoundToURL("index.html"), {
@@ -88,6 +88,14 @@ define(['./workbox-bd5fa0a7'], (function (workbox) { 'use strict';
     url
   }) => url.pathname.startsWith("/api/books"), new workbox.StaleWhileRevalidate({
     "cacheName": "api-books-cache",
+    plugins: [new workbox.CacheableResponsePlugin({
+      statuses: [0, 200]
+    })]
+  }), 'GET');
+  workbox.registerRoute(({
+    url
+  }) => url.pathname.startsWith("/api/circulation/my-loans"), new workbox.NetworkFirst({
+    "cacheName": "api-loans-cache",
     plugins: [new workbox.CacheableResponsePlugin({
       statuses: [0, 200]
     })]

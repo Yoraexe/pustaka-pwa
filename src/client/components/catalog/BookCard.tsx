@@ -1,15 +1,16 @@
 /**
  * @file src/client/components/catalog/BookCard.tsx
- * @description Kartu buku katalog hybrid dengan CardSpotlight tactile mikro-interaksi, Shadcn Badge, dan tombol aksi ergonomis.
+ * @description Kartu buku katalog hybrid dengan CardSpotlight dan BackgroundGradient resmi Aceternity UI, dipadu Shadcn UI Badge & Button.
  * @layer Presentation Component
  */
 
 import React from 'react';
 import type { Book } from '../../../shared/types/index.js';
 import { CardSpotlight } from '../ui/card-spotlight.js';
+import { BackgroundGradient } from '../ui/background-gradient.js';
 import { Badge } from '../ui/badge.js';
 import { Button } from '../ui/button.js';
-import { Tablet, BookOpen, MapPin, CheckCircle, AlertCircle } from 'lucide-react';
+import { Tablet, BookOpen, MapPin, CheckCircle, AlertCircle, Sparkles } from 'lucide-react';
 
 interface BookCardProps {
   book: Book;
@@ -26,13 +27,10 @@ export const BookCard: React.FC<BookCardProps> = ({
 }) => {
   const isDigital = book.bookType === 'DIGITAL_ONLY' || book.bookType === 'HYBRID';
   const isPhysical = book.bookType === 'PHYSICAL_ONLY' || book.bookType === 'HYBRID';
+  const isHybrid = book.bookType === 'HYBRID';
 
-  return (
-    <CardSpotlight
-      className="flex flex-col justify-between group hover:shadow-md transition-all duration-200 border-border bg-card"
-      radius={220}
-      color="rgba(30, 64, 175, 0.08)"
-    >
+  const cardContent = (
+    <div className="flex flex-col justify-between h-full bg-card rounded-[22px] overflow-hidden">
       {/* Cover Image & Badges */}
       <div
         className="relative aspect-[3/4] bg-muted/40 overflow-hidden cursor-pointer select-none"
@@ -42,12 +40,12 @@ export const BookCard: React.FC<BookCardProps> = ({
           <img
             src={book.coverUrl}
             alt={book.title}
-            className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-300"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary/5 via-muted/30 to-muted/80 text-center">
-            <BookOpen size={36} className="text-primary/70 mb-2" />
+          <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary/10 via-muted/40 to-muted/80 text-center">
+            <BookOpen size={36} className="text-primary mb-2 opacity-80" />
             <span className="text-xs font-bold text-foreground line-clamp-3 leading-snug">
               {book.title}
             </span>
@@ -57,16 +55,21 @@ export const BookCard: React.FC<BookCardProps> = ({
 
         {/* Format Badges (Top-Left) */}
         <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 z-20">
-          {book.bookType === 'HYBRID' && <Badge variant="hybrid">Hybrid</Badge>}
+          {isHybrid && (
+            <Badge variant="hybrid" className="shadow-xs">
+              <Sparkles size={10} className="mr-0.5 text-indigo-600" />
+              Hybrid
+            </Badge>
+          )}
           {book.bookType === 'DIGITAL_ONLY' && (
-            <Badge variant="ebook">
-              <Tablet size={10} className="mr-0.5" />
+            <Badge variant="ebook" className="shadow-xs">
+              <Tablet size={10} className="mr-0.5 text-blue-600" />
               E-Book
             </Badge>
           )}
           {book.bookType === 'PHYSICAL_ONLY' && (
-            <Badge variant="physical">
-              <BookOpen size={10} className="mr-0.5" />
+            <Badge variant="physical" className="shadow-xs">
+              <BookOpen size={10} className="mr-0.5 text-amber-600" />
               Fisik
             </Badge>
           )}
@@ -74,7 +77,7 @@ export const BookCard: React.FC<BookCardProps> = ({
 
         {/* Category Pill (Top-Right) */}
         <div className="absolute top-2.5 right-2.5 z-20">
-          <span className="bg-background/90 backdrop-blur-xs text-foreground text-[10px] font-medium px-2 py-0.5 rounded-full border border-border/80 shadow-xs">
+          <span className="bg-background/90 backdrop-blur-md text-foreground text-[10px] font-medium px-2 py-0.5 rounded-full border border-border/80 shadow-xs">
             {book.categoryName || 'Umum'}
           </span>
         </div>
@@ -152,6 +155,28 @@ export const BookCard: React.FC<BookCardProps> = ({
           )}
         </div>
       </div>
+    </div>
+  );
+
+  // Use Aceternity BackgroundGradient for Hybrid books, and CardSpotlight for others
+  if (isHybrid) {
+    return (
+      <BackgroundGradient
+        className="rounded-[22px] p-0.5 bg-card h-full"
+        containerClassName="h-full"
+      >
+        {cardContent}
+      </BackgroundGradient>
+    );
+  }
+
+  return (
+    <CardSpotlight
+      className="flex flex-col justify-between group hover:shadow-md transition-all duration-200 border-border bg-card h-full"
+      radius={240}
+      color="rgba(59, 130, 246, 0.12)"
+    >
+      {cardContent}
     </CardSpotlight>
   );
 };
