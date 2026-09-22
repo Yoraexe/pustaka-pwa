@@ -177,18 +177,19 @@ async function runVerification() {
   }
 
   // ----------------------------------------------------
-  // UJI 5: Real PWA Offline Cache Storage API Integration
+  // UJI 5: Real PWA Offline Dual IndexedDB & Cache Storage Architecture
   // ----------------------------------------------------
-  console.log('▶ [UJI 5] Verifikasi Real Offline Cache Storage API...');
-  const hasCacheOpen = readerSrc.includes("caches.open('pustaka-offline-ebooks')");
-  const hasCachePut = readerSrc.includes("cache.put(cacheKey, res.clone())");
-  const hasCacheMatch = readerSrc.includes("cache.match(cacheKey)");
+  console.log('▶ [UJI 5] Verifikasi Real Offline IndexedDB & Cache Storage API...');
+  const offlineStorageSrc = fs.readFileSync(path.resolve(process.cwd(), 'src/client/services/offlineStorage.ts'), 'utf-8');
+  const hasIndexedDbOpen = offlineStorageSrc.includes("indexedDB.open(DB_NAME");
+  const hasCacheOpen = offlineStorageSrc.includes("caches.open('pustaka-offline-ebooks')");
+  const hasReaderStorage = readerSrc.includes("offlineStorage.saveEbook") && readerSrc.includes("offlineStorage.getEbook");
 
-  if (hasCacheOpen && hasCachePut && hasCacheMatch) {
-    console.log('   ✅ LULUS: Reader terhubung langsung ke Cache Storage API untuk menyimpan dan membaca blob PDF saat offline.\n');
+  if (hasIndexedDbOpen && hasCacheOpen && hasReaderStorage) {
+    console.log('   ✅ LULUS: Reader terhubung ke arsitektur penyimpanan luring ganda (IndexedDB & Cache API).\n');
     passedChecks++;
   } else {
-    console.error('   ❌ GAGAL pada Uji 5: Integrasi Cache Storage API tidak lengkap.');
+    console.error('   ❌ GAGAL pada Uji 5: Integrasi Offline Storage tidak lengkap.', { hasIndexedDbOpen, hasCacheOpen, hasReaderStorage });
   }
 
   // ----------------------------------------------------

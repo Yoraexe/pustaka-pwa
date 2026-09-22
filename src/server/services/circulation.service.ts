@@ -170,7 +170,7 @@ export class CirculationService {
     const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
     const diffTime = nowDateOnly.getTime() - dueDateOnly.getTime();
-    const overdueDays = diffTime > 0 ? Math.floor(diffTime / (1000 * 60 * 60 * 24)) : 0;
+    const overdueDays = diffTime > 0 ? Math.round(diffTime / (1000 * 60 * 60 * 24)) : 0;
     const fineAmount = overdueDays * config.DAILY_FINE_AMOUNT;
 
     // Mutasi status pengembalian secara atomik
