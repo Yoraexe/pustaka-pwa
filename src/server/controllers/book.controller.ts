@@ -8,6 +8,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { bookService } from '../services/book.service.js';
 import { BookFilterSchema, CreateBookSchema } from '../../shared/schemas/index.js';
 import { authenticateToken, requireRole } from '../middleware/auth.middleware.js';
+import { uploadBookFiles } from '../middleware/upload.middleware.js';
 import path from 'path';
 import fs from 'fs';
 
@@ -23,7 +24,7 @@ bookRouter.get('/categories', async (_req: Request, res: Response, next: NextFun
   }
 });
 
-// GET /api/books
+// GET /api/books (Katalog dengan Filter)
 bookRouter.get('/', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const filters = BookFilterSchema.parse(req.query);
@@ -38,10 +39,6 @@ bookRouter.get('/', async (req: Request, res: Response, next: NextFunction): Pro
 bookRouter.get('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const id = Number(req.params.id);
-    if (isNaN(id)) {
-      res.status(400).json({ success: false, error: { code: 'INVALID_ID', message: 'ID Buku tidak valid.' } });
-      return;
-    }
     const book = await bookService.getBookDetail(id);
     res.json({ success: true, data: book });
   } catch (err) {
@@ -49,14 +46,27 @@ bookRouter.get('/:id', async (req: Request, res: Response, next: NextFunction): 
   }
 });
 
-// POST /api/books (Librarian / Admin)
-bookRouter.post('/', authenticateToken, requireRole(['LIBRARIAN', 'ADMIN']), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+// POST /api/books (Librarian / Admin - Multipart Upload & JSON)
+bookRouter.post('/', authenticateToken, requireRole(['LIBRARIAN', 'ADMIN']), uploadBookFiles, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const input = CreateBookSchema.parse(req.body);
+    const rawBody = { ...req.body };
+
+    // Tangani file biner yang diunggah
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+    if (files) {
+      if (files.ebook && files.ebook.length > 0) {
+        rawBody.ebookFilePath = `./uploads/ebooks/${files.ebook[0].filename}`;
+      }
+      if (files.cover && files.cover.length > 0) {
+        rawBody.coverUrl = `/uploads/covers/${files.cover[0].filename}`;
+      }
+    }
+
+    const input = CreateBookSchema.parse(rawBody);
     const newBook = await bookService.addNewBook(input);
     res.status(201).json({
       success: true,
-      message: 'Buku berhasil ditambahkan ke katalog.',
+      message: 'Buku berhasil ditambahkan ke katalog perpustakaan.',
       data: newBook
     });
   } catch (err) {

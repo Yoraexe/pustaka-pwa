@@ -6,3 +6,7 @@ pustaka.db-shm
 pustaka.db-wal
 coverage
 .DS_Store
+uploads/*
+!uploads/.gitkeep
+!uploads/covers/.gitkeep
+!uploads/ebooks/.gitkeep

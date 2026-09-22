@@ -10,7 +10,8 @@ import { useAuth } from '../hooks/useAuth.js';
 import type { Book, Category, BookType } from '../../shared/types/index.js';
 import { BookGrid } from '../components/catalog/BookGrid.js';
 import { BookDetailModal } from '../components/catalog/BookDetailModal.js';
-import { BookOpen, Tablet, Sparkles } from 'lucide-react';
+import { AddBookModal } from '../components/catalog/AddBookModal.js';
+import { BookOpen, Tablet, Sparkles, PlusCircle } from 'lucide-react';
 
 interface CatalogPageProps {
   onOpenLogin: () => void;
@@ -18,7 +19,7 @@ interface CatalogPageProps {
 }
 
 export const CatalogPage: React.FC<CatalogPageProps> = ({ onOpenLogin, onNavigateToMyBooks }) => {
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [books, setBooks] = useState<Book[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | undefined>(undefined);
@@ -28,6 +29,7 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({ onOpenLogin, onNavigat
 
   const [selectedDetailBook, setSelectedDetailBook] = useState<Book | null>(null);
   const [borrowedBookIds, setBorrowedBookIds] = useState<Set<number>>(new Set());
+  const [isAddBookOpen, setIsAddBookOpen] = useState<boolean>(false);
 
   // Fetch Categories
   useEffect(() => {
@@ -130,6 +132,21 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({ onOpenLogin, onNavigat
               <span>Sirkulasi Fisik & Lokasi Rak</span>
             </div>
           </div>
+
+          {isAuthenticated && (user?.role === 'LIBRARIAN' || user?.role === 'ADMIN') && (
+            <div className="mt-5 pt-4 border-t border-white/15 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <span className="text-xs text-primary-100 font-medium">
+                Panel Manajemen Pustakawan: Daftarkan buku cetak fisik atau e-book baru.
+              </span>
+              <button
+                onClick={() => setIsAddBookOpen(true)}
+                className="px-4 py-2 bg-white hover:bg-primary-50 text-primary-900 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-sm self-start sm:self-auto"
+              >
+                <PlusCircle size={16} className="text-primary-600" />
+                <span>+ Tambah Koleksi Buku Baru</span>
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -158,6 +175,15 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({ onOpenLogin, onNavigat
           isBorrowed={borrowedBookIds.has(selectedDetailBook.id)}
         />
       )}
+
+      {/* Add Book Modal (Librarian & Admin) */}
+      <AddBookModal
+        isOpen={isAddBookOpen}
+        onClose={() => setIsAddBookOpen(false)}
+        onSuccess={() => {
+          fetchBooks();
+        }}
+      />
     </div>
   );
 };

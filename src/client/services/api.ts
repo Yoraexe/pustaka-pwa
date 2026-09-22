@@ -4,7 +4,10 @@
  * @layer Client Service Layer
  */
 
-import type { ApiResponse, AuthSession, Book, BookFilterInput, Category, Loan, LoginInput } from '../../shared/types/index.js';
+import type {
+  ApiResponse, AuthSession, Book, BookCopy, BookFilterInput,
+  Category, CreateBookInput, Loan, LoginInput
+} from '../../shared/types/index.js';
 
 const API_BASE = '/api';
 
@@ -29,10 +32,16 @@ class ApiClient {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...(options.headers as Record<string, string>)
-    };
+    const headers: Record<string, string> = {};
+
+    // Jangan set Content-Type jika body adalah FormData agar browser menyetel multipart boundary otomatis
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    if (options.headers) {
+      Object.assign(headers, options.headers);
+    }
 
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
@@ -116,6 +125,16 @@ class ApiClient {
       }
       throw err;
     }
+  }
+
+  async createBook(data: FormData | CreateBookInput): Promise<Book & { copies?: BookCopy[] }> {
+    const isFormData = data instanceof FormData;
+    const body = isFormData ? data : JSON.stringify(data);
+
+    return this.request<Book & { copies?: BookCopy[] }>('/books', {
+      method: 'POST',
+      body
+    });
   }
 
   // --- Circulation ---

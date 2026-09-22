@@ -1,18 +1,30 @@
 /**
  * @file src/client/components/circulation/CirculationDesk.tsx
- * @description Modul Meja Sirkulasi Pustakawan untuk check-out, pengembalian buku fisik, dan kalkulasi denda.
+ * @description Modul Meja Sirkulasi Pustakawan untuk check-out, pengembalian buku fisik, kalkulasi denda, dan pendaftaran koleksi baru.
  * @layer Presentation Component
+ * 
+ * Tujuan: Memfasilitasi sirkulasi buku fisik dan pendaftaran koleksi fisik/digital bagi staf perpustakaan.
+ * Caller: src/client/pages/AdminDashboardPage.tsx / Pustakawan Workspace.
+ * Dependensi: react, lucide-react, src/client/services/api.ts, shared/types, AddBookModal.
+ * Main Functions: CirculationDesk.
+ * Side Effects: Melakukan request peminjaman, pengembalian, dan pemanggilan modal pendaftaran buku.
  */
 
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api.js';
-import type { Loan } from '../../../shared/types/index.js';
-import { QrCode, CheckCircle2, AlertTriangle, ArrowRightLeft, DollarSign, Clock, RefreshCw } from 'lucide-react';
+import type { Loan, Book, BookCopy } from '../../../shared/types/index.js';
+import { AddBookModal } from '../catalog/AddBookModal.js';
+import {
+  QrCode, CheckCircle2, AlertTriangle, ArrowRightLeft, DollarSign,
+  Clock, RefreshCw, PlusCircle, BookOpen, Layers, Tablet, MapPin
+} from 'lucide-react';
 
 export const CirculationDesk: React.FC = () => {
-  const [activeSubTab, setActiveSubTab] = useState<'checkout' | 'return'>('checkout');
+  const [activeSubTab, setActiveSubTab] = useState<'checkout' | 'return' | 'new-book'>('checkout');
   const [loans, setLoans] = useState<Loan[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isAddBookModalOpen, setIsAddBookModalOpen] = useState<boolean>(false);
+  const [lastAddedBook, setLastAddedBook] = useState<(Book & { copies?: BookCopy[] }) | null>(null);
 
   // Form Check-out
   const [borrowerIdentity, setBorrowerIdentity] = useState<string>('');
@@ -149,6 +161,20 @@ export const CirculationDesk: React.FC = () => {
           >
             2. Pengembalian & Denda (Check-In)
           </button>
+
+          <button
+            onClick={() => {
+              setActiveSubTab('new-book');
+            }}
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              activeSubTab === 'new-book'
+                ? 'bg-white text-primary-900 shadow-sm'
+                : 'text-primary-100 hover:bg-white/10'
+            }`}
+          >
+            <PlusCircle size={14} />
+            <span>3. Input Koleksi Baru</span>
+          </button>
         </div>
       </div>
 
@@ -214,7 +240,7 @@ export const CirculationDesk: React.FC = () => {
               </div>
             )}
           </div>
-        ) : (
+        ) : activeSubTab === 'return' ? (
           <div>
             <h3 className="font-bold text-base text-text-main flex items-center gap-2">
               <CheckCircle2 size={18} className="text-emerald-600" />
@@ -282,6 +308,116 @@ export const CirculationDesk: React.FC = () => {
                     </span>
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border-subtle">
+              <div>
+                <h3 className="font-bold text-base text-text-main flex items-center gap-2">
+                  <PlusCircle size={18} className="text-primary-600" />
+                  <span>Pendaftaran Koleksi & Inventaris Buku Baru</span>
+                </h3>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Tambahkan buku fisik dengan auto-generate barcode eksemplar, atau unggah buku digital (PDF) dengan alokasi lisensi peminjaman daring.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAddBookModalOpen(true)}
+                className="px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-2 shadow-sm"
+              >
+                <PlusCircle size={15} />
+                <span>Buka Formulir Input Koleksi</span>
+              </button>
+            </div>
+
+            {/* Banner Quick Actions */}
+            <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 rounded-xl bg-amber-50/70 border border-amber-200/80">
+                <div className="flex items-center gap-2 text-amber-900 font-bold text-xs mb-1">
+                  <BookOpen size={16} className="text-amber-700" />
+                  <span>Koleksi Buku Fisik</span>
+                </div>
+                <p className="text-xs text-amber-800 leading-relaxed">
+                  Input judul, nomor ISBN, lokasi rak, serta jumlah eksemplar. Barcode eksemplar (<span className="font-mono font-semibold">BK-...</span>) dibuat otomatis dan siap ditempel pada fisik buku.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-indigo-50/70 border border-indigo-200/80">
+                <div className="flex items-center gap-2 text-indigo-900 font-bold text-xs mb-1">
+                  <Tablet size={16} className="text-indigo-700" />
+                  <span>Koleksi E-Book Digital</span>
+                </div>
+                <p className="text-xs text-indigo-800 leading-relaxed">
+                  Unggah berkas PDF materi sekolah, atur kuota lisensi peminjaman digital bersamaan, dan buku langsung dapat dibaca online maupun offline di PWA.
+                </p>
+              </div>
+
+              <div className="p-4 rounded-xl bg-emerald-50/70 border border-emerald-200/80">
+                <div className="flex items-center gap-2 text-emerald-900 font-bold text-xs mb-1">
+                  <Layers size={16} className="text-emerald-700" />
+                  <span>Koleksi Hybrid</span>
+                </div>
+                <p className="text-xs text-emerald-800 leading-relaxed">
+                  Satu judul memiliki eksemplar fisik di perpustakaan sekaligus berkas PDF yang dapat dipinjam siswa secara digital melalui aplikasi PWA.
+                </p>
+              </div>
+            </div>
+
+            {/* Last Added Book Card */}
+            {lastAddedBook && (
+              <div className="mt-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 mb-2">
+                  <CheckCircle2 size={16} />
+                  <span>Koleksi Terakhir Berhasil Didaftarkan ke Sistem:</span>
+                </div>
+                <div className="bg-white p-3.5 rounded-lg border border-slate-200 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h5 className="text-sm font-bold text-slate-800">{lastAddedBook.title}</h5>
+                      <p className="text-xs text-slate-500">{lastAddedBook.author} &bull; {lastAddedBook.publisher} ({lastAddedBook.publicationYear})</p>
+                    </div>
+                    <span className="px-2.5 py-1 bg-primary-100 text-primary-800 text-[10px] font-bold rounded-lg uppercase">
+                      {lastAddedBook.bookType}
+                    </span>
+                  </div>
+
+                  {lastAddedBook.shelfLocation && (
+                    <div className="flex items-center gap-1.5 text-xs text-slate-600">
+                      <MapPin size={13} className="text-slate-400" />
+                      <span>Lokasi Rak: <strong className="font-semibold text-slate-800">{lastAddedBook.shelfLocation}</strong></span>
+                    </div>
+                  )}
+
+                  {lastAddedBook.copies && lastAddedBook.copies.length > 0 && (
+                    <div className="pt-2 border-t border-slate-100">
+                      <span className="text-[11px] font-semibold text-slate-600 block mb-1.5">
+                        Barcode Eksemplar Fisik ({lastAddedBook.copies.length} eksemplar):
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {lastAddedBook.copies.map(c => (
+                          <span key={c.id} className="font-mono text-[11px] bg-slate-100 text-slate-800 px-2 py-0.5 rounded border border-slate-200 font-medium">
+                            {c.barcode}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddBookModalOpen(true)}
+                      className="text-xs font-bold text-primary-600 hover:text-primary-800 flex items-center gap-1"
+                    >
+                      <PlusCircle size={13} />
+                      <span>Input Koleksi Lainnya</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -369,6 +505,16 @@ export const CirculationDesk: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {/* Modal Pendaftaran Koleksi Buku Baru */}
+      <AddBookModal
+        isOpen={isAddBookModalOpen}
+        onClose={() => setIsAddBookModalOpen(false)}
+        onSuccess={(newBook) => {
+          setLastAddedBook(newBook);
+          setIsAddBookModalOpen(false);
+        }}
+      />
     </div>
   );
 };

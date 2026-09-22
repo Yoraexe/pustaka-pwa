@@ -5,7 +5,7 @@
  */
 
 import { bookRepository, type BookRepository } from '../repositories/book.repository.js';
-import type { Book, Category, CreateBookInput, BookFilterInput } from '../../shared/types/index.js';
+import type { Book, BookCopy, Category, CreateBookInput, BookFilterInput } from '../../shared/types/index.js';
 
 export class BookService {
   constructor(private bookRepo: BookRepository = bookRepository) {}
@@ -26,19 +26,24 @@ export class BookService {
     return book;
   }
 
-  async addNewBook(input: CreateBookInput): Promise<Book> {
+  async addNewBook(input: CreateBookInput): Promise<Book & { copies: BookCopy[] }> {
     const createdBook = await this.bookRepo.create(input);
+    const copies: BookCopy[] = [];
 
     // Jika memiliki eksemplar fisik, generate barcode eksemplar otomatis (BK-ID-INDEX)
     if (input.bookType === 'HYBRID' || input.bookType === 'PHYSICAL_ONLY') {
       const copyCount = input.totalPhysicalCopies || 1;
       for (let i = 1; i <= copyCount; i++) {
         const barcode = `BK-${String(createdBook.id).padStart(4, '0')}-${String(i).padStart(2, '0')}`;
-        await this.bookRepo.createCopy(createdBook.id, barcode);
+        const copy = await this.bookRepo.createCopy(createdBook.id, barcode);
+        copies.push(copy);
       }
     }
 
-    return createdBook;
+    return {
+      ...createdBook,
+      copies
+    };
   }
 }
 
