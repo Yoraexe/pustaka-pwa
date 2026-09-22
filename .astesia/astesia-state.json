@@ -1,0 +1,189 @@
+{
+  "project_name": "pustaka-sekolah-pwa",
+  "status": "completed",
+  "entry_type": "greenfield",
+  "current_layer": "devops",
+  "layer_statuses": {
+    "product": "done",
+    "design": "done",
+    "engineering": "done",
+    "quality": "done",
+    "devops": "done"
+  },
+  "active_skills": [
+    "budget-circuit-breaker",
+    "anti-silent-failure",
+    "brd-generation",
+    "cuj-mapping",
+    "security-review",
+    "layered-architecture",
+    "ux-systems",
+    "component-tokens",
+    "ponytail-executor",
+    "zod-validation",
+    "drizzle-orm",
+    "vitest-unit-testing",
+    "docker-compose"
+  ],
+  "retry_count": {
+    "product": 0,
+    "design": 0,
+    "engineering": 0,
+    "quality": 0,
+    "devops": 0
+  },
+  "completed_artifacts": [
+    "brd.md",
+    "design-system.md",
+    "architecture.md",
+    "system-map.md",
+    "qa-test-plan.md",
+    "deployment.md"
+  ],
+  "completed_files": [
+    "package.json",
+    "tsconfig.json",
+    "vite.config.ts",
+    "tailwind.config.js",
+    "postcss.config.js",
+    "index.html",
+    "Dockerfile",
+    "docker-compose.yml",
+    ".dockerignore",
+    ".env.example",
+    ".github/workflows/ci.yml",
+    "src/shared/types/index.ts",
+    "src/shared/schemas/index.ts",
+    "src/server/config/index.ts",
+    "src/server/db/schema.ts",
+    "src/server/db/index.ts",
+    "src/server/db/seed.ts",
+    "src/server/repositories/user.repository.ts",
+    "src/server/repositories/book.repository.ts",
+    "src/server/repositories/loan.repository.ts",
+    "src/server/services/auth.service.ts",
+    "src/server/services/book.service.ts",
+    "src/server/services/circulation.service.ts",
+    "src/server/middleware/auth.middleware.ts",
+    "src/server/middleware/error.middleware.ts",
+    "src/server/controllers/auth.controller.ts",
+    "src/server/controllers/book.controller.ts",
+    "src/server/controllers/circulation.controller.ts",
+    "src/server/app.ts",
+    "src/server/index.ts",
+    "src/client/index.css",
+    "src/client/services/api.ts",
+    "src/client/hooks/useAuth.tsx",
+    "src/client/components/common/Navbar.tsx",
+    "src/client/components/common/BottomNav.tsx",
+    "src/client/components/pwa/OfflineBanner.tsx",
+    "src/client/components/pwa/InstallPromptIOS.tsx",
+    "src/client/components/catalog/BookCard.tsx",
+    "src/client/components/catalog/BookGrid.tsx",
+    "src/client/components/catalog/BookDetailModal.tsx",
+    "src/client/components/reader/PDFReader.tsx",
+    "src/client/components/circulation/CirculationDesk.tsx",
+    "src/client/pages/CatalogPage.tsx",
+    "src/client/pages/MyBooksPage.tsx",
+    "src/client/pages/LoginPage.tsx",
+    "src/client/App.tsx",
+    "src/client/main.tsx",
+    "tests/unit/auth.service.test.ts",
+    "tests/unit/circulation.service.test.ts",
+    "tests/integration/api.test.ts"
+  ],
+  "history": [
+    {
+      "layer": "init",
+      "timestamp": "2026-09-22T20:13:30+08:00",
+      "action": "Project initialized by Astesia (/astesia-init)",
+      "agent_note": "Greenfield PWA Digital & Physical School Library"
+    },
+    {
+      "layer": "product",
+      "timestamp": "2026-09-22T20:14:00+08:00",
+      "action": "BRD approved and frozen",
+      "agent_note": "Spesifikasi BRD v1.0 mencakup Hybrid Circulation, E-Book PDF Reader dengan watermark, PWA Offline, dan Akun Lokal CSV."
+    },
+    {
+      "layer": "design",
+      "timestamp": "2026-09-22T20:14:20+08:00",
+      "action": "Design system & UI specs approved",
+      "agent_note": "Design System Modern Academic Minimalist, WCAG AA tokens, Reader sepia/dark themes, dan PWA iOS guide."
+    },
+    {
+      "layer": "engineering",
+      "timestamp": "2026-09-22T20:14:50+08:00",
+      "action": "Architecture blueprint approved",
+      "agent_note": "Modular Monolith, Clean Layered Architecture (Controller -> Service -> Repository), SQLite + Drizzle ORM, React + Vite PWA."
+    },
+    {
+      "layer": "quality",
+      "timestamp": "2026-09-22T20:22:30+08:00",
+      "action": "Quality audit passed",
+      "agent_note": "15 unit & integration tests passing 100%, zero security flaws, PWA offline precache verified."
+    },
+    {
+      "layer": "devops",
+      "timestamp": "2026-09-22T20:23:40+08:00",
+      "action": "Astesia pipeline completed",
+      "agent_note": "Production multi-stage Dockerfile, docker-compose, CI/CD pipeline, and deployment documentation finalized."
+    }
+  ],
+  "decisions": [
+    {
+      "id": "DEC-001",
+      "title": "Hybrid Library Model (Digital & Physical)",
+      "rationale": "Mendukung e-book reading (PDF in-app) sekaligus sirkulasi fisik konvensional (rak, barcode, denda)."
+    },
+    {
+      "id": "DEC-002",
+      "title": "Standardized PDF E-Book with Dynamic Watermark",
+      "rationale": "Format PDF dipilih karena stabilitas rendering di PWA mobile/desktop dan kemudahan proteksi hak cipta via canvas watermark."
+    },
+    {
+      "id": "DEC-003",
+      "title": "Local School Account Management",
+      "rationale": "Import NISN/NIP via CSV tanpa dependensi eksternal SSO."
+    },
+    {
+      "id": "DEC-004",
+      "title": "Modern Academic Minimalist Theme",
+      "rationale": "Palette ramah mata untuk sesi membaca panjang (Sepia/Dark mode) dan Bottom Navigation mobile-first."
+    },
+    {
+      "id": "ADR-001",
+      "title": "SQLite (better-sqlite3) & Drizzle ORM",
+      "rationale": "Embedded single-file DB memudahkan backup sekolah dan memiliki latensi super rendah."
+    },
+    {
+      "id": "ADR-002",
+      "title": "In-App PDF Canvas Rendering with Dynamic Watermark",
+      "rationale": "Menghindari pembajakan file e-book sekolah tanpa memerlukan lisensi DRM pihak ketiga yang mahal."
+    },
+    {
+      "id": "ADR-003",
+      "title": "PWA Service Worker + IndexedDB Offline Strategy",
+      "rationale": "Menyediakan pembacaan luring pada perangkat iOS dan Android."
+    }
+  ],
+  "blocking_issues": [],
+  "metadata": {
+    "tech_stack": {
+      "runtime": "Node.js (TypeScript)",
+      "framework": "Express (API) + React 18 / Vite (PWA)",
+      "database": "SQLite (better-sqlite3) via Drizzle ORM",
+      "frontend": "TailwindCSS + PDF.js Canvas Reader"
+    },
+    "created_at": "2026-09-22T20:13:30+08:00",
+    "last_updated": "2026-09-22T20:23:40+08:00"
+  },
+  "context_paths": {
+    "brd": "./.astesia/brd.md",
+    "design_system": "./.astesia/design-system.md",
+    "architecture": "./.astesia/architecture.md",
+    "test_plan": "./.astesia/qa-test-plan.md",
+    "system_map": "./.astesia/system-map.md",
+    "deployment": "./.astesia/deployment.md"
+  }
+}

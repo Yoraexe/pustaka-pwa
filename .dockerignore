@@ -1,0 +1,10 @@
+node_modules
+.git
+.env
+dist
+coverage
+.astesia/*.log
+uploads/ebooks/*.pdf
+pustaka.db
+pustaka.db-wal
+pustaka.db-shm

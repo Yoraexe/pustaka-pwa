@@ -1,0 +1,8 @@
+node_modules
+dist
+.env
+pustaka.db
+pustaka.db-shm
+pustaka.db-wal
+coverage
+.DS_Store
