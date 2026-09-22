@@ -52,6 +52,16 @@ export default defineConfig({
                 statuses: [0, 200]
               }
             }
+          },
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/circulation/my-loans'),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-loans-cache',
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
           }
         ]
       }

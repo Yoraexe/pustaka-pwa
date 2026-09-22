@@ -30,15 +30,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return;
       }
 
-      try {
-        const profile = await api.getCurrentUser();
-        setUser(profile);
-      } catch {
-        api.logout();
-        setUser(null);
-      } finally {
-        setIsLoading(false);
+      // 1. Muat profil user yang di-cache di localStorage untuk offline availability
+      const cached = localStorage.getItem('pustaka_cached_user');
+      if (cached) {
+        try {
+          setUser(JSON.parse(cached));
+        } catch {
+          // ignore parse error
+        }
       }
+
+      // 2. Jika online, verifikasi ke server
+      if (navigator.onLine) {
+        try {
+          const profile = await api.getCurrentUser();
+          setUser(profile);
+          localStorage.setItem('pustaka_cached_user', JSON.stringify(profile));
+        } catch (err: unknown) {
+          // Hanya logout jika token benar-benar ditolak oleh server (401)
+          if (!api.getToken()) {
+            localStorage.removeItem('pustaka_cached_user');
+            setUser(null);
+          }
+        }
+      }
+
+      setIsLoading(false);
     };
 
     initAuth();
@@ -49,6 +66,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const session = await api.login(input);
       setUser(session.user);
+      localStorage.setItem('pustaka_cached_user', JSON.stringify(session.user));
     } finally {
       setIsLoading(false);
     }
@@ -56,8 +74,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = () => {
     api.logout();
+    localStorage.removeItem('pustaka_cached_user');
     setUser(null);
   };
+
 
   return (
     <AuthContext.Provider

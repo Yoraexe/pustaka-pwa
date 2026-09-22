@@ -81,10 +81,11 @@ bookRouter.get('/:id/stream-pdf', authenticateToken, async (req: Request, res: R
       return;
     }
 
-    // Set header agar browser tidak langsung men-download sebagai file attachment, tapi streaming binary
+    // Set header agar browser mengizinkan caching offline dan streaming inline
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'inline; filename="document.pdf"');
-    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+    res.setHeader('Cache-Control', 'private, max-age=0, must-revalidate');
+    res.setHeader('Content-Length', fs.statSync(fullPath).size);
 
     const stream = fs.createReadStream(fullPath);
     stream.pipe(res);

@@ -7,6 +7,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import type { Book, User } from '../../../shared/types/index.js';
 import { api } from '../../services/api.js';
+import { offlineStorage } from '../../services/offlineStorage.js';
 import {
   ArrowLeft, Sun, Moon, Coffee, ZoomIn, ZoomOut,
   ChevronLeft, ChevronRight, ShieldCheck, DownloadCloud,
@@ -34,28 +35,31 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const watermarkOverlayRef = useRef<HTMLCanvasElement | null>(null);
+  const currentBlobRef = useRef<Blob | null>(null);
 
   const cacheKey = `/api/books/${book.id}/stream-pdf`;
 
-  // 1. Load Real PDF stream from Cache or Server
+  // Cek apakah buku ini sudah tersimpan offline di perangkat
+  useEffect(() => {
+    offlineStorage.isEbookSaved(book.id).then(saved => {
+      setIsSavedOffline(saved);
+    });
+  }, [book.id]);
+
+  // 1. Load Real PDF stream from IndexedDB / Cache API or Server
   useEffect(() => {
     let active = true;
 
     const loadPdfDocument = async () => {
       setIsLoadingPdf(true);
       try {
-        // Cek apakah sudah tersimpan di Cache API
-        let blob: Blob | null = null;
-        if ('caches' in window) {
-          const cache = await caches.open('pustaka-offline-ebooks');
-          const cachedResponse = await cache.match(cacheKey);
-          if (cachedResponse) {
-            blob = await cachedResponse.blob();
-            setIsSavedOffline(true);
-          }
+        // 1. Prioritaskan pengambilan offline-first (IndexedDB & Cache Storage)
+        let blob: Blob | null = await offlineStorage.getEbook(book.id);
+        if (blob) {
+          setIsSavedOffline(true);
         }
 
-        // Jika belum ada di cache, fetch dari server
+        // 2. Jika belum tersimpan lokal dan perangkat online, fetch dari server
         if (!blob) {
           const token = api.getToken();
           const res = await fetch(cacheKey, {
@@ -67,8 +71,12 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
         }
 
         if (active && blob) {
+          currentBlobRef.current = blob;
           const url = URL.createObjectURL(blob);
           setPdfBlobUrl(url);
+        } else if (active && !blob) {
+          // Jika tidak ada blob dan offline, beralih ke canvas reflow mode
+          setViewMode('canvas-theme');
         }
       } catch (err) {
         console.warn('Gagal memuat PDF binary riil, beralih ke canvas preview:', err);
@@ -88,25 +96,25 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
     };
   }, [book.id, cacheKey]);
 
-  // 2. Real Offline Save via Cache Storage API
+  // 2. Real Offline Save via IndexedDB & Cache Storage API
   const handleSaveOffline = async () => {
     try {
-      if (!('caches' in window)) {
-        alert('Browser Anda belum mendukung Cache Storage API.');
-        return;
+      let blob = currentBlobRef.current;
+      if (!blob) {
+        const token = api.getToken();
+        const res = await fetch(cacheKey, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+
+        if (!res.ok) throw new Error('Gagal mengunduh file dari server.');
+        blob = await res.blob();
+        currentBlobRef.current = blob;
       }
 
-      const token = api.getToken();
-      const res = await fetch(cacheKey, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
-
-      if (!res.ok) throw new Error('Gagal mengunduh file dari server.');
-
-      const cache = await caches.open('pustaka-offline-ebooks');
-      await cache.put(cacheKey, res.clone());
+      // Simpan ke IndexedDB & Cache Storage secara redundan
+      await offlineStorage.saveEbook(book.id, book.title, blob);
       setIsSavedOffline(true);
-      alert(`Buku "${book.title}" berhasil diunduh ke Cache Storage lokal. Buku dapat dibaca offline tanpa internet.`);
+      alert(`Buku "${book.title}" berhasil disimpan di perangkat Anda (IndexedDB & Cache API). Anda dapat membacanya secara offline tanpa jaringan internet.`);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Gagal menyimpan offline.');
     }

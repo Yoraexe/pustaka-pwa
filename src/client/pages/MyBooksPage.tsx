@@ -6,9 +6,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api.js';
+import { offlineStorage } from '../services/offlineStorage.js';
 import type { Loan, Book, User } from '../../shared/types/index.js';
 import { PDFReader } from '../components/reader/PDFReader.js';
-import { BookmarkCheck, Clock, BookOpen, RotateCcw, AlertTriangle } from 'lucide-react';
+import {
+  BookmarkCheck, Clock, BookOpen, RotateCcw, AlertTriangle,
+  CheckCircle2, HardDrive, Trash2, Smartphone
+} from 'lucide-react';
 
 interface MyBooksPageProps {
   user: User;
@@ -16,16 +20,49 @@ interface MyBooksPageProps {
 
 export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
   const [activeLoans, setActiveLoans] = useState<Loan[]>([]);
+  const [offlineBooks, setOfflineBooks] = useState<Array<{ id: number; title: string; savedAt: string; size: number }>>([]);
+  const [savedOfflineIds, setSavedOfflineIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [readingBook, setReadingBook] = useState<Book | null>(null);
 
   const fetchMyLoans = async () => {
     setIsLoading(true);
+
+    // 1. Muat data instan dari cache lokal (localStorage)
+    const cachedLoans = localStorage.getItem('pustaka_my_loans_true');
+    if (cachedLoans) {
+      try {
+        setActiveLoans(JSON.parse(cachedLoans));
+      } catch {
+        // ignore
+      }
+    }
+
+    // 2. Muat daftar buku offline dari IndexedDB
     try {
-      const data = await api.getMyLoans(true); // active only
-      setActiveLoans(data);
+      const offlineList = await offlineStorage.getAllOfflineEbooks();
+      setOfflineBooks(offlineList);
+      setSavedOfflineIds(new Set(offlineList.map(b => b.id)));
     } catch (err) {
-      console.error('Gagal mengambil data buku saya:', err);
+      console.warn('Gagal membaca IndexedDB offline books:', err);
+    }
+
+    // 3. Jika online, sinkronkan dengan server perpustakaan
+    try {
+      const data = await api.getMyLoans(true);
+      setActiveLoans(data);
+
+      // Periksa status offline untuk setiap buku pinjaman
+      const offlineIds = new Set<number>();
+      for (const loan of data) {
+        if (loan.loanType === 'DIGITAL') {
+          const isSaved = await offlineStorage.isEbookSaved(loan.bookId);
+          if (isSaved) offlineIds.add(loan.bookId);
+        }
+      }
+      setSavedOfflineIds(prev => new Set([...prev, ...offlineIds]));
+    } catch (err) {
+      console.warn('Tidak dapat menghubungi server (offline mode):', err);
     } finally {
       setIsLoading(false);
     }
@@ -46,12 +83,36 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
     }
   };
 
-  const handleOpenReader = async (bookId: number) => {
+  const handleRemoveOfflineBook = async (bookId: number, title: string) => {
+    if (!confirm(`Hapus salinan offline "${title}" dari perangkat ini?`)) return;
+    await offlineStorage.removeEbook(bookId);
+    fetchMyLoans();
+  };
+
+  const handleOpenReader = async (bookId: number, bookTitle?: string) => {
     try {
       const book = await api.getBookDetail(bookId);
       setReadingBook(book);
-    } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Gagal memuat e-book.');
+    } catch {
+      // Fallback offline jika detail buku belum tercache dari server
+      const loan = activeLoans.find(l => l.bookId === bookId);
+      const offlineItem = offlineBooks.find(b => b.id === bookId);
+
+      const fallbackBook: Book = {
+        id: bookId,
+        categoryId: 1,
+        title: loan?.bookTitle || offlineItem?.title || bookTitle || 'E-Book Pelajaran',
+        author: 'Penulis Buku',
+        publisher: 'Perpustakaan Sekolah',
+        publicationYear: new Date().getFullYear(),
+        bookType: 'DIGITAL_ONLY',
+        digitalLicenseCount: 1,
+        totalPhysicalCopies: 0,
+        availablePhysicalCopies: 0,
+        coverUrl: loan?.bookCover || null,
+        createdAt: new Date().toISOString()
+      };
+      setReadingBook(fallbackBook);
     }
   };
 
@@ -101,9 +162,17 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-2">
                     {loan.loanType === 'DIGITAL' ? (
-                      <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                        E-Book Digital
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          E-Book Digital
+                        </span>
+                        {savedOfflineIds.has(loan.bookId) && (
+                          <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <CheckCircle2 size={10} />
+                            Offline
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       <span className="bg-amber-50 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-full font-mono">
                         Fisik: {loan.copyBarcode}
@@ -138,7 +207,7 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                   {loan.loanType === 'DIGITAL' ? (
                     <>
                       <button
-                        onClick={() => handleOpenReader(loan.bookId)}
+                        onClick={() => handleOpenReader(loan.bookId, loan.bookTitle)}
                         className="flex-1 py-2 px-3 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                       >
                         <BookOpen size={14} />
@@ -164,12 +233,81 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
           })}
         </div>
       ) : (
-        <div className="text-center py-16 bg-surface-card rounded-3xl border border-border-subtle p-8">
-          <BookmarkCheck size={48} className="mx-auto text-slate-300 mb-3" />
-          <h3 className="font-bold text-base text-text-main">Rak buku Anda masih kosong</h3>
-          <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
-            Jelajahi Katalog Buku dan pinjam modul informatika atau buku referensi pelajaran lainnya.
-          </p>
+        offlineBooks.length === 0 && (
+          <div className="text-center py-16 bg-surface-card rounded-3xl border border-border-subtle p-8">
+            <BookmarkCheck size={48} className="mx-auto text-slate-300 mb-3" />
+            <h3 className="font-bold text-base text-text-main">Rak buku Anda masih kosong</h3>
+            <p className="text-xs text-text-muted mt-1 max-w-sm mx-auto">
+              Jelajahi Katalog Buku dan pinjam modul informatika atau buku referensi pelajaran lainnya.
+            </p>
+          </div>
+        )
+      )}
+
+      {/* Offline Storage Shelf Section */}
+      {offlineBooks.length > 0 && (
+        <div className="bg-surface-card p-6 rounded-3xl border border-emerald-200 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <HardDrive size={20} className="text-emerald-600" />
+              <div>
+                <h2 className="font-bold text-sm sm:text-base text-text-main">
+                  Koleksi Tersimpan di Perangkat ({offlineBooks.length} Dokumen)
+                </h2>
+                <p className="text-[11px] text-text-muted">
+                  Tersimpan di memori lokal IndexedDB browser Anda. Dapat dibuka kapan saja tanpa koneksi internet.
+                </p>
+              </div>
+            </div>
+            <span className="text-[11px] text-emerald-800 bg-emerald-100/80 font-bold px-3 py-1 rounded-full flex items-center gap-1.5 self-start sm:self-auto shrink-0">
+              <Smartphone size={13} />
+              Akses PWA Luring Siap
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {offlineBooks.map(item => (
+              <div
+                key={item.id}
+                className="bg-emerald-50/50 border border-emerald-200/80 rounded-2xl p-4 flex flex-col justify-between hover:shadow-sm transition-shadow"
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-1 mb-2">
+                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <CheckCircle2 size={11} />
+                      Tersimpan Offline
+                    </span>
+                    <span className="text-[10px] text-text-muted font-mono">
+                      {(item.size / 1024 / 1024).toFixed(1)} MB
+                    </span>
+                  </div>
+                  <h4 className="font-bold text-xs text-text-main line-clamp-2 leading-snug">
+                    {item.title}
+                  </h4>
+                  <span className="text-[10px] text-text-muted block mt-1.5">
+                    Disimpan: {new Date(item.savedAt).toLocaleDateString('id-ID', { dateStyle: 'medium' })}
+                  </span>
+                </div>
+
+                <div className="mt-3 pt-3 border-t border-emerald-100 flex items-center gap-2">
+                  <button
+                    onClick={() => handleOpenReader(item.id, item.title)}
+                    className="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+                  >
+                    <BookOpen size={14} />
+                    <span>Buka Offline</span>
+                  </button>
+                  <button
+                    onClick={() => handleRemoveOfflineBook(item.id, item.title)}
+                    title="Hapus salinan dari perangkat"
+                    className="p-1.5 border border-emerald-200 hover:bg-red-50 hover:text-red-600 text-text-muted rounded-xl transition-colors"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

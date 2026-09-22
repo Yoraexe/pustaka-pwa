@@ -85,4 +85,24 @@ describe('Pustaka Sekolah API Integration Tests', () => {
       expect(borrowRes.status).toBe(400);
     }
   });
+
+  it('GET /api/books/:id/stream-pdf harus mengembalikan binary PDF dengan header ramah offline cache', async () => {
+    const booksRes = await request(app).get('/api/books');
+    const bookWithPdf = booksRes.body.data.find(
+      (b: { ebookFilePath: string | null }) => !!b.ebookFilePath
+    );
+    expect(bookWithPdf).toBeDefined();
+
+    const pdfRes = await request(app)
+      .get(`/api/books/${bookWithPdf.id}/stream-pdf`)
+      .set('Authorization', `Bearer ${studentToken}`);
+
+    expect(pdfRes.status).toBe(200);
+    expect(pdfRes.headers['content-type']).toBe('application/pdf');
+    // Memastikan tidak ada 'no-store' agar W3C Cache API browser tidak melempar TypeError saat cache.put()
+    expect(pdfRes.headers['cache-control']).not.toContain('no-store');
+    expect(pdfRes.headers['cache-control']).toContain('must-revalidate');
+    expect(pdfRes.headers['content-length']).toBeDefined();
+    expect(Number(pdfRes.headers['content-length'])).toBeGreaterThan(0);
+  });
 });

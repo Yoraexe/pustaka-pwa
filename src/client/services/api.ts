@@ -87,11 +87,35 @@ class ApiClient {
     if (filters.bookType && filters.bookType !== 'ALL') params.set('bookType', filters.bookType);
     if (filters.availableOnly) params.set('availableOnly', 'true');
 
-    return this.request<Book[]>(`/books?${params.toString()}`);
+    const cacheKey = 'pustaka_cached_books';
+    try {
+      const books = await this.request<Book[]>(`/books?${params.toString()}`);
+      if (!filters.search && (!filters.categoryId || filters.categoryId === 0)) {
+        localStorage.setItem(cacheKey, JSON.stringify(books));
+      }
+      return books;
+    } catch (err) {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+      throw err;
+    }
   }
 
   async getBookDetail(id: number): Promise<Book> {
-    return this.request<Book>(`/books/${id}`);
+    const cacheKey = `pustaka_book_${id}`;
+    try {
+      const book = await this.request<Book>(`/books/${id}`);
+      localStorage.setItem(cacheKey, JSON.stringify(book));
+      return book;
+    } catch (err) {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+      throw err;
+    }
   }
 
   // --- Circulation ---
@@ -110,7 +134,18 @@ class ApiClient {
   }
 
   async getMyLoans(activeOnly = false): Promise<Loan[]> {
-    return this.request<Loan[]>(`/circulation/my-loans?active=${activeOnly}`);
+    const cacheKey = `pustaka_my_loans_${activeOnly}`;
+    try {
+      const loans = await this.request<Loan[]>(`/circulation/my-loans?active=${activeOnly}`);
+      localStorage.setItem(cacheKey, JSON.stringify(loans));
+      return loans;
+    } catch (err) {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+      throw err;
+    }
   }
 
   async checkOutPhysicalBook(userIdentity: string, copyBarcode: string): Promise<Loan> {
