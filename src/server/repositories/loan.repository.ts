@@ -150,6 +150,8 @@ export class LoanRepository {
   }
 
   async findAllLoans(limit = 100): Promise<Loan[]> {
+    await this.autoExpireDigitalLoans();
+
     const rows = await db.select({
       loan: loans,
       bookTitle: books.title,
