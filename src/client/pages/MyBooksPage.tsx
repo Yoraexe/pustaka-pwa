@@ -1,6 +1,6 @@
 /**
  * @file src/client/pages/MyBooksPage.tsx
- * @description Halaman 'Rak Buku Saya' dengan Shadcn AlertDialog untuk konfirmasi pengembalian, Sonner toast, dan shelf offline.
+ * @description Halaman 'Rak Buku Saya' dengan arsitektur editorial bersih, Shadcn AlertDialog, bebas dari icon dekoratif.
  * @layer Page Component
  */
 
@@ -22,17 +22,6 @@ import {
   AlertDialogCancel,
 } from '../components/ui/alert-dialog.js';
 import { toast } from 'sonner';
-import {
-  BookmarkCheck,
-  Clock,
-  BookOpen,
-  RotateCcw,
-  AlertTriangle,
-  CheckCircle2,
-  HardDrive,
-  Trash2,
-  Smartphone,
-} from 'lucide-react';
 
 interface MyBooksPageProps {
   user: User;
@@ -45,15 +34,12 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [readingBook, setReadingBook] = useState<Book | null>(null);
 
-  // Alert Dialog State for Return Digital Book
   const [bookToReturn, setBookToReturn] = useState<{ id: number; title: string } | null>(null);
-  // Alert Dialog State for Delete Offline Book
   const [bookToDeleteOffline, setBookToDeleteOffline] = useState<{ id: number; title: string } | null>(null);
 
   const fetchMyLoans = async () => {
     setIsLoading(true);
 
-    // 1. Muat data instan dari cache lokal (localStorage)
     const cachedLoans = localStorage.getItem('pustaka_my_loans_true');
     if (cachedLoans) {
       try {
@@ -63,7 +49,6 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
       }
     }
 
-    // 2. Muat daftar buku offline dari IndexedDB
     try {
       const offlineList = await offlineStorage.getAllOfflineEbooks();
       setOfflineBooks(offlineList);
@@ -72,7 +57,6 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
       console.warn('Gagal membaca IndexedDB offline books:', err);
     }
 
-    // 3. Jika online, sinkronkan dengan server perpustakaan
     try {
       const data = await api.getMyLoans(true);
       setActiveLoans(data);
@@ -155,23 +139,22 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       {/* Page Header */}
-      <div className="bg-card p-6 rounded-3xl border border-border shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="bg-card p-6 sm:p-8 rounded-3xl border border-border shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-2 text-primary text-xs font-bold uppercase tracking-wider mb-1">
-            <BookmarkCheck size={16} />
-            <span>Koleksi Aktif Pengguna</span>
+          <div className="text-primary text-[11px] font-mono font-semibold uppercase tracking-wider mb-1">
+            Koleksi Aktif Siswa & Guru
           </div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground">Rak Buku Saya</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">Rak Buku Saya</h1>
           <p className="text-xs text-muted-foreground mt-1">
             Daftar buku digital dan buku fisik yang sedang aktif Anda pinjam dari perpustakaan sekolah.
           </p>
         </div>
 
-        <div className="bg-primary/5 border border-primary/20 px-4 py-2.5 rounded-2xl text-right shrink-0">
-          <span className="text-[10px] text-muted-foreground block">Buku Sedang Dipinjam:</span>
-          <span className="text-lg font-bold text-primary">
+        <div className="bg-muted/50 border border-border px-4 py-2.5 rounded-2xl text-right shrink-0">
+          <span className="text-[10px] text-muted-foreground block font-medium">Buku Sedang Dipinjam:</span>
+          <span className="text-lg font-bold text-foreground font-mono">
             {activeLoans.length} {user.role === 'TEACHER' ? '/ 5' : '/ 2'} Kuota
           </span>
         </div>
@@ -181,7 +164,7 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
           {[1, 2].map((n) => (
-            <div key={n} className="bg-card rounded-3xl p-5 h-48 border border-border" />
+            <div key={n} className="bg-card rounded-3xl p-5 h-44 border border-border" />
           ))}
         </div>
       ) : activeLoans.length > 0 ? (
@@ -198,32 +181,27 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                 className="bg-card rounded-3xl border border-border shadow-xs p-5 flex flex-col justify-between hover:shadow-md transition-shadow"
               >
                 <div>
-                  <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center justify-between gap-2 mb-3">
                     {loan.loanType === 'DIGITAL' ? (
                       <div className="flex items-center gap-1.5">
                         <Badge variant="ebook">E-Book Digital</Badge>
                         {savedOfflineIds.has(loan.bookId) && (
-                          <Badge variant="success">
-                            <CheckCircle2 size={10} className="mr-0.5" />
-                            Offline
-                          </Badge>
+                          <Badge variant="success">Tersimpan Offline</Badge>
                         )}
                       </div>
                     ) : (
                       <Badge variant="physical" className="font-mono">
-                        Fisik: {loan.copyBarcode}
+                        Barcode: {loan.copyBarcode}
                       </Badge>
                     )}
 
-                    <div className="flex items-center gap-1 text-[11px]">
+                    <div className="text-[11px] font-medium font-mono">
                       {isOverdue ? (
-                        <span className="text-destructive font-bold flex items-center gap-1">
-                          <AlertTriangle size={12} />
+                        <span className="text-destructive font-bold">
                           Terlambat {Math.abs(daysLeft)} Hari
                         </span>
                       ) : (
-                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                          <Clock size={12} />
+                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
                           Sisa {daysLeft} Hari
                         </span>
                       )}
@@ -233,22 +211,21 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                   <h3 className="font-bold text-sm text-foreground line-clamp-2 leading-snug">
                     {loan.bookTitle}
                   </h3>
-                  <p className="text-xs text-muted-foreground mt-1">
+                  <p className="text-xs text-muted-foreground mt-1.5 font-normal">
                     Jatuh Tempo: {dueDate.toLocaleDateString('id-ID', { dateStyle: 'medium' })}
                   </p>
                 </div>
 
                 {/* Actions */}
-                <div className="mt-4 pt-3 border-t border-border flex items-center gap-2">
+                <div className="mt-5 pt-3.5 border-t border-border flex items-center gap-2">
                   {loan.loanType === 'DIGITAL' ? (
                     <>
                       <Button
                         size="sm"
                         onClick={() => handleOpenReader(loan.bookId, loan.bookTitle)}
-                        className="flex-1 gap-1.5 shadow-xs"
+                        className="flex-1 text-xs font-semibold"
                       >
-                        <BookOpen size={14} />
-                        <span>Baca Sekarang</span>
+                        Baca Sekarang
                       </Button>
 
                       <Button
@@ -260,15 +237,14 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                             title: loan.bookTitle || 'E-Book Pelajaran',
                           })
                         }
-                        title="Kembalikan E-Book"
-                        className="px-2.5"
+                        className="text-xs px-3"
                       >
-                        <RotateCcw size={15} />
+                        Kembalikan
                       </Button>
                     </>
                   ) : (
-                    <div className="w-full text-center py-2 text-xs text-muted-foreground bg-muted/50 rounded-xl">
-                      Kembalikan di Meja Pustakawan Sekolah
+                    <div className="w-full text-center py-2 text-xs text-muted-foreground bg-muted/50 rounded-xl font-medium">
+                      Kembalikan di Meja Pustakawan
                     </div>
                   )}
                 </div>
@@ -279,7 +255,6 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
       ) : (
         offlineBooks.length === 0 && (
           <div className="text-center py-16 bg-card rounded-3xl border border-border p-8">
-            <BookmarkCheck size={48} className="mx-auto text-muted-foreground/40 mb-3" />
             <h3 className="font-bold text-base text-foreground">Rak buku Anda masih kosong</h3>
             <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
               Jelajahi Katalog Buku dan pinjam modul informatika atau buku referensi pelajaran lainnya.
@@ -290,26 +265,22 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
 
       {/* Offline Storage Shelf Section */}
       {offlineBooks.length > 0 && (
-        <div className="bg-card p-6 rounded-3xl border border-emerald-500/30 shadow-xs space-y-4">
+        <div className="bg-card p-6 sm:p-7 rounded-3xl border border-emerald-500/30 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <HardDrive size={20} className="text-emerald-600 dark:text-emerald-400" />
-              <div>
-                <h2 className="font-bold text-sm sm:text-base text-foreground">
-                  Koleksi Tersimpan di Perangkat ({offlineBooks.length} Dokumen)
-                </h2>
-                <p className="text-[11px] text-muted-foreground">
-                  Tersimpan di memori lokal IndexedDB browser Anda. Dapat dibuka kapan saja tanpa koneksi internet.
-                </p>
-              </div>
+            <div>
+              <h2 className="font-bold text-sm sm:text-base text-foreground">
+                Dokumen Tersimpan di Perangkat ({offlineBooks.length})
+              </h2>
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                Tersimpan di memori browser IndexedDB. Dapat dibaca kapan saja tanpa koneksi internet.
+              </p>
             </div>
-            <span className="text-[11px] text-emerald-800 dark:text-emerald-200 bg-emerald-500/15 font-bold px-3 py-1 rounded-full flex items-center gap-1.5 self-start sm:self-auto shrink-0 border border-emerald-500/20">
-              <Smartphone size={13} />
-              Akses PWA Luring Siap
+            <span className="text-[11px] text-emerald-800 dark:text-emerald-200 bg-emerald-500/15 font-semibold px-3 py-1 rounded-full self-start sm:self-auto shrink-0 border border-emerald-500/20 font-mono">
+              PWA Offline Siap
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
             {offlineBooks.map((item) => (
               <div
                 key={item.id}
@@ -317,10 +288,7 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
               >
                 <div>
                   <div className="flex items-center justify-between gap-1 mb-2">
-                    <Badge variant="success">
-                      <CheckCircle2 size={11} className="mr-0.5" />
-                      Tersimpan Offline
-                    </Badge>
+                    <Badge variant="success">Tersimpan</Badge>
                     <span className="text-[10px] text-muted-foreground font-mono">
                       {(item.size / 1024 / 1024).toFixed(1)} MB
                     </span>
@@ -328,20 +296,19 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                   <h4 className="font-bold text-xs text-foreground line-clamp-2 leading-snug">
                     {item.title}
                   </h4>
-                  <span className="text-[10px] text-muted-foreground block mt-1.5">
+                  <span className="text-[10px] text-muted-foreground block mt-1.5 font-mono">
                     Disimpan: {new Date(item.savedAt).toLocaleDateString('id-ID', { dateStyle: 'medium' })}
                   </span>
                 </div>
 
-                <div className="mt-3 pt-3 border-t border-emerald-500/15 flex items-center gap-2">
+                <div className="mt-4 pt-3 border-t border-emerald-500/15 flex items-center gap-2">
                   <Button
                     size="sm"
                     variant="emerald"
                     onClick={() => handleOpenReader(item.id, item.title)}
-                    className="flex-1 gap-1.5 shadow-xs"
+                    className="flex-1 text-xs font-semibold"
                   >
-                    <BookOpen size={14} />
-                    <span>Buka Offline</span>
+                    Buka Luring
                   </Button>
                   <Button
                     variant="outline"
@@ -352,10 +319,9 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                         title: item.title,
                       })
                     }
-                    title="Hapus salinan dari perangkat"
-                    className="px-2.5 hover:text-destructive hover:bg-destructive/10 hover:border-destructive/30"
+                    className="text-xs px-3 hover:text-destructive hover:bg-destructive/10 hover:border-destructive/30"
                   >
-                    <Trash2 size={14} />
+                    Hapus
                   </Button>
                 </div>
               </div>

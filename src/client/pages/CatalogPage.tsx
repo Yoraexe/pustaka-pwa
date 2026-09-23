@@ -1,6 +1,6 @@
 /**
  * @file src/client/pages/CatalogPage.tsx
- * @description Halaman utama katalog buku hybrid dengan komponen resmi Aceternity UI (Spotlight, FlipWords, MovingBorder, HoverEffect) dan Shadcn UI.
+ * @description Halaman katalog buku dengan arsitektur tipografi editorial murni, bebas dari icon dekoratif yang berlebihan.
  * @layer Page Component
  */
 
@@ -17,7 +17,6 @@ import { FlipWords } from '../components/ui/flip-words.js';
 import { MovingBorderButton } from '../components/ui/moving-border.js';
 import { HoverEffect } from '../components/ui/card-hover-effect.js';
 import { toast } from 'sonner';
-import { BookOpen, Tablet, PlusCircle, Command, Library, Sparkles, Code2, BookmarkCheck } from 'lucide-react';
 
 interface CatalogPageProps {
   onOpenLogin: () => void;
@@ -66,7 +65,7 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
       const ids = new Set(myLoans.map((l) => l.bookId));
       setBorrowedBookIds(ids);
     } catch {
-      // Abaikan jika unauthenticated
+      // Unauthenticated
     }
   }, [isAuthenticated]);
 
@@ -128,35 +127,34 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
     }
   };
 
-  // Curated spotlight features for the Aceternity HoverEffect section
   const curatedCollections = [
     {
       id: 'informatika',
-      title: 'Modul Informatika & Coding',
-      description: 'Materi struktur data, algoritma komputasional, dan dasar rekayasa perangkat lunak.',
-      icon: <Code2 className="h-5 w-5 text-blue-400" />,
-      badge: 'Kurikulum Baru',
+      indexNumber: '01',
+      title: 'Modul Informatika & Algoritma',
+      description: 'Materi struktur data, berpikir komputasional, dan dasar rekayasa perangkat lunak sekolah.',
+      badge: 'Kurikulum Merdeka',
     },
     {
       id: 'digital',
-      title: 'E-Book Siap Offline PWA',
-      description: 'Dokumen pelajaran PDF in-app dengan watermark resmi siswa dan cache memori lokal.',
-      icon: <Tablet className="h-5 w-5 text-emerald-400" />,
-      badge: 'IndexedDB Ready',
+      indexNumber: '02',
+      title: 'E-Book Pelajaran Siap Offline',
+      description: 'Buku teks resmi PDF dengan proteksi watermark identitas siswa dan cache IndexedDB lokal.',
+      badge: 'PWA Luring',
     },
     {
       id: 'physical',
-      title: 'Sirkulasi Rak Fisik Sekolah',
-      description: 'Lacak ketersediaan eksemplar di rak buku perpustakaan untuk peminjaman langsung.',
-      icon: <BookOpen className="h-5 w-5 text-amber-400" />,
-      badge: 'Lacak Rak',
+      indexNumber: '03',
+      title: 'Sirkulasi Rak Buku Fisik',
+      description: 'Pemantauan ketersediaan eksemplar di rak perpustakaan secara real-time untuk peminjaman langsung.',
+      badge: 'Stok Terdata',
     },
   ];
 
   return (
-    <div className="space-y-8">
-      {/* Aceternity UI Spotlight Hero Section */}
-      <div className="relative rounded-3xl border border-slate-800/80 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-6 sm:p-10 text-white shadow-xl overflow-hidden">
+    <div className="space-y-10">
+      {/* Aceternity UI Spotlight Hero Section (Clean Typography, No Decorative Slop) */}
+      <div className="relative rounded-3xl border border-slate-800/90 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-6 sm:p-12 text-white shadow-xl overflow-hidden">
         {/* Aceternity SVG Spotlight Theater Beam */}
         <Spotlight
           className="-top-40 left-0 md:left-60 md:-top-20"
@@ -164,37 +162,35 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
         />
 
         <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md text-slate-200 text-xs font-semibold mb-4 border border-white/10 shadow-xs">
-            <Library size={14} className="text-amber-300" />
-            <span>Katalog Resmi Perpustakaan Sekolah</span>
+          <div className="inline-block px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-slate-300 text-xs font-mono font-medium mb-4 border border-white/10">
+            Sistem Informasi Perpustakaan Terpadu
           </div>
 
           {/* Aceternity FlipWords Headline */}
-          <h1 className="text-2xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white leading-tight">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white leading-tight">
             Pusat Literasi Digital &{' '}
             <FlipWords
               words={['Informatika', 'Modul Merdeka', 'Buku Pelajaran', 'Koleksi Rak']}
-              className="text-blue-400 font-extrabold"
+              className="text-blue-400 font-extrabold px-0"
             />
           </h1>
 
-          <p className="mt-3 text-xs sm:text-sm text-slate-300 leading-relaxed max-w-2xl">
-            Akses ribuan materi ajar kurikulum sekolah, baca e-book resmi terproteksi watermark secara luring (offline), dan pantau ketersediaan buku fisik di rak perpustakaan secara real-time.
+          <p className="mt-4 text-xs sm:text-sm text-slate-300/90 leading-relaxed max-w-2xl font-normal">
+            Akses materi ajar sekolah secara luring, baca e-book resmi terproteksi hak cipta, dan lacak ketersediaan buku fisik di rak perpustakaan sekolah langsung dari peramban Anda.
           </p>
 
-          {/* Aceternity MovingBorder Button CTA */}
-          <div className="mt-6 flex flex-wrap items-center gap-3">
+          {/* Action CTAs */}
+          <div className="mt-7 flex flex-wrap items-center gap-3">
             {onOpenCommand && (
               <MovingBorderButton
                 borderRadius="0.875rem"
                 duration={3500}
                 onClick={onOpenCommand}
                 containerClassName="h-11"
-                className="bg-slate-950/90 hover:bg-slate-900 text-white font-semibold text-xs px-4 py-2 border-slate-700/60 shadow-sm"
+                className="bg-slate-950/90 hover:bg-slate-900 text-white font-semibold text-xs px-5 py-2 border-slate-700/60 shadow-sm"
               >
-                <Command size={14} className="mr-2 text-blue-400" />
-                <span>Pencarian Cepat Katalog</span>
-                <kbd className="ml-2 text-[10px] bg-white/15 px-1.5 py-0.5 rounded font-mono">⌘K</kbd>
+                <span>Pencarian Cepat</span>
+                <kbd className="ml-2.5 text-[10px] bg-white/15 px-1.5 py-0.5 rounded font-mono">⌘K</kbd>
               </MovingBorderButton>
             )}
 
@@ -202,26 +198,24 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
               variant="outline"
               size="sm"
               onClick={onNavigateToMyBooks}
-              className="h-11 px-4 rounded-xl border-slate-700 bg-slate-900/60 text-slate-200 hover:bg-slate-800 hover:text-white"
+              className="h-11 px-5 rounded-xl border-slate-700 bg-slate-900/60 text-slate-200 hover:bg-slate-800 hover:text-white text-xs font-semibold"
             >
-              <BookmarkCheck size={14} className="mr-1.5 text-emerald-400" />
-              <span>Buka Rak Buku Saya</span>
+              Rak Buku Saya
             </Button>
           </div>
 
           {isAuthenticated && (user?.role === 'LIBRARIAN' || user?.role === 'ADMIN') && (
-            <div className="mt-6 pt-4 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="mt-7 pt-5 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <span className="text-xs text-slate-400 font-medium">
-                Panel Pustakawan: Tambahkan buku cetak fisik atau e-book materi pelajaran baru.
+                Pustakawan: Daftarkan eksemplar fisik atau berkas PDF e-book baru ke basis data.
               </span>
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={() => setIsAddBookOpen(true)}
-                className="self-start sm:self-auto gap-1.5 font-bold shadow-xs bg-white text-slate-900 hover:bg-slate-100"
+                className="self-start sm:self-auto font-semibold text-xs shadow-xs bg-white text-slate-900 hover:bg-slate-100 px-4 py-2"
               >
-                <PlusCircle size={15} className="text-primary" />
-                <span>+ Tambah Koleksi Buku</span>
+                Tambah Koleksi Buku
               </Button>
             </div>
           )}
@@ -231,14 +225,11 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
       {/* Aceternity UI CardHoverEffect for Featured Collections */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Sparkles size={16} className="text-primary" />
-            <h2 className="font-bold text-base text-foreground tracking-tight">
-              Eksplorasi Kurasi Perpustakaan
-            </h2>
-          </div>
+          <h2 className="font-bold text-base text-foreground tracking-tight">
+            Kurasi Pilihan Perpustakaan
+          </h2>
           <span className="text-xs text-muted-foreground hidden sm:inline">
-            Arahkan kursor untuk melihat kategori unggulan
+            Pilih untuk menyaring format buku
           </span>
         </div>
 

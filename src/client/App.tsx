@@ -1,6 +1,6 @@
 /**
  * @file src/client/App.tsx
- * @description Komponen utama aplikasi PWA dengan global Sonner Toaster, shortcut Command Palette (Ctrl+K), dan layout responsive.
+ * @description Komponen utama aplikasi PWA dengan layout editorial bersih, Command Palette, dan Sonner Toaster.
  * @layer Application Root Component
  */
 
@@ -28,7 +28,6 @@ import {
 import { api } from './services/api.js';
 import type { Book } from '../shared/types/index.js';
 import { BookDetailModal } from './components/catalog/BookDetailModal.js';
-import { Shield, User as UserIcon, BookOpen, Layers, BookmarkCheck, LogIn } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const App: React.FC = () => {
@@ -95,20 +94,19 @@ export const App: React.FC = () => {
           isAuthenticated && user ? (
             <MyBooksPage user={user} />
           ) : (
-            <div className="text-center py-20 bg-card rounded-3xl border border-border p-8 max-w-md mx-auto shadow-xs">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
-                <BookOpen size={32} />
-              </div>
+            <div className="text-center py-16 bg-card rounded-3xl border border-border p-8 max-w-md mx-auto shadow-xs">
+              <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest block mb-2">
+                Autentikasi Diperlukan
+              </span>
               <h2 className="text-lg font-bold text-foreground">Masuk untuk Melihat Rak Buku</h2>
-              <p className="text-xs text-muted-foreground mt-1 mb-6 leading-relaxed">
+              <p className="text-xs text-muted-foreground mt-2 mb-6 leading-relaxed">
                 Silakan masuk menggunakan Nomor Induk Siswa Nasional (NISN) atau NIP untuk mengakses buku yang sedang dipinjam.
               </p>
               <Button
                 onClick={() => setIsLoginModalOpen(true)}
-                className="w-full gap-2 shadow-xs"
+                className="w-full text-xs font-semibold py-2.5 shadow-xs"
               >
-                <LogIn size={15} />
-                <span>Masuk Akun Sekarang</span>
+                Masuk Akun Sekarang
               </Button>
             </div>
           )
@@ -118,12 +116,12 @@ export const App: React.FC = () => {
           isAuthenticated && (user?.role === 'LIBRARIAN' || user?.role === 'ADMIN') ? (
             <CirculationDesk />
           ) : (
-            <div className="text-center py-20 bg-card rounded-3xl border border-border p-8 max-w-md mx-auto shadow-xs">
-              <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto mb-4">
-                <Shield size={32} />
-              </div>
-              <h2 className="text-lg font-bold text-foreground">Akses Terbatas</h2>
-              <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+            <div className="text-center py-16 bg-card rounded-3xl border border-border p-8 max-w-md mx-auto shadow-xs">
+              <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 uppercase tracking-widest block mb-2">
+                Hak Akses Terbatas
+              </span>
+              <h2 className="text-lg font-bold text-foreground">Akses Khusus Staf Perpustakaan</h2>
+              <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
                 Halaman Meja Sirkulasi hanya dapat diakses oleh akun Pustakawan atau Administrator sekolah.
               </p>
             </div>
@@ -133,14 +131,14 @@ export const App: React.FC = () => {
         {currentTab === 'profile' && (
           <div className="max-w-md mx-auto bg-card rounded-3xl border border-border shadow-xs p-6">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold text-xl">
-                <UserIcon size={32} />
+              <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold text-lg font-mono">
+                {user?.name?.slice(0, 2).toUpperCase() || 'US'}
               </div>
               <div>
                 <h3 className="font-bold text-base text-foreground">{user?.name}</h3>
                 <p className="text-xs text-muted-foreground font-mono">{user?.identityNumber}</p>
                 <div className="mt-1">
-                  <Badge variant="outline">
+                  <Badge variant="outline" className="font-normal text-[10px]">
                     {user?.role}
                   </Badge>
                 </div>
@@ -171,7 +169,7 @@ export const App: React.FC = () => {
                   description: 'Anda telah berhasil keluar dari akun perpustakaan.',
                 });
               }}
-              className="mt-6 w-full"
+              className="mt-6 w-full text-xs font-semibold"
             >
               Keluar dari Akun
             </Button>
@@ -209,8 +207,7 @@ export const App: React.FC = () => {
                 setIsCommandOpen(false);
               }}
             >
-              <BookOpen className="mr-2 h-4 w-4 text-primary" />
-              <span>Buka Katalog Utama</span>
+              <span>Katalog Utama</span>
             </CommandItem>
             {isAuthenticated && (
               <CommandItem
@@ -219,8 +216,7 @@ export const App: React.FC = () => {
                   setIsCommandOpen(false);
                 }}
               >
-                <BookmarkCheck className="mr-2 h-4 w-4 text-emerald-600" />
-                <span>Buka Rak Buku Saya</span>
+                <span>Rak Buku Saya</span>
               </CommandItem>
             )}
             {isAuthenticated && (user?.role === 'LIBRARIAN' || user?.role === 'ADMIN') && (
@@ -230,8 +226,7 @@ export const App: React.FC = () => {
                   setIsCommandOpen(false);
                 }}
               >
-                <Layers className="mr-2 h-4 w-4 text-amber-600" />
-                <span>Buka Meja Sirkulasi Pustakawan</span>
+                <span>Meja Sirkulasi Pustakawan</span>
               </CommandItem>
             )}
           </CommandGroup>
@@ -250,7 +245,7 @@ export const App: React.FC = () => {
                     <span className="font-semibold text-foreground">{book.title}</span>
                     <span className="text-[11px] text-muted-foreground ml-2">by {book.author}</span>
                   </div>
-                  <Badge variant="outline" className="text-[9px] shrink-0 ml-2">
+                  <Badge variant="outline" className="text-[9px] shrink-0 ml-2 font-normal">
                     {book.bookType === 'DIGITAL_ONLY' ? 'E-Book' : book.bookType === 'PHYSICAL_ONLY' ? 'Fisik' : 'Hybrid'}
                   </Badge>
                 </div>

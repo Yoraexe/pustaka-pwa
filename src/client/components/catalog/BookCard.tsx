@@ -1,6 +1,6 @@
 /**
  * @file src/client/components/catalog/BookCard.tsx
- * @description Kartu buku katalog hybrid dengan CardSpotlight dan BackgroundGradient resmi Aceternity UI, dipadu Shadcn UI Badge & Button.
+ * @description Kartu buku katalog hybrid dengan tipografi tajam, Aceternity CardSpotlight & BackgroundGradient, bebas dari icon dekoratif.
  * @layer Presentation Component
  */
 
@@ -10,7 +10,6 @@ import { CardSpotlight } from '../ui/card-spotlight.js';
 import { BackgroundGradient } from '../ui/background-gradient.js';
 import { Badge } from '../ui/badge.js';
 import { Button } from '../ui/button.js';
-import { Tablet, BookOpen, MapPin, CheckCircle, AlertCircle, Sparkles } from 'lucide-react';
 
 interface BookCardProps {
   book: Book;
@@ -44,47 +43,46 @@ export const BookCard: React.FC<BookCardProps> = ({
             loading="lazy"
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-gradient-to-br from-primary/10 via-muted/40 to-muted/80 text-center">
-            <BookOpen size={36} className="text-primary mb-2 opacity-80" />
+          <div className="w-full h-full flex flex-col items-center justify-center p-5 bg-gradient-to-br from-primary/5 via-muted/30 to-muted/80 text-center">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground/80 mb-2 block">
+              Buku Pelajaran
+            </span>
             <span className="text-xs font-bold text-foreground line-clamp-3 leading-snug">
               {book.title}
             </span>
-            <span className="text-[10px] text-muted-foreground mt-1">{book.author}</span>
+            <span className="text-[10px] text-muted-foreground mt-2 block">{book.author}</span>
           </div>
         )}
 
         {/* Format Badges (Top-Left) */}
-        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 z-20">
+        <div className="absolute top-3 left-3 flex flex-col gap-1 z-20">
           {isHybrid && (
-            <Badge variant="hybrid" className="shadow-xs">
-              <Sparkles size={10} className="mr-0.5 text-indigo-600" />
+            <Badge variant="hybrid" className="shadow-xs font-medium">
               Hybrid
             </Badge>
           )}
           {book.bookType === 'DIGITAL_ONLY' && (
-            <Badge variant="ebook" className="shadow-xs">
-              <Tablet size={10} className="mr-0.5 text-blue-600" />
+            <Badge variant="ebook" className="shadow-xs font-medium">
               E-Book
             </Badge>
           )}
           {book.bookType === 'PHYSICAL_ONLY' && (
-            <Badge variant="physical" className="shadow-xs">
-              <BookOpen size={10} className="mr-0.5 text-amber-600" />
+            <Badge variant="physical" className="shadow-xs font-medium">
               Fisik
             </Badge>
           )}
         </div>
 
         {/* Category Pill (Top-Right) */}
-        <div className="absolute top-2.5 right-2.5 z-20">
-          <span className="bg-background/90 backdrop-blur-md text-foreground text-[10px] font-medium px-2 py-0.5 rounded-full border border-border/80 shadow-xs">
+        <div className="absolute top-3 right-3 z-20">
+          <span className="bg-background/90 backdrop-blur-md text-foreground text-[10px] font-semibold px-2.5 py-0.5 rounded-full border border-border/80 shadow-xs">
             {book.categoryName || 'Umum'}
           </span>
         </div>
       </div>
 
       {/* Book Metadata & Action */}
-      <div className="p-3.5 flex-1 flex flex-col justify-between z-20">
+      <div className="p-4 flex-1 flex flex-col justify-between z-20">
         <div>
           <h3
             onClick={() => onSelectDetail?.(book)}
@@ -93,53 +91,47 @@ export const BookCard: React.FC<BookCardProps> = ({
           >
             {book.title}
           </h3>
-          <p className="text-xs text-muted-foreground mt-1 truncate">
+          <p className="text-xs text-muted-foreground mt-1 truncate font-normal">
             {book.author} • {book.publicationYear}
           </p>
 
           {/* Availability Details */}
-          <div className="mt-2.5 pt-2 border-t border-border/60 text-[11px] space-y-1">
+          <div className="mt-3 pt-2.5 border-t border-border/60 text-[11px] space-y-1">
             {isPhysical && (
-              <div className="flex items-center gap-1.5 text-muted-foreground">
-                <MapPin size={12} className="text-amber-600 dark:text-amber-400 shrink-0" />
-                <span className="truncate">
-                  {book.shelfLocation || 'Rak Meja Pustaka'}
-                  <span className="ml-1 text-[10px] font-semibold text-muted-foreground">
-                    ({book.availablePhysicalCopies}/{book.totalPhysicalCopies} eks)
-                  </span>
+              <div className="text-muted-foreground truncate">
+                <span className="font-medium text-foreground">Rak {book.shelfLocation || 'Utama'}</span>
+                <span className="ml-1 text-[10px] text-muted-foreground">
+                  ({book.availablePhysicalCopies}/{book.totalPhysicalCopies} eks)
                 </span>
               </div>
             )}
 
             {isDigital && (
-              <div className="flex items-center gap-1.5 text-primary font-medium">
-                <CheckCircle size={12} className="shrink-0 text-emerald-600 dark:text-emerald-400" />
-                <span className="truncate">E-Book Digital Siap Baca</span>
+              <div className="text-primary font-medium truncate text-[11px]">
+                E-Book Digital Siap Baca
               </div>
             )}
           </div>
         </div>
 
         {/* Action Button */}
-        <div className="mt-3 pt-2">
+        <div className="mt-3.5 pt-2">
           {isBorrowedByUser ? (
             <Button
               variant="outline"
               size="sm"
               onClick={() => onSelectDetail?.(book)}
-              className="w-full text-emerald-700 dark:text-emerald-300 border-emerald-300/50 bg-emerald-50/50 dark:bg-emerald-950/40 hover:bg-emerald-100/60"
+              className="w-full text-emerald-700 dark:text-emerald-300 border-emerald-300/50 bg-emerald-50/50 dark:bg-emerald-950/40 hover:bg-emerald-100/60 font-semibold text-xs"
             >
-              <CheckCircle size={13} className="mr-1 text-emerald-600" />
-              Sudah Dipinjam (Buka)
+              Sudah Dipinjam
             </Button>
           ) : isDigital ? (
             <Button
               variant="default"
               size="sm"
               onClick={() => onBorrowDigital?.(book)}
-              className="w-full shadow-xs"
+              className="w-full shadow-xs font-semibold text-xs"
             >
-              <Tablet size={13} className="mr-1.5" />
               Pinjam E-Book
             </Button>
           ) : (
@@ -147,10 +139,9 @@ export const BookCard: React.FC<BookCardProps> = ({
               variant="secondary"
               size="sm"
               onClick={() => onSelectDetail?.(book)}
-              className="w-full text-muted-foreground"
+              className="w-full text-muted-foreground font-semibold text-xs"
             >
-              <AlertCircle size={13} className="mr-1 text-amber-600" />
-              Pinjam di Meja Perpus
+              Pinjam di Perpustakaan
             </Button>
           )}
         </div>
@@ -158,7 +149,6 @@ export const BookCard: React.FC<BookCardProps> = ({
     </div>
   );
 
-  // Use Aceternity BackgroundGradient for Hybrid books, and CardSpotlight for others
   if (isHybrid) {
     return (
       <BackgroundGradient

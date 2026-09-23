@@ -1,6 +1,6 @@
 /**
  * @file src/client/components/catalog/BookGrid.tsx
- * @description Komponen grid katalog buku dengan filter format berbasis Tabs Radix UI, input pencarian dengan hint shortcut Ctrl+K, dan kategori chips.
+ * @description Komponen grid katalog buku dengan filter format berbasis Tabs Radix UI, pencarian efisien, bebas dari icon dekoratif.
  * @layer Presentation Component
  */
 
@@ -9,7 +9,7 @@ import type { Book, Category, BookType } from '../../../shared/types/index.js';
 import { BookCard } from './BookCard.js';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs.js';
 import { Button } from '../ui/button.js';
-import { Search, BookOpen, Command } from 'lucide-react';
+import { Search } from 'lucide-react';
 
 interface BookGridProps {
   books: Book[];
@@ -46,25 +46,24 @@ export const BookGrid: React.FC<BookGridProps> = ({
     <div className="space-y-6">
       {/* Search Bar & Fast Filters */}
       <div className="bg-card p-4 sm:p-5 rounded-3xl border border-border shadow-xs space-y-4">
-        {/* Search Input Box with Command Palette Trigger */}
+        {/* Search Input Box */}
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
-            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Cari judul buku, penulis, kurikulum (contoh: Informatika, Algoritma)..."
-              className="w-full pl-10 pr-24 py-2.5 bg-muted/40 border border-border/80 rounded-2xl text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:bg-background transition-all"
+              placeholder="Cari judul buku, pengarang, kurikulum, topik..."
+              className="w-full pl-11 pr-20 py-2.5 bg-muted/40 border border-border/80 rounded-2xl text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:bg-background transition-all"
             />
             {onOpenCommand && (
               <button
                 type="button"
                 onClick={onOpenCommand}
-                className="hidden sm:inline-flex items-center gap-1 absolute right-2.5 top-1/2 -translate-y-1/2 px-2 py-1 rounded-lg bg-background border border-border text-[10px] text-muted-foreground font-mono shadow-xs hover:text-foreground"
+                className="hidden sm:inline-flex items-center absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-lg bg-background border border-border text-[10px] text-muted-foreground font-mono shadow-xs hover:text-foreground"
               >
-                <Command size={10} />
-                <span>K</span>
+                ⌘K
               </button>
             )}
           </div>
@@ -72,12 +71,11 @@ export const BookGrid: React.FC<BookGridProps> = ({
           {onOpenCommand && (
             <Button
               variant="outline"
-              size="icon"
-              className="sm:hidden shrink-0 rounded-2xl"
+              size="sm"
+              className="sm:hidden shrink-0 rounded-2xl font-mono text-xs px-3"
               onClick={onOpenCommand}
-              title="Buka Command Palette"
             >
-              <Command size={16} />
+              ⌘K
             </Button>
           )}
         </div>
@@ -105,8 +103,8 @@ export const BookGrid: React.FC<BookGridProps> = ({
             </TabsList>
           </Tabs>
 
-          <span className="text-[11px] text-muted-foreground hidden md:inline">
-            Menampilkan <strong>{books.length}</strong> buku
+          <span className="text-[11px] text-muted-foreground hidden md:inline font-mono">
+            Total {books.length} Koleksi
           </span>
         </div>
 
@@ -163,7 +161,9 @@ export const BookGrid: React.FC<BookGridProps> = ({
         </div>
       ) : (
         <div className="text-center py-16 bg-card rounded-3xl border border-border p-8">
-          <BookOpen size={48} className="mx-auto text-muted-foreground/40 mb-3" />
+          <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground/80 block mb-2">
+            Pencarian Nihil
+          </span>
           <h4 className="font-bold text-foreground text-base">Tidak ada koleksi buku yang cocok</h4>
           <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto mb-4">
             Coba gunakan kata kunci pencarian yang lain atau reset filter format dan kategori.
@@ -177,6 +177,7 @@ export const BookGrid: React.FC<BookGridProps> = ({
                 onSelectCategory(undefined);
                 onSelectType('ALL');
               }}
+              className="text-xs"
             >
               Reset Filter
             </Button>

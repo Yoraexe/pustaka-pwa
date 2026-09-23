@@ -1,6 +1,6 @@
 /**
  * @file src/client/components/common/Navbar.tsx
- * @description Header navigasi desktop dengan logo sekolah, Command Palette trigger (Ctrl+K), dan peran pengguna.
+ * @description Header navigasi desktop dengan tipografi bersih, pencarian kilat, dan navigasi peran tanpa icon dekoratif.
  * @layer Presentation Component
  */
 
@@ -8,7 +8,7 @@ import React from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import { Button } from '../ui/button.js';
 import { Badge } from '../ui/badge.js';
-import { BookOpen, LogOut, User as UserIcon, Shield, Layers, Search } from 'lucide-react';
+import { LogOut, Search } from 'lucide-react';
 
 interface NavbarProps {
   currentTab: string;
@@ -33,8 +33,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           className="flex items-center gap-3 cursor-pointer select-none"
           onClick={() => onSelectTab('catalog')}
         >
-          <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center text-primary-foreground shadow-xs">
-            <BookOpen size={20} />
+          <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm font-mono shadow-xs">
+            P
           </div>
           <div>
             <span className="font-extrabold text-base sm:text-lg text-foreground tracking-tight leading-none block">
@@ -75,14 +75,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           {isAuthenticated && (user?.role === 'LIBRARIAN' || user?.role === 'ADMIN') && (
             <button
               onClick={() => onSelectTab('circulation')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
                 currentTab === 'circulation'
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
-              <Layers size={15} />
-              <span>Meja Sirkulasi</span>
+              Meja Sirkulasi
             </button>
           )}
         </nav>
@@ -94,10 +93,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={onOpenCommand}
-              className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-border text-xs transition-colors"
+              className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-border text-xs transition-colors"
             >
               <Search size={14} />
-              <span>Cari koleksi...</span>
+              <span>Cari katalog...</span>
               <kbd className="text-[10px] font-mono bg-background border px-1.5 py-0.5 rounded shadow-2xs">
                 ⌘K
               </kbd>
@@ -107,12 +106,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           {isAuthenticated && user ? (
             <div className="flex items-center gap-3">
               <div className="hidden sm:block text-right">
-                <div className="text-xs font-bold text-foreground leading-tight flex items-center justify-end gap-1">
-                  <span>{user.name}</span>
-                  {user.role === 'ADMIN' && <Shield size={12} className="text-destructive" />}
+                <div className="text-xs font-bold text-foreground leading-tight">
+                  {user.name}
                 </div>
                 <div className="mt-0.5">
-                  <Badge variant="outline" className="text-[9px] py-0 px-1.5">
+                  <Badge variant="outline" className="text-[9px] py-0 px-1.5 font-normal">
                     {user.role === 'STUDENT' ? `Siswa • ${user.className || 'Reguler'}` : user.role}
                   </Badge>
                 </div>
@@ -132,10 +130,9 @@ export const Navbar: React.FC<NavbarProps> = ({
               variant="default"
               size="sm"
               onClick={onOpenLogin}
-              className="gap-1.5 shadow-xs"
+              className="shadow-xs text-xs font-semibold px-4"
             >
-              <UserIcon size={14} />
-              <span>Masuk (NISN/NIP)</span>
+              Masuk Akun
             </Button>
           )}
         </div>
