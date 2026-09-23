@@ -1,7 +1,13 @@
 /**
  * @file src/client/components/catalog/BookDetailModal.tsx
- * @description Modal detail buku dengan arsitektur Radix UI Dialog Shadcn, bebas icon dekoratif dan fokus pada kejelasan data.
+ * @description Modal detail buku dengan arsitektur Radix UI Dialog Shadcn, fitur click-to-copy lokasi rak & ISBN, serta bebas icon dekoratif.
  * @layer Presentation Component
+ * 
+ * Tujuan: Menampilkan informasi mendalam mengenai ketersediaan buku fisik di rak dan buku digital, disertai aksi pinjam dan salin metadata.
+ * Caller: src/client/pages/CatalogPage.tsx, src/client/App.tsx (Command Palette)
+ * Dependensi: react, shared/types, Radix UI Dialog, Button, Badge, sonner.
+ * Main Functions: BookDetailModal
+ * Side Effects: Membaca clipboard API, trigger Sonner toast feedback, memanggil callback onBorrowDigital.
  */
 
 import React from 'react';
@@ -16,6 +22,7 @@ import {
 } from '../ui/dialog.js';
 import { Button } from '../ui/button.js';
 import { Badge } from '../ui/badge.js';
+import { toast } from 'sonner';
 
 interface BookDetailModalProps {
   book: Book;
@@ -33,6 +40,16 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
   const isDigital = book.bookType === 'DIGITAL_ONLY' || book.bookType === 'HYBRID';
   const isPhysical = book.bookType === 'PHYSICAL_ONLY' || book.bookType === 'HYBRID';
 
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      toast.success(`${label} Disalin`, {
+        description: `Teks "${text}" telah disalin ke papan klip perangkat.`,
+      });
+    }).catch(() => {
+      toast.info(text);
+    });
+  };
+
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-xl">
@@ -46,7 +63,20 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
           <DialogTitle className="text-xl font-bold">{book.title}</DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground mt-1">
             {book.author} • {book.publisher} ({book.publicationYear})
-            {book.isbn && <span className="block font-mono mt-1 text-foreground/80">ISBN: {book.isbn}</span>}
+            {book.isbn && (
+              <span className="block font-mono mt-1 text-foreground/80">
+                ISBN:{' '}
+                <button
+                  type="button"
+                  onClick={() => handleCopy(book.isbn!, 'Nomor ISBN')}
+                  className="hover:underline hover:text-primary transition-colors cursor-pointer inline-flex items-center gap-1 font-semibold"
+                  title="Klik untuk menyalin nomor ISBN"
+                >
+                  {book.isbn}
+                  <span className="text-[10px] text-muted-foreground font-normal">(Salin)</span>
+                </button>
+              </span>
+            )}
           </DialogDescription>
         </DialogHeader>
 
@@ -71,9 +101,14 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
               <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-xs space-y-2">
                 <div className="flex items-center justify-between">
                   <h4 className="font-bold text-amber-900 dark:text-amber-200">Koleksi Fisik Perpustakaan</h4>
-                  <span className="font-mono text-[11px] bg-background/80 px-2 py-0.5 rounded border border-amber-500/30 text-amber-900 dark:text-amber-200 font-semibold">
-                    Rak: {book.shelfLocation || 'Utama'}
-                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleCopy(book.shelfLocation || 'Utama', 'Kode Lokasi Rak')}
+                    className="font-mono text-[11px] bg-background/80 hover:bg-background px-2 py-0.5 rounded border border-amber-500/30 text-amber-900 dark:text-amber-200 font-semibold cursor-pointer transition-colors shadow-xs"
+                    title="Klik untuk menyalin kode rak"
+                  >
+                    Rak: {book.shelfLocation || 'Utama'} (Salin)
+                  </button>
                 </div>
                 <p className="text-amber-800 dark:text-amber-300/90 leading-relaxed">
                   Tersedia <strong>{book.availablePhysicalCopies}</strong> dari total {book.totalPhysicalCopies} eksemplar fisik di perpustakaan.
@@ -90,7 +125,7 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
                   </span>
                 </div>
                 <p className="text-blue-800 dark:text-blue-300/90 text-[11px] leading-relaxed">
-                  Dapat dibaca langsung di browser atau disimpan luring (IndexedDB) dengan proteksi watermark nama siswa.
+                  Dapat dibaca langsung di browser atau disimpan luring (IndexedDB) dengan proteksi watermark nama siswa dan penyimpanan progres halaman otomatis.
                 </p>
               </div>
             )}

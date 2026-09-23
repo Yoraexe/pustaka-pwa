@@ -2,6 +2,12 @@
  * @file src/client/App.tsx
  * @description Komponen utama aplikasi PWA dengan layout editorial bersih, Command Palette, dan Sonner Toaster.
  * @layer Application Root Component
+ * 
+ * Tujuan: Root komponen aplikasi yang mengatur state navigasi antar tab, otentikasi sesi, shortcut pencarian global (Cmd+K), dan banner offline.
+ * Caller: src/client/main.tsx
+ * Dependensi: react, useAuth, Navbar, BottomNav, OfflineBanner, CatalogPage, MyBooksPage, CirculationDesk, LoginPage, UI components.
+ * Main Functions: App
+ * Side Effects: Mendaftarkan global keydown listener untuk Cmd+K, memuat daftar buku untuk command palette.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -9,7 +15,6 @@ import { useAuth } from './hooks/useAuth.js';
 import { Navbar } from './components/common/Navbar.js';
 import { BottomNav } from './components/common/BottomNav.js';
 import { OfflineBanner } from './components/pwa/OfflineBanner.js';
-import { InstallPromptIOS } from './components/pwa/InstallPromptIOS.js';
 import { CatalogPage } from './pages/CatalogPage.js';
 import { MyBooksPage } from './pages/MyBooksPage.js';
 import { CirculationDesk } from './components/circulation/CirculationDesk.js';
@@ -184,8 +189,7 @@ export const App: React.FC = () => {
         onOpenLogin={() => setIsLoginModalOpen(true)}
       />
 
-      {/* iOS Safari 'Add to Home Screen' Interactive Sheet */}
-      <InstallPromptIOS />
+
 
       {/* Login Modal */}
       {isLoginModalOpen && (

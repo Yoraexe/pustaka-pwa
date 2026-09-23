@@ -1,10 +1,16 @@
 /**
  * @file src/client/components/catalog/BookGrid.tsx
- * @description Komponen grid katalog buku dengan filter format berbasis Tabs Radix UI, pencarian efisien, bebas dari icon dekoratif.
+ * @description Komponen grid katalog buku dengan filter format, filter ketersediaan stok real-time, pengurutan, dan pencarian efisien.
  * @layer Presentation Component
+ * 
+ * Tujuan: Menyajikan daftar koleksi buku terfilter dengan kontrol ketersediaan dan opsi sortir editorial.
+ * Caller: src/client/pages/CatalogPage.tsx
+ * Dependensi: react, shared/types, BookCard, Radix Tabs, Button.
+ * Main Functions: BookGrid
+ * Side Effects: Render list, trigger callback seleksi detail dan peminjaman digital.
  */
 
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Book, Category, BookType } from '../../../shared/types/index.js';
 import { BookCard } from './BookCard.js';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs.js';
@@ -42,6 +48,35 @@ export const BookGrid: React.FC<BookGridProps> = ({
   isLoading,
   onOpenCommand,
 }) => {
+  const [onlyAvailable, setOnlyAvailable] = useState<boolean>(false);
+  const [sortBy, setSortBy] = useState<'latest' | 'title' | 'year'>('latest');
+
+  // Filter & Sortir Buku Real-Time di sisi Klien
+  const displayedBooks = useMemo(() => {
+    let list = [...books];
+
+    // 1. Filter Ketersediaan Nyata (E-Book selalu tersedia, Buku Fisik memiliki eksemplar > 0)
+    if (onlyAvailable) {
+      list = list.filter((b) => {
+        if (b.bookType === 'DIGITAL_ONLY') return true;
+        return b.availablePhysicalCopies > 0;
+      });
+    }
+
+    // 2. Sortir Berdasarkan Opsi
+    list.sort((a, b) => {
+      if (sortBy === 'title') {
+        return a.title.localeCompare(b.title, 'id');
+      }
+      if (sortBy === 'year') {
+        return b.publicationYear - a.publicationYear;
+      }
+      return b.id - a.id;
+    });
+
+    return list;
+  }, [books, onlyAvailable, sortBy]);
+
   return (
     <div className="space-y-6">
       {/* Search Bar & Fast Filters */}
@@ -104,8 +139,41 @@ export const BookGrid: React.FC<BookGridProps> = ({
           </Tabs>
 
           <span className="text-[11px] text-muted-foreground hidden md:inline font-mono">
-            Total {books.length} Koleksi
+            Menampilkan {displayedBooks.length} dari {books.length} Koleksi
           </span>
+        </div>
+
+        {/* Real-time Availability & Sorting Toolbar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-border/60">
+          {/* Checkbox Hanya yang Tersedia */}
+          <label className="inline-flex items-center gap-2 cursor-pointer select-none text-xs text-foreground font-medium">
+            <input
+              type="checkbox"
+              checked={onlyAvailable}
+              onChange={(e) => setOnlyAvailable(e.target.checked)}
+              className="rounded border-border text-primary focus:ring-primary w-4 h-4 accent-primary cursor-pointer"
+            />
+            <span>Hanya Tampilkan yang Tersedia</span>
+            {onlyAvailable && (
+              <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded font-semibold border border-emerald-500/20">
+                Aktif
+              </span>
+            )}
+          </label>
+
+          {/* Sort Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-muted-foreground hidden sm:inline">Urutan:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as 'latest' | 'title' | 'year')}
+              className="bg-muted/50 border border-border/80 rounded-xl px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-medium"
+            >
+              <option value="latest">Terbaru Ditambahkan</option>
+              <option value="title">Judul (A-Z)</option>
+              <option value="year">Tahun Terbit (Terbaru)</option>
+            </select>
+          </div>
         </div>
 
         {/* Category Filter Chips */}
@@ -147,9 +215,9 @@ export const BookGrid: React.FC<BookGridProps> = ({
             </div>
           ))}
         </div>
-      ) : books.length > 0 ? (
+      ) : displayedBooks.length > 0 ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
-          {books.map((book) => (
+          {displayedBooks.map((book) => (
             <BookCard
               key={book.id}
               book={book}
@@ -166,9 +234,11 @@ export const BookGrid: React.FC<BookGridProps> = ({
           </span>
           <h4 className="font-bold text-foreground text-base">Tidak ada koleksi buku yang cocok</h4>
           <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto mb-4">
-            Coba gunakan kata kunci pencarian yang lain atau reset filter format dan kategori.
+            {onlyAvailable
+              ? 'Tidak ada buku yang saat ini berstatus tersedia untuk filter yang dipilih.'
+              : 'Coba gunakan kata kunci pencarian yang lain atau reset filter format dan kategori.'}
           </p>
-          {(searchTerm || selectedCategory !== undefined || selectedType !== 'ALL') && (
+          {(searchTerm || selectedCategory !== undefined || selectedType !== 'ALL' || onlyAvailable) && (
             <Button
               variant="outline"
               size="sm"
@@ -176,10 +246,11 @@ export const BookGrid: React.FC<BookGridProps> = ({
                 onSearchChange('');
                 onSelectCategory(undefined);
                 onSelectType('ALL');
+                setOnlyAvailable(false);
               }}
               className="text-xs"
             >
-              Reset Filter
+              Reset Semua Filter
             </Button>
           )}
         </div>

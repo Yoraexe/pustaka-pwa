@@ -1,7 +1,13 @@
 /**
  * @file src/client/components/reader/PDFReader.tsx
- * @description In-App E-Book Reader dengan dukungan streaming file PDF asli, Cache Storage offline riil, dan watermark canvas siswa.
+ * @description In-App E-Book Reader dengan streaming PDF dokumen resmi, watermark canvas proteksi siswa, cache IndexedDB offline, dan auto-save bookmark progres membaca.
  * @layer Presentation Component
+ * 
+ * Tujuan: Menyediakan antarmuka pembaca dokumen PDF terproteksi dengan pencatatan progres baca siswa secara persisten.
+ * Caller: src/client/pages/MyBooksPage.tsx
+ * Dependensi: react, src/client/services/api.ts, src/client/services/offlineStorage.ts, shared/types
+ * Main Functions: PDFReader
+ * Side Effects: Membaca/menulis localStorage untuk bookmark progres baca, membaca/menulis IndexedDB untuk salinan offline, HTTP GET stream PDF.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -9,10 +15,10 @@ import type { Book, User } from '../../../shared/types/index.js';
 import { api } from '../../services/api.js';
 import { offlineStorage } from '../../services/offlineStorage.js';
 import {
-  ArrowLeft, Sun, Moon, Coffee, ZoomIn, ZoomOut,
-  ChevronLeft, ChevronRight, ShieldCheck, DownloadCloud,
-  FileText, CheckCircle2, Loader2
+  ArrowLeft, ShieldCheck, DownloadCloud,
+  FileText, CheckCircle2, Loader2, Bookmark
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface PDFReaderProps {
   book: Book;
@@ -20,46 +26,63 @@ interface PDFReaderProps {
   onClose: () => void;
 }
 
-type ReaderTheme = 'light' | 'sepia' | 'dark';
-type ViewMode = 'real-pdf' | 'canvas-theme';
+interface ReadingProgress {
+  page: number;
+  updatedAt: string;
+}
 
 export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => {
-  const [viewMode, setViewMode] = useState<ViewMode>('real-pdf');
-  const [theme, setTheme] = useState<ReaderTheme>('sepia');
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [totalPages] = useState<number>(14);
-  const [zoomScale, setZoomScale] = useState<number>(1.0);
   const [isSavedOffline, setIsSavedOffline] = useState<boolean>(false);
   const [isLoadingPdf, setIsLoadingPdf] = useState<boolean>(true);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
 
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Real Reading Progress & Bookmark
+  const storageKey = `pustaka_progress_${user.id}_${book.id}`;
+  const [savedProgress, setSavedProgress] = useState<ReadingProgress | null>(null);
+  const [currentPageInput, setCurrentPageInput] = useState<number>(1);
+  const [activePage, setActivePage] = useState<number>(1);
+
   const watermarkOverlayRef = useRef<HTMLCanvasElement | null>(null);
   const currentBlobRef = useRef<Blob | null>(null);
 
   const cacheKey = `/api/books/${book.id}/stream-pdf`;
 
-  // Cek apakah buku ini sudah tersimpan offline di perangkat
+  // 1. Inisialisasi Bookmark Progres Membaca dari localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        const parsed: ReadingProgress = JSON.parse(stored);
+        setSavedProgress(parsed);
+        setCurrentPageInput(parsed.page);
+        setActivePage(parsed.page);
+      }
+    } catch {
+      // Abaikan jika localStorage tidak valid
+    }
+  }, [storageKey]);
+
+  // Cek apakah buku sudah tersimpan di IndexedDB perangkat
   useEffect(() => {
     offlineStorage.isEbookSaved(book.id).then(saved => {
       setIsSavedOffline(saved);
     });
   }, [book.id]);
 
-  // 1. Load Real PDF stream from IndexedDB / Cache API or Server
+  // 2. Muat Berkas PDF Riil dari IndexedDB atau Server Streaming
   useEffect(() => {
     let active = true;
 
     const loadPdfDocument = async () => {
       setIsLoadingPdf(true);
       try {
-        // 1. Prioritaskan pengambilan offline-first (IndexedDB & Cache Storage)
+        // Prioritaskan cache offline (IndexedDB & Cache API)
         let blob: Blob | null = await offlineStorage.getEbook(book.id);
         if (blob) {
           setIsSavedOffline(true);
         }
 
-        // 2. Jika belum tersimpan lokal dan perangkat online, fetch dari server
+        // Jika belum ada di lokal dan online, unduh dari server streaming
         if (!blob) {
           const token = api.getToken();
           const res = await fetch(cacheKey, {
@@ -74,13 +97,9 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
           currentBlobRef.current = blob;
           const url = URL.createObjectURL(blob);
           setPdfBlobUrl(url);
-        } else if (active && !blob) {
-          // Jika tidak ada blob dan offline, beralih ke canvas reflow mode
-          setViewMode('canvas-theme');
         }
       } catch (err) {
-        console.warn('Gagal memuat PDF binary riil, beralih ke canvas preview:', err);
-        setViewMode('canvas-theme');
+        console.warn('Gagal memuat PDF stream riil:', err);
       } finally {
         if (active) setIsLoadingPdf(false);
       }
@@ -96,7 +115,26 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
     };
   }, [book.id, cacheKey]);
 
-  // 2. Real Offline Save via IndexedDB & Cache Storage API
+  // 3. Simpan Progres Halaman Terakhir ke localStorage
+  const handleSaveProgress = (pageToSave: number) => {
+    if (pageToSave < 1) return;
+    const progressData: ReadingProgress = {
+      page: pageToSave,
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      localStorage.setItem(storageKey, JSON.stringify(progressData));
+      setSavedProgress(progressData);
+      setActivePage(pageToSave);
+      toast.success('Progres Tersimpan', {
+        description: `Posisi baca tersimpan di Halaman ${pageToSave}.`,
+      });
+    } catch {
+      toast.error('Gagal Menyimpan Progres');
+    }
+  };
+
+  // 4. Unduh & Simpan ke Penyimpanan Offline (IndexedDB)
   const handleSaveOffline = async () => {
     try {
       let blob = currentBlobRef.current;
@@ -106,21 +144,22 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         });
 
-        if (!res.ok) throw new Error('Gagal mengunduh file dari server.');
+        if (!res.ok) throw new Error('Gagal mengunduh berkas e-book dari server.');
         blob = await res.blob();
         currentBlobRef.current = blob;
       }
 
-      // Simpan ke IndexedDB & Cache Storage secara redundan
       await offlineStorage.saveEbook(book.id, book.title, blob);
       setIsSavedOffline(true);
-      alert(`Buku "${book.title}" berhasil disimpan di perangkat Anda (IndexedDB & Cache API). Anda dapat membacanya secara offline tanpa jaringan internet.`);
+      toast.success('Buku Tersimpan Luring', {
+        description: `"${book.title}" tersimpan di memori perangkat. Anda dapat membacanya tanpa koneksi internet.`,
+      });
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Gagal menyimpan offline.');
+      toast.error(err instanceof Error ? err.message : 'Gagal menyimpan berkas luring.');
     }
   };
 
-  // 3. Render Canvas Watermark Overlay (Anti-Leak Layer)
+  // 5. Watermark Proteksi Anti-Bocor (Canvas Overlay)
   useEffect(() => {
     const wmCanvas = watermarkOverlayRef.current;
     if (!wmCanvas) return;
@@ -137,250 +176,141 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
     ctx.save();
     ctx.translate(width / 2, height / 2);
     ctx.rotate(-Math.PI / 4);
-    ctx.font = `bold 16px 'Plus Jakarta Sans', sans-serif`;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.08)';
+    ctx.font = `bold 14px 'Plus Jakarta Sans', sans-serif`;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
     ctx.textAlign = 'center';
 
     const wmText = `PERPUSTAKAAN SEKOLAH • ${user.name.toUpperCase()} (${user.identityNumber})`;
-    for (let y = -400; y <= 400; y += 120) {
+    for (let y = -450; y <= 450; y += 110) {
       ctx.fillText(wmText, 0, y);
     }
     ctx.restore();
-  }, [user, viewMode]);
+  }, [user]);
 
-  // 4. Render Reflowable Sepia/Dark Canvas Theme
-  useEffect(() => {
-    if (viewMode !== 'canvas-theme') return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const width = 600 * zoomScale;
-    const height = 800 * zoomScale;
-    canvas.width = width;
-    canvas.height = height;
-
-    if (theme === 'sepia') {
-      ctx.fillStyle = '#FBF0D9';
-    } else if (theme === 'dark') {
-      ctx.fillStyle = '#0F172A';
-    } else {
-      ctx.fillStyle = '#FFFFFF';
-    }
-    ctx.fillRect(0, 0, width, height);
-
-    const textColor = theme === 'dark' ? '#E2E8F0' : theme === 'sepia' ? '#433422' : '#1E293B';
-    ctx.fillStyle = textColor;
-
-    ctx.font = `bold ${16 * zoomScale}px 'Plus Jakarta Sans', sans-serif`;
-    ctx.fillText(`${book.title.toUpperCase()}`, 40 * zoomScale, 50 * zoomScale);
-    ctx.font = `${11 * zoomScale}px 'Plus Jakarta Sans', sans-serif`;
-    ctx.fillStyle = theme === 'dark' ? '#94A3B8' : '#78716C';
-    ctx.fillText(`BAB ${currentPage}: Landasan Berpikir Komputasional & Informatika`, 40 * zoomScale, 70 * zoomScale);
-
-    ctx.strokeStyle = theme === 'dark' ? '#334155' : '#E7E5E4';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(40 * zoomScale, 85 * zoomScale);
-    ctx.lineTo((width - 40) * zoomScale, 85 * zoomScale);
-    ctx.stroke();
-
-    ctx.fillStyle = textColor;
-    ctx.font = `${13 * zoomScale}px 'Plus Jakarta Sans', serif`;
-    const lines = [
-      `1.1 Pengantar Informatika dan Masyarakat Digital`,
-      ``,
-      `Pada era transformasi digital saat ini, pemahaman mendalam tentang`,
-      `arsitektur sistem komputer, algoritma, serta etika digital menjadi fondasi utama`,
-      `dalam kurikulum sekolah menengah. Kemampuan bernalar kritis melalui dekomposisi`,
-      `masalah (computational thinking) membantu siswa merancang solusi perangkat lunak`,
-      `yang modular, efisien, dan memiliki skalabilitas tinggi.`,
-      ``,
-      `Karakteristik Utama Sistem Digital Berbasis PWA:`,
-      `• Multi-Platform: Berjalan seragam di Web, Android (WebAPK), dan iOS (Safari Standalone).`,
-      `• Offline First: Memanfaatkan Service Worker untuk caching asset dan IndexedDB.`,
-      `• Secure In-App Reading: Perlindungan hak cipta materi sekolah via canvas watermark.`,
-      ``,
-      `Latihan Pemahaman ${currentPage}.1:`,
-      `Jelaskan mengapa pemisahan tanggung jawab (Clean Layered Architecture)`,
-      `antara Controller, Service, dan Repository sangat penting dalam mencegah technical debt!`,
-      ``,
-      `[Halaman ${currentPage} dari ${totalPages}]`
-    ];
-
-    let yOffset = 120 * zoomScale;
-    for (const line of lines) {
-      ctx.fillText(line, 40 * zoomScale, yOffset);
-      yOffset += 24 * zoomScale;
-    }
-  }, [currentPage, zoomScale, theme, book, viewMode]);
+  const targetPdfUrl = pdfBlobUrl ? `${pdfBlobUrl}#page=${activePage}&toolbar=1&navpanes=0` : null;
 
   return (
-    <div className={`fixed inset-0 z-50 flex flex-col select-none ${
-      theme === 'dark' ? 'bg-slate-950 text-slate-100' : theme === 'sepia' ? 'bg-[#F2E8CE] text-[#433422]' : 'bg-slate-100 text-slate-900'
-    }`}>
-      {/* Top Header Controls */}
-      <header className="h-14 px-4 border-b border-black/10 flex items-center justify-between backdrop-blur-md bg-opacity-90 sticky top-0 z-20">
+    <div className="fixed inset-0 z-50 flex flex-col bg-slate-900 text-slate-100 select-none">
+      {/* Top Header Navigation */}
+      <header className="h-14 px-3 sm:px-6 border-b border-slate-800 flex items-center justify-between bg-slate-950/90 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-3">
           <button
             onClick={onClose}
-            className="p-2 rounded-xl hover:bg-black/5 transition-colors flex items-center gap-1.5 text-xs font-semibold"
+            className="p-2 rounded-xl hover:bg-white/10 transition-colors flex items-center gap-1.5 text-xs font-semibold text-slate-200"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={16} />
             <span className="hidden sm:inline">Kembali</span>
           </button>
-          <div className="truncate max-w-[160px] sm:max-w-xs md:max-w-md">
-            <h2 className="font-bold text-xs sm:text-sm truncate">{book.title}</h2>
-            <div className="flex items-center gap-1 text-[10px] opacity-70">
-              <ShieldCheck size={11} className="text-emerald-500 shrink-0" />
-              <span>Proteksi Watermark: {user.name}</span>
+          <div className="truncate max-w-[150px] sm:max-w-xs md:max-w-md">
+            <h2 className="font-bold text-xs sm:text-sm truncate text-white">{book.title}</h2>
+            <div className="flex items-center gap-1 text-[10px] text-slate-400">
+              <ShieldCheck size={11} className="text-emerald-400 shrink-0" />
+              <span className="truncate">Proteksi Hak Cipta: {user.name}</span>
             </div>
           </div>
         </div>
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
-          {/* Mode Switcher */}
-          <div className="flex items-center bg-black/5 rounded-lg p-0.5 text-xs font-semibold">
+          {/* Bookmark Quick Save */}
+          <div className="flex items-center bg-slate-800/80 rounded-xl px-2 py-1 border border-slate-700 text-xs">
+            <span className="text-[11px] text-slate-400 mr-1.5 hidden sm:inline">Hlm:</span>
+            <input
+              type="number"
+              min={1}
+              value={currentPageInput}
+              onChange={(e) => setCurrentPageInput(Math.max(1, parseInt(e.target.value) || 1))}
+              className="w-12 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-center text-xs font-mono text-white focus:outline-none focus:border-primary-500"
+            />
             <button
-              onClick={() => setViewMode('real-pdf')}
-              className={`px-2.5 py-1 rounded-md transition-all ${
-                viewMode === 'real-pdf' ? 'bg-white text-primary-700 shadow-xs' : 'opacity-60'
-              }`}
+              onClick={() => handleSaveProgress(currentPageInput)}
+              className="ml-1.5 p-1 rounded hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+              title="Simpan Bookmark Halaman"
             >
-              PDF Asli
-            </button>
-            <button
-              onClick={() => setViewMode('canvas-theme')}
-              className={`px-2.5 py-1 rounded-md transition-all ${
-                viewMode === 'canvas-theme' ? 'bg-white text-primary-700 shadow-xs' : 'opacity-60'
-              }`}
-            >
-              Reflow Tema
+              <Bookmark size={14} className={savedProgress?.page === currentPageInput ? 'text-amber-400 fill-amber-400' : ''} />
             </button>
           </div>
 
-          {/* Theme Toggles (for canvas mode) */}
-          {viewMode === 'canvas-theme' && (
-            <div className="hidden sm:flex items-center bg-black/5 rounded-lg p-0.5">
-              <button
-                onClick={() => setTheme('light')}
-                className={`p-1.5 rounded-md ${theme === 'light' ? 'bg-white shadow-xs' : 'opacity-60'}`}
-              >
-                <Sun size={14} />
-              </button>
-              <button
-                onClick={() => setTheme('sepia')}
-                className={`p-1.5 rounded-md ${theme === 'sepia' ? 'bg-[#FBF0D9] text-[#433422] shadow-xs' : 'opacity-60'}`}
-              >
-                <Coffee size={14} />
-              </button>
-              <button
-                onClick={() => setTheme('dark')}
-                className={`p-1.5 rounded-md ${theme === 'dark' ? 'bg-slate-800 text-white shadow-xs' : 'opacity-60'}`}
-              >
-                <Moon size={14} />
-              </button>
-            </div>
-          )}
-
-          {/* Real Offline Download Button */}
+          {/* Real Offline Download */}
           <button
             onClick={handleSaveOffline}
-            className={`p-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors ${
-              isSavedOffline ? 'text-emerald-700 bg-emerald-100' : 'bg-primary-600 text-white hover:bg-primary-700'
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+              isSavedOffline
+                ? 'text-emerald-300 bg-emerald-950/80 border border-emerald-700/60'
+                : 'bg-primary-600 text-white hover:bg-primary-500'
             }`}
           >
-            {isSavedOffline ? <CheckCircle2 size={15} /> : <DownloadCloud size={15} />}
+            {isSavedOffline ? <CheckCircle2 size={14} /> : <DownloadCloud size={14} />}
             <span className="hidden md:inline">{isSavedOffline ? 'Tersimpan Offline' : 'Unduh Offline'}</span>
           </button>
         </div>
       </header>
 
+      {/* Bookmark Resume Notification Strip */}
+      {savedProgress && savedProgress.page > 1 && savedProgress.page !== activePage && (
+        <div className="bg-primary-950/90 border-b border-primary-800/60 px-4 py-2 flex items-center justify-between text-xs text-primary-200">
+          <div className="flex items-center gap-2">
+            <Bookmark size={14} className="text-amber-400 fill-amber-400 shrink-0" />
+            <span>
+              Anda sebelumnya membaca hingga <strong>Halaman {savedProgress.page}</strong> (
+              {new Date(savedProgress.updatedAt).toLocaleDateString('id-ID')}).
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setActivePage(savedProgress.page);
+              setCurrentPageInput(savedProgress.page);
+            }}
+            className="px-2.5 py-1 rounded bg-primary-600 hover:bg-primary-500 text-white font-semibold text-[11px] transition-colors"
+          >
+            Lanjutkan ke Halaman {savedProgress.page}
+          </button>
+        </div>
+      )}
+
       {/* Main Viewport */}
-      <main className="flex-1 overflow-auto relative flex items-center justify-center p-2 sm:p-4">
+      <main className="flex-1 overflow-hidden relative flex items-center justify-center p-2 sm:p-4 bg-slate-950">
         {/* Dynamic Watermark Canvas Overlay (Unselectable) */}
         <canvas
           ref={watermarkOverlayRef}
           className="absolute inset-0 pointer-events-none z-10 w-full h-full"
         />
 
-        {viewMode === 'real-pdf' ? (
-          isLoadingPdf ? (
-            <div className="flex flex-col items-center justify-center gap-2 text-text-muted">
-              <Loader2 size={32} className="animate-spin text-primary-600" />
-              <span className="text-xs font-medium">Memuat dokumen PDF sekolah...</span>
-            </div>
-          ) : pdfBlobUrl ? (
-            <div className="w-full h-full max-w-4xl bg-white rounded-2xl shadow-xl overflow-hidden border border-slate-200">
-              <object
-                data={`${pdfBlobUrl}#toolbar=0&navpanes=0`}
-                type="application/pdf"
-                className="w-full h-full min-h-[500px]"
-              >
-                <iframe
-                  src={pdfBlobUrl}
-                  title="PDF Viewer"
-                  className="w-full h-full min-h-[500px] border-0"
-                />
-              </object>
-            </div>
-          ) : (
-            <div className="text-center p-8 bg-surface-card rounded-2xl max-w-sm">
-              <FileText size={40} className="mx-auto text-slate-400 mb-2" />
-              <h4 className="font-bold text-sm">Dokumen PDF Belum Diunggah</h4>
-              <p className="text-xs text-text-muted mt-1 mb-3">
-                Silakan beralih ke Mode Reflow Tema untuk membaca materi pelajaran.
-              </p>
-              <button
-                onClick={() => setViewMode('canvas-theme')}
-                className="px-4 py-2 bg-primary-600 text-white rounded-xl text-xs font-semibold"
-              >
-                Buka Mode Reflow
-              </button>
-            </div>
-          )
+        {isLoadingPdf ? (
+          <div className="flex flex-col items-center justify-center gap-2 text-slate-400">
+            <Loader2 size={32} className="animate-spin text-primary-500" />
+            <span className="text-xs font-medium">Menyiapkan dokumen e-book terproteksi...</span>
+          </div>
+        ) : targetPdfUrl ? (
+          <div className="w-full h-full max-w-5xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-800">
+            <object
+              data={targetPdfUrl}
+              type="application/pdf"
+              className="w-full h-full min-h-[500px]"
+            >
+              <iframe
+                src={targetPdfUrl}
+                title={book.title}
+                className="w-full h-full min-h-[500px] border-0"
+              />
+            </object>
+          </div>
         ) : (
-          <div className="shadow-2xl rounded-lg overflow-hidden border border-black/10">
-            <canvas ref={canvasRef} className="block max-w-full h-auto" />
+          <div className="text-center p-8 bg-slate-900 border border-slate-800 rounded-3xl max-w-md shadow-xl">
+            <FileText size={44} className="mx-auto text-slate-500 mb-3" />
+            <h4 className="font-bold text-base text-white">Dokumen PDF Belum Tersedia</h4>
+            <p className="text-xs text-slate-400 mt-2 mb-5 leading-relaxed">
+              Berkas PDF untuk buku ini belum diunggah oleh Pustakawan ke basis data perpustakaan. Silakan hubungi meja sirkulasi atau akses koleksi buku digital lainnya.
+            </p>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors"
+            >
+              Tutup Pembaca
+            </button>
           </div>
         )}
       </main>
-
-      {/* Bottom Floating Scrubber for Canvas Mode */}
-      {viewMode === 'canvas-theme' && (
-        <footer className="h-14 px-4 border-t border-black/10 flex items-center justify-between backdrop-blur-md bg-opacity-90 max-w-xl mx-auto w-full rounded-t-2xl">
-          <div className="flex items-center gap-1">
-            <button onClick={() => setZoomScale(s => Math.max(0.7, s - 0.1))} className="p-1.5 rounded-lg hover:bg-black/5">
-              <ZoomOut size={16} />
-            </button>
-            <span className="text-xs font-medium w-12 text-center">{Math.round(zoomScale * 100)}%</span>
-            <button onClick={() => setZoomScale(s => Math.min(1.5, s + 0.1))} className="p-1.5 rounded-lg hover:bg-black/5">
-              <ZoomIn size={16} />
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              disabled={currentPage <= 1}
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              className="p-1.5 rounded-lg hover:bg-black/5 disabled:opacity-30"
-            >
-              <ChevronLeft size={18} />
-            </button>
-            <span className="text-xs font-semibold">{currentPage} / {totalPages}</span>
-            <button
-              disabled={currentPage >= totalPages}
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              className="p-1.5 rounded-lg hover:bg-black/5 disabled:opacity-30"
-            >
-              <ChevronRight size={18} />
-            </button>
-          </div>
-        </footer>
-      )}
     </div>
   );
 };

@@ -16,8 +16,9 @@ import type { Loan, Book, BookCopy } from '../../../shared/types/index.js';
 import { AddBookModal } from '../catalog/AddBookModal.js';
 import {
   QrCode, CheckCircle2, AlertTriangle, ArrowRightLeft, DollarSign,
-  Clock, RefreshCw, PlusCircle, BookOpen, Layers, Tablet, MapPin
+  Clock, RefreshCw, PlusCircle, BookOpen, Layers, Tablet, MapPin, Download
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export const CirculationDesk: React.FC = () => {
   const [activeSubTab, setActiveSubTab] = useState<'checkout' | 'return' | 'new-book'>('checkout');
@@ -104,6 +105,65 @@ export const CirculationDesk: React.FC = () => {
     } catch (err: unknown) {
       setReturnError(err instanceof Error ? err.message : 'Gagal memproses pengembalian.');
     }
+  };
+
+  const handleExportCSV = () => {
+    if (loans.length === 0) {
+      toast.warning('Tidak Ada Data', {
+        description: 'Belum ada transaksi sirkulasi untuk diekspor.',
+      });
+      return;
+    }
+
+    const headers = [
+      'ID Transaksi',
+      'Nama Peminjam',
+      'NISN / NIP',
+      'Judul Buku',
+      'Tipe Sirkulasi',
+      'Barcode Eksemplar',
+      'Tanggal Pinjam',
+      'Jatuh Tempo',
+      'Tanggal Kembali',
+      'Status',
+      'Denda (Rp)',
+    ];
+
+    const escapeCSV = (val: string | number | undefined | null) => {
+      if (val === undefined || val === null) return '""';
+      const s = String(val).replace(/"/g, '""');
+      return `"${s}"`;
+    };
+
+    const rows = loans.map((l) => [
+      l.id,
+      escapeCSV(l.userName || 'Siswa'),
+      escapeCSV(l.userIdentity || '-'),
+      escapeCSV(l.bookTitle || '-'),
+      l.loanType === 'DIGITAL' ? 'E-Book' : 'Fisik',
+      escapeCSV(l.copyBarcode || '-'),
+      new Date(l.borrowDate).toISOString().slice(0, 10),
+      new Date(l.dueDate).toISOString().slice(0, 10),
+      l.returnDate ? new Date(l.returnDate).toISOString().slice(0, 10) : '-',
+      l.status === 'BORROWED' ? 'Dipinjam' : 'Dikembalikan',
+      l.fineAmount || 0,
+    ].join(','));
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    const dateStr = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.setAttribute('download', `laporan-sirkulasi-${dateStr}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success('Ekspor CSV Berhasil', {
+      description: `Laporan sirkulasi (${loans.length} transaksi) berhasil diunduh.`,
+    });
   };
 
   return (
@@ -426,9 +486,20 @@ export const CirculationDesk: React.FC = () => {
 
       {/* Circulation Log Table */}
       <div className="bg-surface-card rounded-2xl border border-border-subtle shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-border-subtle flex items-center justify-between">
-          <h4 className="font-bold text-sm text-text-main">Riwayat Sirkulasi Terbaru</h4>
-          <span className="text-xs text-text-muted font-medium">{loans.length} Transaksi Tercatat</span>
+        <div className="p-4 border-b border-border-subtle flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h4 className="font-bold text-sm text-text-main">Riwayat Sirkulasi Terbaru</h4>
+            <span className="text-xs text-text-muted font-medium">{loans.length} Transaksi Tercatat</span>
+          </div>
+
+          <button
+            onClick={handleExportCSV}
+            className="self-start sm:self-auto px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-xs"
+            title="Unduh seluruh data sirkulasi ke dalam berkas CSV"
+          >
+            <Download size={14} />
+            <span>Ekspor Laporan CSV</span>
+          </button>
         </div>
 
         <div className="overflow-x-auto">

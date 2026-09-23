@@ -1,7 +1,13 @@
 /**
  * @file src/client/pages/CatalogPage.tsx
- * @description Halaman katalog buku dengan arsitektur tipografi editorial murni, bebas dari icon dekoratif yang berlebihan.
+ * @description Halaman katalog buku dengan arsitektur tipografi editorial murni, bebas dari icon dekoratif yang berlebihan dan kurasi palsu.
  * @layer Page Component
+ * 
+ * Tujuan: Menyediakan antarmuka penelusuran, pencarian, dan peminjaman buku sekolah bagi siswa dan guru.
+ * Caller: src/client/App.tsx
+ * Dependensi: react, src/client/services/api.ts, src/client/hooks/useAuth.ts, shared/types, UI components.
+ * Main Functions: CatalogPage
+ * Side Effects: Fetch katalog buku dan kategori via HTTP REST API, mutasi peminjaman digital.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -15,7 +21,6 @@ import { Button } from '../components/ui/button.js';
 import { Spotlight } from '../components/ui/spotlight.js';
 import { FlipWords } from '../components/ui/flip-words.js';
 import { MovingBorderButton } from '../components/ui/moving-border.js';
-import { HoverEffect } from '../components/ui/card-hover-effect.js';
 import { toast } from 'sonner';
 
 interface CatalogPageProps {
@@ -127,29 +132,7 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
     }
   };
 
-  const curatedCollections = [
-    {
-      id: 'informatika',
-      indexNumber: '01',
-      title: 'Modul Informatika & Algoritma',
-      description: 'Materi struktur data, berpikir komputasional, dan dasar rekayasa perangkat lunak sekolah.',
-      badge: 'Kurikulum Merdeka',
-    },
-    {
-      id: 'digital',
-      indexNumber: '02',
-      title: 'E-Book Pelajaran Siap Offline',
-      description: 'Buku teks resmi PDF dengan proteksi watermark identitas siswa dan cache IndexedDB lokal.',
-      badge: 'PWA Luring',
-    },
-    {
-      id: 'physical',
-      indexNumber: '03',
-      title: 'Sirkulasi Rak Buku Fisik',
-      description: 'Pemantauan ketersediaan eksemplar di rak perpustakaan secara real-time untuk peminjaman langsung.',
-      badge: 'Stok Terdata',
-    },
-  ];
+
 
   return (
     <div className="space-y-10">
@@ -222,33 +205,8 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
         </div>
       </div>
 
-      {/* Aceternity UI CardHoverEffect for Featured Collections */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h2 className="font-bold text-base text-foreground tracking-tight">
-            Kurasi Pilihan Perpustakaan
-          </h2>
-          <span className="text-xs text-muted-foreground hidden sm:inline">
-            Pilih untuk menyaring format buku
-          </span>
-        </div>
-
-        <HoverEffect
-          items={curatedCollections}
-          onItemClick={(item) => {
-            if (item.id === 'digital') {
-              setSelectedType('DIGITAL_ONLY');
-            } else if (item.id === 'physical') {
-              setSelectedType('PHYSICAL_ONLY');
-            } else {
-              setSearchTerm('Informatika');
-            }
-          }}
-        />
-      </div>
-
       {/* Main Catalog Grid */}
-      <div className="space-y-4 pt-2">
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="font-bold text-lg text-foreground tracking-tight">
             Katalog Buku Lengkap

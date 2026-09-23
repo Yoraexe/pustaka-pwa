@@ -1,16 +1,23 @@
 /**
  * @file src/client/pages/MyBooksPage.tsx
- * @description Halaman 'Rak Buku Saya' dengan arsitektur editorial bersih, Shadcn AlertDialog, bebas dari icon dekoratif.
+ * @description Halaman 'Rak Buku Saya' dengan manajemen pinjaman aktif, rekam jejak portofolio literasi (riwayat selesai), dan penyimpanan luring IndexedDB.
  * @layer Page Component
+ * 
+ * Tujuan: Menyajikan rak buku personal siswa/guru, memantau batas jatuh tempo, mengakses pembaca e-book, dan melihat portofolio riwayat literasi.
+ * Caller: src/client/App.tsx
+ * Dependensi: react, src/client/services/api.ts, src/client/services/offlineStorage.ts, shared/types, UI components (Tabs, AlertDialog, Button, Badge).
+ * Main Functions: MyBooksPage
+ * Side Effects: Fetch loans via HTTP API, membaca/menghapus IndexedDB offline ebooks, memanggil modal pembaca PDF.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api.js';
 import { offlineStorage } from '../services/offlineStorage.js';
 import type { Loan, Book, User } from '../../shared/types/index.js';
 import { PDFReader } from '../components/reader/PDFReader.js';
 import { Button } from '../components/ui/button.js';
 import { Badge } from '../components/ui/badge.js';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs.js';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -29,26 +36,34 @@ interface MyBooksPageProps {
 
 export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
   const [activeLoans, setActiveLoans] = useState<Loan[]>([]);
+  const [historyLoans, setHistoryLoans] = useState<Loan[]>([]);
   const [offlineBooks, setOfflineBooks] = useState<Array<{ id: number; title: string; savedAt: string; size: number }>>([]);
   const [savedOfflineIds, setSavedOfflineIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [readingBook, setReadingBook] = useState<Book | null>(null);
 
+  const [activeTab, setActiveTab] = useState<string>('active');
   const [bookToReturn, setBookToReturn] = useState<{ id: number; title: string } | null>(null);
   const [bookToDeleteOffline, setBookToDeleteOffline] = useState<{ id: number; title: string } | null>(null);
 
-  const fetchMyLoans = async () => {
+  const maxQuota = user.role === 'TEACHER' ? 5 : 2;
+
+  const fetchMyLoans = useCallback(async () => {
     setIsLoading(true);
 
-    const cachedLoans = localStorage.getItem('pustaka_my_loans_true');
+    // 1. Muat cache lokal jika ada
+    const cachedLoans = localStorage.getItem('pustaka_my_loans_false');
     if (cachedLoans) {
       try {
-        setActiveLoans(JSON.parse(cachedLoans));
+        const parsed: Loan[] = JSON.parse(cachedLoans);
+        setActiveLoans(parsed.filter((l) => l.status === 'BORROWED'));
+        setHistoryLoans(parsed.filter((l) => l.status === 'RETURNED'));
       } catch {
-        // ignore
+        // Abaikan parse error
       }
     }
 
+    // 2. Muat berkas offline dari IndexedDB
     try {
       const offlineList = await offlineStorage.getAllOfflineEbooks();
       setOfflineBooks(offlineList);
@@ -57,12 +72,17 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
       console.warn('Gagal membaca IndexedDB offline books:', err);
     }
 
+    // 3. Ambil data sirkulasi riil (aktif & riwayat selesai) dari server
     try {
-      const data = await api.getMyLoans(true);
-      setActiveLoans(data);
+      const allLoans = await api.getMyLoans(false);
+      const active = allLoans.filter((l) => l.status === 'BORROWED');
+      const finished = allLoans.filter((l) => l.status === 'RETURNED');
+
+      setActiveLoans(active);
+      setHistoryLoans(finished);
 
       const offlineIds = new Set<number>();
-      for (const loan of data) {
+      for (const loan of allLoans) {
         if (loan.loanType === 'DIGITAL') {
           const isSaved = await offlineStorage.isEbookSaved(loan.bookId);
           if (isSaved) offlineIds.add(loan.bookId);
@@ -74,18 +94,18 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchMyLoans();
-  }, []);
+  }, [fetchMyLoans]);
 
   const confirmReturnDigital = async () => {
     if (!bookToReturn) return;
     try {
       await api.returnDigitalBook(bookToReturn.id);
       toast.success('Pengembalian Sukses', {
-        description: `E-book "${bookToReturn.title}" berhasil dikembalikan. Kuota peminjaman Anda telah diperbarui.`,
+        description: `E-book "${bookToReturn.title}" berhasil dikembalikan. Tercatat di portofolio riwayat selesai.`,
       });
       setBookToReturn(null);
       fetchMyLoans();
@@ -101,7 +121,7 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
     try {
       await offlineStorage.removeEbook(bookToDeleteOffline.id);
       toast.info('Salinan Dihapus', {
-        description: `File offline "${bookToDeleteOffline.title}" telah dihapus dari memori perangkat.`,
+        description: `Berkas luring "${bookToDeleteOffline.title}" telah dihapus dari memori perangkat.`,
       });
       setBookToDeleteOffline(null);
       fetchMyLoans();
@@ -117,7 +137,7 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
       const book = await api.getBookDetail(bookId);
       setReadingBook(book);
     } catch {
-      const loan = activeLoans.find((l) => l.bookId === bookId);
+      const loan = [...activeLoans, ...historyLoans].find((l) => l.bookId === bookId);
       const offlineItem = offlineBooks.find((b) => b.id === bookId);
 
       const fallbackBook: Book = {
@@ -140,195 +160,291 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
 
   return (
     <div className="space-y-8">
-      {/* Page Header */}
-      <div className="bg-card p-6 sm:p-8 rounded-3xl border border-border shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      {/* Portfolio Header & Reading Metrics */}
+      <div className="bg-card p-6 sm:p-8 rounded-3xl border border-border shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <div className="text-primary text-[11px] font-mono font-semibold uppercase tracking-wider mb-1">
-            Koleksi Aktif Siswa & Guru
+            Portofolio Literasi Siswa & Guru
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">Rak Buku Saya</h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Daftar buku digital dan buku fisik yang sedang aktif Anda pinjam dari perpustakaan sekolah.
+          <p className="text-xs text-muted-foreground mt-1 max-w-xl">
+            Kelola buku yang sedang aktif dipinjam, tinjau rekam jejak literasi buku yang telah selesai dibaca, dan akses dokumen luring perangkat.
           </p>
         </div>
 
-        <div className="bg-muted/50 border border-border px-4 py-2.5 rounded-2xl text-right shrink-0">
-          <span className="text-[10px] text-muted-foreground block font-medium">Buku Sedang Dipinjam:</span>
-          <span className="text-lg font-bold text-foreground font-mono">
-            {activeLoans.length} {user.role === 'TEACHER' ? '/ 5' : '/ 2'} Kuota
-          </span>
+        {/* 3 Metrics Cards */}
+        <div className="grid grid-cols-3 gap-2.5 sm:gap-4 shrink-0">
+          <div className="bg-muted/40 border border-border p-3 rounded-2xl text-center">
+            <span className="text-[10px] text-muted-foreground block font-medium">Pinjaman Aktif</span>
+            <span className="text-base sm:text-lg font-bold text-foreground font-mono">
+              {activeLoans.length}/{maxQuota}
+            </span>
+          </div>
+
+          <div className="bg-muted/40 border border-border p-3 rounded-2xl text-center">
+            <span className="text-[10px] text-muted-foreground block font-medium">Telah Selesai</span>
+            <span className="text-base sm:text-lg font-bold text-primary font-mono">
+              {historyLoans.length}
+            </span>
+          </div>
+
+          <div className="bg-muted/40 border border-border p-3 rounded-2xl text-center">
+            <span className="text-[10px] text-muted-foreground block font-medium">Siap Luring</span>
+            <span className="text-base sm:text-lg font-bold text-emerald-600 dark:text-emerald-400 font-mono">
+              {offlineBooks.length}
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Active Borrowed Books Cards */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
-          {[1, 2].map((n) => (
-            <div key={n} className="bg-card rounded-3xl p-5 h-44 border border-border" />
-          ))}
-        </div>
-      ) : activeLoans.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-          {activeLoans.map((loan) => {
-            const dueDate = new Date(loan.dueDate);
-            const now = new Date();
-            const daysLeft = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-            const isOverdue = daysLeft < 0;
+      {/* Tabs Navigation: Aktif vs Riwayat Selesai vs Dokumen Offline */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="bg-muted/60 p-1 rounded-2xl h-11 border border-border/80 inline-flex">
+          <TabsTrigger value="active" className="rounded-xl px-4 py-1.5 text-xs font-semibold gap-2">
+            <span>Pinjaman Aktif</span>
+            <span className="text-[10px] font-mono bg-background/80 px-1.5 py-0.2 rounded-full border border-border">
+              {activeLoans.length}
+            </span>
+          </TabsTrigger>
 
-            return (
-              <div
-                key={loan.id}
-                className="bg-card rounded-3xl border border-border shadow-xs p-5 flex flex-col justify-between hover:shadow-md transition-shadow"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    {loan.loanType === 'DIGITAL' ? (
-                      <div className="flex items-center gap-1.5">
-                        <Badge variant="ebook">E-Book Digital</Badge>
-                        {savedOfflineIds.has(loan.bookId) && (
-                          <Badge variant="success">Tersimpan Offline</Badge>
+          <TabsTrigger value="history" className="rounded-xl px-4 py-1.5 text-xs font-semibold gap-2">
+            <span>Riwayat Selesai</span>
+            <span className="text-[10px] font-mono bg-background/80 px-1.5 py-0.2 rounded-full border border-border">
+              {historyLoans.length}
+            </span>
+          </TabsTrigger>
+
+          <TabsTrigger value="offline" className="rounded-xl px-4 py-1.5 text-xs font-semibold gap-2">
+            <span>Tersimpan Luring</span>
+            <span className="text-[10px] font-mono bg-background/80 px-1.5 py-0.2 rounded-full border border-border">
+              {offlineBooks.length}
+            </span>
+          </TabsTrigger>
+        </TabsList>
+
+        {/* TAB 1: Pinjaman Aktif */}
+        <TabsContent value="active" className="space-y-4">
+          {isLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
+              {[1, 2].map((n) => (
+                <div key={n} className="bg-card rounded-3xl p-5 h-44 border border-border" />
+              ))}
+            </div>
+          ) : activeLoans.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+              {activeLoans.map((loan) => {
+                const dueDate = new Date(loan.dueDate);
+                const now = new Date();
+                const daysLeft = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                const isOverdue = daysLeft < 0;
+
+                return (
+                  <div
+                    key={loan.id}
+                    className="bg-card rounded-3xl border border-border shadow-xs p-5 flex flex-col justify-between hover:shadow-md transition-shadow"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        {loan.loanType === 'DIGITAL' ? (
+                          <div className="flex items-center gap-1.5">
+                            <Badge variant="ebook">E-Book Digital</Badge>
+                            {savedOfflineIds.has(loan.bookId) && (
+                              <Badge variant="success">Tersimpan Luring</Badge>
+                            )}
+                          </div>
+                        ) : (
+                          <Badge variant="physical" className="font-mono">
+                            Barcode: {loan.copyBarcode}
+                          </Badge>
                         )}
-                      </div>
-                    ) : (
-                      <Badge variant="physical" className="font-mono">
-                        Barcode: {loan.copyBarcode}
-                      </Badge>
-                    )}
 
-                    <div className="text-[11px] font-medium font-mono">
-                      {isOverdue ? (
-                        <span className="text-destructive font-bold">
-                          Terlambat {Math.abs(daysLeft)} Hari
-                        </span>
+                        <div className="text-[11px] font-medium font-mono">
+                          {isOverdue ? (
+                            <span className="text-destructive font-bold">
+                              Terlambat {Math.abs(daysLeft)} Hari
+                            </span>
+                          ) : (
+                            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                              Sisa {daysLeft} Hari
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <h3 className="font-bold text-sm text-foreground line-clamp-2 leading-snug">
+                        {loan.bookTitle}
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1.5 font-normal">
+                        Jatuh Tempo: {dueDate.toLocaleDateString('id-ID', { dateStyle: 'medium' })}
+                      </p>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="mt-5 pt-3.5 border-t border-border flex items-center gap-2">
+                      {loan.loanType === 'DIGITAL' ? (
+                        <>
+                          <Button
+                            size="sm"
+                            onClick={() => handleOpenReader(loan.bookId, loan.bookTitle)}
+                            className="flex-1 text-xs font-semibold"
+                          >
+                            Baca Sekarang
+                          </Button>
+
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() =>
+                              setBookToReturn({
+                                id: loan.bookId,
+                                title: loan.bookTitle || 'E-Book Pelajaran',
+                              })
+                            }
+                            className="text-xs px-3"
+                          >
+                            Kembalikan
+                          </Button>
+                        </>
                       ) : (
-                        <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
-                          Sisa {daysLeft} Hari
-                        </span>
+                        <div className="w-full text-center py-2 text-xs text-muted-foreground bg-muted/50 rounded-xl font-medium">
+                          Kembalikan di Meja Pustakawan
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-16 bg-card rounded-3xl border border-border p-8">
+              <h3 className="font-bold text-base text-foreground">Tidak ada pinjaman aktif</h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                Anda sedang tidak meminjam buku fisik ataupun e-book. Kunjungi Katalog Buku untuk mulai meminjam.
+              </p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* TAB 2: Riwayat Selesai (Portofolio Literasi) */}
+        <TabsContent value="history" className="space-y-4">
+          {historyLoans.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+              {historyLoans.map((loan) => (
+                <div
+                  key={loan.id}
+                  className="bg-card rounded-3xl border border-border shadow-xs p-5 flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <Badge variant="outline">
+                        {loan.loanType === 'DIGITAL' ? 'E-Book' : 'Buku Fisik'}
+                      </Badge>
+                      <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                        Selesai Dikembalikan
+                      </span>
+                    </div>
+
+                    <h3 className="font-bold text-sm text-foreground line-clamp-2 leading-snug">
+                      {loan.bookTitle}
+                    </h3>
+
+                    <div className="mt-2 space-y-1 text-[11px] text-muted-foreground font-mono">
+                      <div>Dipinjam: {new Date(loan.borrowDate).toLocaleDateString('id-ID')}</div>
+                      {loan.returnDate && (
+                        <div>Kembali: {new Date(loan.returnDate).toLocaleDateString('id-ID')}</div>
                       )}
                     </div>
                   </div>
 
-                  <h3 className="font-bold text-sm text-foreground line-clamp-2 leading-snug">
-                    {loan.bookTitle}
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-1.5 font-normal">
-                    Jatuh Tempo: {dueDate.toLocaleDateString('id-ID', { dateStyle: 'medium' })}
-                  </p>
-                </div>
+                  <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
+                    <span className="text-[11px] text-muted-foreground">
+                      Status Denda: {loan.fineAmount > 0 ? `Rp ${loan.fineAmount.toLocaleString('id-ID')} (Lunas)` : 'Bebas Denda'}
+                    </span>
 
-                {/* Actions */}
-                <div className="mt-5 pt-3.5 border-t border-border flex items-center gap-2">
-                  {loan.loanType === 'DIGITAL' ? (
-                    <>
+                    {loan.loanType === 'DIGITAL' && (
                       <Button
                         size="sm"
+                        variant="ghost"
                         onClick={() => handleOpenReader(loan.bookId, loan.bookTitle)}
-                        className="flex-1 text-xs font-semibold"
+                        className="text-xs font-semibold text-primary hover:text-primary"
                       >
-                        Baca Sekarang
+                        Buka Kembali
                       </Button>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          setBookToReturn({
-                            id: loan.bookId,
-                            title: loan.bookTitle || 'E-Book Pelajaran',
-                          })
-                        }
-                        className="text-xs px-3"
-                      >
-                        Kembalikan
-                      </Button>
-                    </>
-                  ) : (
-                    <div className="w-full text-center py-2 text-xs text-muted-foreground bg-muted/50 rounded-xl font-medium">
-                      Kembalikan di Meja Pustakawan
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        offlineBooks.length === 0 && (
-          <div className="text-center py-16 bg-card rounded-3xl border border-border p-8">
-            <h3 className="font-bold text-base text-foreground">Rak buku Anda masih kosong</h3>
-            <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-              Jelajahi Katalog Buku dan pinjam modul informatika atau buku referensi pelajaran lainnya.
-            </p>
-          </div>
-        )
-      )}
-
-      {/* Offline Storage Shelf Section */}
-      {offlineBooks.length > 0 && (
-        <div className="bg-card p-6 sm:p-7 rounded-3xl border border-emerald-500/30 shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <h2 className="font-bold text-sm sm:text-base text-foreground">
-                Dokumen Tersimpan di Perangkat ({offlineBooks.length})
-              </h2>
-              <p className="text-[11px] text-muted-foreground mt-0.5">
-                Tersimpan di memori browser IndexedDB. Dapat dibaca kapan saja tanpa koneksi internet.
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16 bg-card rounded-3xl border border-border p-8">
+              <h3 className="font-bold text-base text-foreground">Belum ada riwayat selesai</h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                Buku yang telah Anda baca dan kembalikan akan otomatis terdata di sini sebagai catatan rekam literasi sekolah.
               </p>
             </div>
-            <span className="text-[11px] text-emerald-800 dark:text-emerald-200 bg-emerald-500/15 font-semibold px-3 py-1 rounded-full self-start sm:self-auto shrink-0 border border-emerald-500/20 font-mono">
-              PWA Offline Siap
-            </span>
-          </div>
+          )}
+        </TabsContent>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-1">
-            {offlineBooks.map((item) => (
-              <div
-                key={item.id}
-                className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-4 flex flex-col justify-between hover:shadow-xs transition-shadow"
-              >
-                <div>
-                  <div className="flex items-center justify-between gap-1 mb-2">
-                    <Badge variant="success">Tersimpan</Badge>
-                    <span className="text-[10px] text-muted-foreground font-mono">
-                      {(item.size / 1024 / 1024).toFixed(1)} MB
+        {/* TAB 3: Tersimpan Luring (IndexedDB) */}
+        <TabsContent value="offline" className="space-y-4">
+          {offlineBooks.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {offlineBooks.map((item) => (
+                <div
+                  key={item.id}
+                  className="bg-card border border-emerald-500/30 rounded-3xl p-5 flex flex-col justify-between shadow-xs"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-2">
+                      <Badge variant="success">IndexedDB Luring</Badge>
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        {(item.size / 1024 / 1024).toFixed(1)} MB
+                      </span>
+                    </div>
+                    <h4 className="font-bold text-xs text-foreground line-clamp-2 leading-snug">
+                      {item.title}
+                    </h4>
+                    <span className="text-[10px] text-muted-foreground block mt-1.5 font-mono">
+                      Disimpan: {new Date(item.savedAt).toLocaleDateString('id-ID', { dateStyle: 'medium' })}
                     </span>
                   </div>
-                  <h4 className="font-bold text-xs text-foreground line-clamp-2 leading-snug">
-                    {item.title}
-                  </h4>
-                  <span className="text-[10px] text-muted-foreground block mt-1.5 font-mono">
-                    Disimpan: {new Date(item.savedAt).toLocaleDateString('id-ID', { dateStyle: 'medium' })}
-                  </span>
-                </div>
 
-                <div className="mt-4 pt-3 border-t border-emerald-500/15 flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="emerald"
-                    onClick={() => handleOpenReader(item.id, item.title)}
-                    className="flex-1 text-xs font-semibold"
-                  >
-                    Buka Luring
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setBookToDeleteOffline({
-                        id: item.id,
-                        title: item.title,
-                      })
-                    }
-                    className="text-xs px-3 hover:text-destructive hover:bg-destructive/10 hover:border-destructive/30"
-                  >
-                    Hapus
-                  </Button>
+                  <div className="mt-4 pt-3 border-t border-emerald-500/15 flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="emerald"
+                      onClick={() => handleOpenReader(item.id, item.title)}
+                      className="flex-1 text-xs font-semibold"
+                    >
+                      Buka Luring
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setBookToDeleteOffline({
+                          id: item.id,
+                          title: item.title,
+                        })
+                      }
+                      className="text-xs px-3 hover:text-destructive hover:bg-destructive/10 hover:border-destructive/30"
+                    >
+                      Hapus
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16 bg-card rounded-3xl border border-border p-8">
+              <h3 className="font-bold text-base text-foreground">Tidak ada buku tersimpan luring</h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                Buka e-book yang sedang Anda pinjam, lalu tekan tombol "Unduh Offline" untuk menyimpannya ke memori perangkat.
+              </p>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Fullscreen Reader Modal if opened */}
       {readingBook && (
@@ -346,10 +462,10 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Kembalikan E-Book Lebih Awal?</AlertDialogTitle>
+            <AlertDialogTitle>Kembalikan E-Book Sekarang?</AlertDialogTitle>
             <AlertDialogDescription>
               Apakah Anda yakin ingin mengembalikan e-book <strong>"{bookToReturn?.title}"</strong>?
-              Setelah dikembalikan, buku ini akan dilepas dari rak aktif Anda dan kuota peminjaman Anda akan bertambah 1.
+              Buku ini akan dipindahkan ke tab <em>Riwayat Selesai</em> dan kuota pinjaman Anda akan bertambah 1.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -370,8 +486,8 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Salinan Offline?</AlertDialogTitle>
             <AlertDialogDescription>
-              Hapus file e-book <strong>"{bookToDeleteOffline?.title}"</strong> dari penyimpanan lokal IndexedDB perangkat ini?
-              Anda tetap dapat mengunduhnya kembali saat terhubung ke jaringan internet perpustakaan.
+              Hapus berkas e-book <strong>"{bookToDeleteOffline?.title}"</strong> dari penyimpanan lokal IndexedDB perangkat ini?
+              Anda tetap dapat mengunduhnya kembali sewaktu-waktu saat terhubung ke jaringan internet.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
