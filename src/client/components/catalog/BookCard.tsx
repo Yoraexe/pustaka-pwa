@@ -7,7 +7,6 @@
 import React from 'react';
 import type { Book } from '../../../shared/types/index.js';
 import { CardSpotlight } from '../ui/card-spotlight.js';
-import { BackgroundGradient } from '../ui/background-gradient.js';
 import { Badge } from '../ui/badge.js';
 import { Button } from '../ui/button.js';
 
@@ -149,20 +148,9 @@ export const BookCard: React.FC<BookCardProps> = ({
     </div>
   );
 
-  if (isHybrid) {
-    return (
-      <BackgroundGradient
-        className="rounded-[22px] p-0.5 bg-card h-full"
-        containerClassName="h-full"
-      >
-        {cardContent}
-      </BackgroundGradient>
-    );
-  }
-
   return (
     <CardSpotlight
-      className="flex flex-col justify-between group hover:shadow-md transition-all duration-200 border-border bg-card h-full"
+      className="flex flex-col justify-between group hover:shadow-md transition-all duration-200 border-border bg-card h-full min-w-0"
       radius={240}
       color="rgba(59, 130, 246, 0.12)"
     >

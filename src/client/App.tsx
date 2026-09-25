@@ -71,7 +71,7 @@ export const App: React.FC = () => {
   }, [isCommandOpen, commandBooks.length]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground pb-20 md:pb-10 selection:bg-primary/20 selection:text-primary">
+    <div className="min-h-screen w-full overflow-x-hidden flex flex-col bg-background text-foreground pb-20 md:pb-10 selection:bg-primary/20 selection:text-primary">
       {/* Sonner Toast Notification Root */}
       <Toaster richColors position="top-right" />
 
@@ -87,7 +87,7 @@ export const App: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="flex-1 w-full min-w-0 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {currentTab === 'catalog' && (
           <CatalogPage
             onOpenLogin={() => setIsLoginModalOpen(true)}

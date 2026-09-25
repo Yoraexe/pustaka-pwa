@@ -23,7 +23,7 @@ export const BentoGrid = ({
   return (
     <div
       className={cn(
-        'grid grid-cols-1 md:grid-cols-3 gap-4 max-w-7xl mx-auto',
+        'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 w-full min-w-0',
         className
       )}
     >
@@ -53,29 +53,29 @@ export const BentoGridItem = ({
     <div
       onClick={onClick}
       className={cn(
-        'group/bento relative overflow-hidden rounded-3xl p-6 bg-card border border-border/80 hover:border-primary/40 hover:shadow-md transition-all duration-300 flex flex-col justify-between cursor-pointer select-none',
+        'group/bento relative overflow-hidden rounded-2xl p-4 sm:p-5 bg-card border border-border hover:border-primary/40 hover:shadow-md transition-all duration-300 flex flex-col justify-between cursor-pointer select-none min-w-0 w-full',
         className
       )}
     >
       {/* Background subtle hover glow */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover/bento:opacity-100 transition-opacity duration-300 pointer-events-none" />
 
-      {header && <div className="mb-4 relative z-10">{header}</div>}
+      {header && <div className="mb-3 relative z-10">{header}</div>}
 
-      <div className="relative z-10 flex flex-col justify-between flex-1">
-        <div>
-          {badge && <div className="mb-3">{badge}</div>}
-          <h3 className="font-bold text-base text-foreground tracking-tight group-hover/bento:text-primary transition-colors">
+      <div className="relative z-10 flex flex-col justify-between flex-1 min-w-0">
+        <div className="min-w-0">
+          {badge && <div className="mb-2.5">{badge}</div>}
+          <h3 className="font-bold text-sm text-foreground tracking-tight group-hover/bento:text-primary transition-colors truncate">
             {title}
           </h3>
-          <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+          <p className="text-xs text-muted-foreground mt-1 leading-relaxed line-clamp-2">
             {description}
           </p>
         </div>
 
-        <div className="mt-5 pt-3 border-t border-border/60 flex items-center justify-between text-xs font-semibold text-primary">
-          <span>{actionText}</span>
-          <span className="group-hover/bento:translate-x-1 transition-transform">→</span>
+        <div className="mt-3.5 pt-2.5 border-t border-border/60 flex items-center justify-between text-xs font-semibold text-primary">
+          <span className="truncate">{actionText}</span>
+          <span className="group-hover/bento:translate-x-1 transition-transform shrink-0 ml-1">→</span>
         </div>
       </div>
     </div>

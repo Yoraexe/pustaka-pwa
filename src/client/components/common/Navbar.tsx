@@ -26,11 +26,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { user, logout, isAuthenticated } = useAuth();
 
   return (
-    <header className="bg-card border-b border-border sticky top-0 z-30 shadow-2xs backdrop-blur-md bg-opacity-95">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+    <header className="w-full bg-card border-b border-border sticky top-0 z-30 shadow-2xs backdrop-blur-md bg-opacity-95">
+      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Brand & School Logo */}
         <div
-          className="flex items-center gap-3 cursor-pointer select-none"
+          className="flex items-center gap-3 cursor-pointer select-none shrink-0"
           onClick={() => onSelectTab('catalog')}
         >
           <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm font-mono shadow-xs">
@@ -84,7 +84,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         </nav>
 
         {/* Actions & Profile */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* Quick Search Button (Command Palette) */}
           {onOpenCommand && (
             <button

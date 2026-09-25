@@ -137,41 +137,41 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
 
 
   return (
-    <div className="space-y-10">
-      {/* Aceternity UI Spotlight Hero Section (Clean Typography, No Decorative Slop) */}
-      <div className="relative rounded-3xl border border-slate-800/90 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-6 sm:p-12 text-white shadow-xl overflow-hidden">
-        {/* Aceternity SVG Spotlight Theater Beam */}
+    <div className="space-y-6 sm:space-y-8 w-full min-w-0">
+      {/* Aceternity UI Spotlight Hero Section (Clean & Theme-Adaptive) */}
+      <div className="relative rounded-3xl border border-border bg-card p-6 sm:p-8 shadow-xs overflow-hidden w-full min-w-0">
+        {/* Aceternity SVG Spotlight Subtle Illumination */}
         <Spotlight
-          className="-top-40 left-0 md:left-60 md:-top-20"
+          className="-top-24 left-0 md:left-32"
           fill="#3b82f6"
         />
 
-        <div className="relative z-10 max-w-3xl">
+        <div className="relative z-10 max-w-2xl">
           {/* Aceternity FlipWords Headline */}
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white leading-tight">
-            Pusat Literasi Digital &{' '}
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold tracking-tight text-foreground leading-tight">
+            Pusat Literasi &{' '}
             <FlipWords
-              words={['Informatika', 'Modul Merdeka', 'Buku Pelajaran', 'Koleksi Rak']}
-              className="text-blue-400 font-extrabold px-0"
+              words={['Informatika', 'Kurikulum Merdeka', 'Buku Pelajaran', 'Koleksi Rak']}
+              className="text-primary font-extrabold px-0"
             />
           </h1>
 
-          <p className="mt-3 text-xs sm:text-sm text-slate-300/80 max-w-xl font-normal">
+          <p className="mt-2 text-xs sm:text-sm text-muted-foreground font-normal">
             Katalog terpadu e-book kurikulum luring dan sirkulasi rak fisik sekolah.
           </p>
 
           {/* Action CTAs */}
-          <div className="mt-6 flex flex-wrap items-center gap-3">
+          <div className="mt-5 flex flex-wrap items-center gap-2.5">
             {onOpenCommand && (
               <MovingBorderButton
-                borderRadius="0.875rem"
+                borderRadius="0.75rem"
                 duration={3500}
                 onClick={onOpenCommand}
-                containerClassName="h-11"
-                className="bg-slate-950/90 hover:bg-slate-900 text-white font-semibold text-xs px-5 py-2 border-slate-700/60 shadow-sm"
+                containerClassName="h-10"
+                className="bg-card hover:bg-muted text-foreground font-semibold text-xs px-4 py-2 border-border shadow-2xs"
               >
-                <span>Pencarian Cepat</span>
-                <kbd className="ml-2.5 text-[10px] bg-white/15 px-1.5 py-0.5 rounded font-mono">⌘K</kbd>
+                <span>Cari Buku</span>
+                <kbd className="ml-2 text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono border border-border">⌘K</kbd>
               </MovingBorderButton>
             )}
 
@@ -179,72 +179,59 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
               variant="outline"
               size="sm"
               onClick={onNavigateToMyBooks}
-              className="h-11 px-5 rounded-xl border-slate-700 bg-slate-900/60 text-slate-200 hover:bg-slate-800 hover:text-white text-xs font-semibold"
+              className="h-10 px-4 rounded-xl text-xs font-semibold"
             >
               Rak Buku Saya
             </Button>
-          </div>
 
-          {isAuthenticated && (user?.role === 'LIBRARIAN' || user?.role === 'ADMIN') && (
-            <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between">
-              <span className="text-xs text-slate-400 font-medium">Panel Staf</span>
+            {isAuthenticated && (user?.role === 'LIBRARIAN' || user?.role === 'ADMIN') && (
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={() => setIsAddBookOpen(true)}
-                className="font-semibold text-xs shadow-xs bg-white text-slate-900 hover:bg-slate-100 px-4 py-2"
+                className="h-10 px-4 rounded-xl text-xs font-semibold"
               >
-                + Tambah Koleksi Buku
+                + Tambah Buku
               </Button>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Aceternity UI Bento Grid - Pustaka Feature Showcase */}
-      <div className="space-y-3">
-        <h2 className="font-bold text-base text-foreground tracking-tight">
-          Layanan Pustaka
-        </h2>
+      {/* Aceternity UI Bento Grid - Pustaka Feature Highlights (Clean 4-Card Equal Row) */}
+      <BentoGrid>
+        <BentoGridItem
+          badge={<Badge variant="ebook">E-Book</Badge>}
+          title="Koleksi Digital"
+          description="Akses e-book luring langsung di perangkat tanpa kuota."
+          actionText="Buka Digital"
+          onClick={() => setSelectedType('DIGITAL_ONLY')}
+        />
 
-        <BentoGrid className="md:auto-rows-[10rem]">
-          <BentoGridItem
-            className="md:col-span-2"
-            badge={<Badge variant="ebook">E-Book</Badge>}
-            title="Koleksi Digital Luring"
-            description="Baca langsung di browser atau simpan ke perangkat untuk akses tanpa internet."
-            actionText="Koleksi Digital"
-            onClick={() => setSelectedType('DIGITAL_ONLY')}
-          />
+        <BentoGridItem
+          badge={<Badge variant="physical">Fisik</Badge>}
+          title="Koleksi Rak"
+          description="Pantau ketersediaan eksemplar di rak sekolah."
+          actionText="Buka Fisik"
+          onClick={() => setSelectedType('PHYSICAL_ONLY')}
+        />
 
-          <BentoGridItem
-            className="md:col-span-1"
-            badge={<Badge variant="physical">Fisik</Badge>}
-            title="Koleksi Rak"
-            description="Pantau ketersediaan eksemplar di rak secara real-time."
-            actionText="Koleksi Fisik"
-            onClick={() => setSelectedType('PHYSICAL_ONLY')}
-          />
+        <BentoGridItem
+          badge={<Badge variant="outline">Shortcut</Badge>}
+          title="Pencarian Cepat"
+          description="Temukan buku instan menggunakan tombol pintas."
+          actionText="Buka ⌘K"
+          onClick={() => onOpenCommand?.()}
+        />
 
-          <BentoGridItem
-            className="md:col-span-1"
-            badge={<Badge variant="outline">Shortcut</Badge>}
-            title="Pencarian Kilat ⌘K"
-            description="Cari judul buku dan pengarang langsung dari keyboard."
-            actionText="Buka Pencarian"
-            onClick={() => onOpenCommand?.()}
-          />
-
-          <BentoGridItem
-            className="md:col-span-2"
-            badge={<Badge variant="hybrid">Kurikulum</Badge>}
-            title="Informatika & Sains"
-            description="Modul ajar resmi dan buku pegangan siswa terbitan Kemendikbudristek."
-            actionText="Topik Informatika"
-            onClick={() => setSearchTerm('Informatika')}
-          />
-        </BentoGrid>
-      </div>
+        <BentoGridItem
+          badge={<Badge variant="hybrid">Kurikulum</Badge>}
+          title="Kurikulum Merdeka"
+          description="Modul ajar resmi terbitan Kemendikbudristek."
+          actionText="Lihat Topik"
+          onClick={() => setSearchTerm('Informatika')}
+        />
+      </BentoGrid>
 
       {/* Main Catalog Grid */}
       <div className="space-y-4 pt-2">
