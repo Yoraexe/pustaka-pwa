@@ -18,9 +18,11 @@ import { BookGrid } from '../components/catalog/BookGrid.js';
 import { BookDetailModal } from '../components/catalog/BookDetailModal.js';
 import { AddBookModal } from '../components/catalog/AddBookModal.js';
 import { Button } from '../components/ui/button.js';
+import { Badge } from '../components/ui/badge.js';
 import { Spotlight } from '../components/ui/spotlight.js';
 import { FlipWords } from '../components/ui/flip-words.js';
 import { MovingBorderButton } from '../components/ui/moving-border.js';
+import { BentoGrid, BentoGridItem } from '../components/ui/bento-grid.js';
 import { toast } from 'sonner';
 
 interface CatalogPageProps {
@@ -205,8 +207,58 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
         </div>
       </div>
 
+      {/* Aceternity UI Bento Grid - Pustaka Feature Showcase */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold text-base text-foreground tracking-tight">
+            Etalase Layanan Pustaka
+          </h2>
+          <span className="text-xs text-muted-foreground hidden sm:inline">
+            Akses langsung format & modul prioritas
+          </span>
+        </div>
+
+        <BentoGrid className="md:auto-rows-[11rem]">
+          <BentoGridItem
+            className="md:col-span-2"
+            badge={<Badge variant="ebook">PWA Offline-First</Badge>}
+            title="E-Book Kurikulum Bebas Kuota"
+            description="Akses puluhan modul ajar digital resmi, simpan ke memori IndexedDB perangkat Anda, dan baca dokumen secara luring kapan saja dengan proteksi identitas siswa."
+            actionText="Filter Koleksi Digital"
+            onClick={() => setSelectedType('DIGITAL_ONLY')}
+          />
+
+          <BentoGridItem
+            className="md:col-span-1"
+            badge={<Badge variant="physical">Sirkulasi Real-Time</Badge>}
+            title="Koleksi Fisik & Lokasi Rak"
+            description="Pantau ketersediaan stok buku cetak di rak perpustakaan secara transparan sebelum melakukan peminjaman langsung."
+            actionText="Filter Koleksi Fisik"
+            onClick={() => setSelectedType('PHYSICAL_ONLY')}
+          />
+
+          <BentoGridItem
+            className="md:col-span-1"
+            badge={<Badge variant="outline">Shortcut ⌘K</Badge>}
+            title="Pencarian Kilat Command"
+            description="Telusuri katalog, kurikulum, dan navigasi aplikasi dalam hitungan milidetik langsung dari keyboard."
+            actionText="Buka Pencarian"
+            onClick={() => onOpenCommand?.()}
+          />
+
+          <BentoGridItem
+            className="md:col-span-2"
+            badge={<Badge variant="hybrid">Kurikulum Merdeka</Badge>}
+            title="Modul Informatika & Sains Komputasional"
+            description="Temukan buku pegangan siswa terbitan resmi Kemendikbudristek untuk jenjang sekolah menengah dengan format hybrid."
+            actionText="Cari Topik Informatika"
+            onClick={() => setSearchTerm('Informatika')}
+          />
+        </BentoGrid>
+      </div>
+
       {/* Main Catalog Grid */}
-      <div className="space-y-4">
+      <div className="space-y-4 pt-2">
         <div className="flex items-center justify-between">
           <h2 className="font-bold text-lg text-foreground tracking-tight">
             Katalog Buku Lengkap

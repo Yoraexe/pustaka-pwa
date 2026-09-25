@@ -1,12 +1,29 @@
 /**
  * @file src/client/pages/LoginPage.tsx
- * @description Dialog / Halaman login akun lokal sekolah (NISN / NIP) dengan quick demo access.
+ * @description Dialog autentikasi akun sekolah berbasis Shadcn UI Dialog, Input, Label, dan Button dengan presisi tipografi editorial.
  * @layer Page Component
+ * 
+ * Tujuan: Menyediakan antarmuka login NISN/NIP sekolah yang aman, cepat, dan terintegrasi dengan arsitektur modal Shadcn.
+ * Caller: src/client/App.tsx
+ * Dependensi: react, src/client/hooks/useAuth.ts, src/client/components/ui/dialog.ts, src/client/components/ui/button.ts, src/client/components/ui/input.ts, src/client/components/ui/label.ts
+ * Main Functions: LoginPage
+ * Side Effects: Memanggil API login, menyimpan token ke localStorage, mengupdate sesi auth.
  */
 
 import React, { useState } from 'react';
 import { useAuth } from '../hooks/useAuth.js';
-import { LogIn, UserCheck, Shield, BookOpen, X, AlertCircle } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '../components/ui/dialog.js';
+import { Button } from '../components/ui/button.js';
+import { Input } from '../components/ui/input.js';
+import { Label } from '../components/ui/label.js';
+import { Badge } from '../components/ui/badge.js';
+import { toast } from 'sonner';
 
 interface LoginPageProps {
   onClose?: () => void;
@@ -28,12 +45,17 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
     try {
       await login({
         identityNumber: identityNumber.trim(),
-        password
+        password,
+      });
+      toast.success('Autentikasi Berhasil', {
+        description: 'Selamat datang kembali di Pustaka Sekolah.',
       });
       onSuccess?.();
       onClose?.();
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : 'Gagal melakukan login.');
+      const msg = err instanceof Error ? err.message : 'Gagal melakukan verifikasi akun.';
+      setErrorMsg(msg);
+      toast.error('Gagal Masuk', { description: msg });
     } finally {
       setIsSubmitting(false);
     }
@@ -46,127 +68,116 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 animate-fadeIn">
-      <div className="bg-surface-card rounded-3xl border border-border-subtle shadow-2xl max-w-md w-full p-6 sm:p-8 relative">
-        {onClose && (
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 text-text-muted hover:text-text-main rounded-full hover:bg-slate-100 transition-colors"
-            aria-label="Tutup"
-          >
-            <X size={20} />
-          </button>
-        )}
-
-        <div className="text-center mb-6">
-          <div className="w-12 h-12 rounded-2xl bg-primary-600 text-white mx-auto flex items-center justify-center shadow-md mb-3">
-            <BookOpen size={24} />
+    <Dialog open={true} onOpenChange={(open) => !open && onClose?.()}>
+      <DialogContent className="max-w-md p-6 sm:p-8">
+        <DialogHeader className="text-left">
+          <div className="flex items-center gap-2 mb-1">
+            <Badge variant="outline" className="font-mono text-[10px]">
+              Single Sign-On Sekolah
+            </Badge>
           </div>
-          <h2 className="text-xl font-bold text-text-main">Masuk ke Pustaka Sekolah</h2>
-          <p className="text-xs text-text-muted mt-1">
-            Gunakan Nomor Induk Siswa Nasional (NISN) atau NIP yang terdaftar di sekolah.
-          </p>
-        </div>
+          <DialogTitle className="text-xl sm:text-2xl font-bold tracking-tight">
+            Masuk ke Pustaka Sekolah
+          </DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground mt-1 leading-relaxed">
+            Gunakan Nomor Induk Siswa Nasional (NISN) atau NIP yang terdaftar pada sistem dapodik sekolah.
+          </DialogDescription>
+        </DialogHeader>
 
         {errorMsg && (
-          <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-xs font-medium flex items-center gap-2">
-            <AlertCircle size={16} className="shrink-0" />
-            <span>{errorMsg}</span>
+          <div className="p-3 bg-destructive/10 text-destructive border border-destructive/20 rounded-xl text-xs font-medium">
+            {errorMsg}
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 my-2">
           <div>
-            <label className="block text-xs font-semibold text-text-main mb-1">
-              Nomor Identitas (NISN / NIP)
-            </label>
-            <input
+            <Label htmlFor="identityNumber">Nomor Identitas (NISN / NIP)</Label>
+            <Input
+              id="identityNumber"
               type="text"
               required
               value={identityNumber}
               onChange={(e) => setIdentityNumber(e.target.value)}
               placeholder="Contoh: NISN202601"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono"
+              className="font-mono"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-text-main mb-1">
-              Kata Sandi
-            </label>
-            <input
+            <Label htmlFor="password">Kata Sandi</Label>
+            <Input
+              id="password"
               type="password"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
 
-          <button
+          <Button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-2.5 bg-primary-600 hover:bg-primary-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors shadow-sm"
+            className="w-full h-11 text-xs font-semibold shadow-xs"
           >
-            <LogIn size={16} />
-            <span>{isSubmitting ? 'Memverifikasi...' : 'Masuk Akun'}</span>
-          </button>
+            {isSubmitting ? 'Memverifikasi Kredensial...' : 'Masuk ke Akun'}
+          </Button>
         </form>
 
-        {/* Demo Quick Access Buttons */}
-        <div className="mt-6 pt-4 border-t border-slate-100">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-text-muted block mb-2 text-center">
-            Pilih Cepat Akun Demo (Untuk Pengujian)
+        {/* Quick Demo Access - Formatted as refined Shadcn Cards */}
+        <div className="pt-4 border-t border-border space-y-2.5">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground block text-center font-medium">
+            Akses Cepat Pengujian (Demo Sandbox)
           </span>
 
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => handleQuickLogin('NISN202601', 'siswa123')}
-              className="p-2 text-left bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 text-xs transition-colors"
+              className="p-2.5 text-left rounded-xl border border-border bg-muted/40 hover:bg-muted hover:border-primary/40 transition-colors text-xs cursor-pointer group"
             >
-              <div className="font-semibold text-primary-700 flex items-center gap-1">
-                <UserCheck size={12} /> Siswa 1 (X RPL 1)
+              <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                Siswa (X RPL 1)
               </div>
-              <div className="text-[10px] text-text-muted font-mono">NISN202601</div>
+              <div className="text-[10px] text-muted-foreground font-mono mt-0.5">NISN202601</div>
             </button>
 
             <button
               type="button"
               onClick={() => handleQuickLogin('PUSTAKA01', 'pustaka123')}
-              className="p-2 text-left bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 text-xs transition-colors"
+              className="p-2.5 text-left rounded-xl border border-border bg-muted/40 hover:bg-muted hover:border-primary/40 transition-colors text-xs cursor-pointer group"
             >
-              <div className="font-semibold text-amber-700 flex items-center gap-1">
-                <Shield size={12} /> Pustakawan
+              <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                Pustakawan
               </div>
-              <div className="text-[10px] text-text-muted font-mono">PUSTAKA01</div>
+              <div className="text-[10px] text-muted-foreground font-mono mt-0.5">PUSTAKA01</div>
             </button>
 
             <button
               type="button"
               onClick={() => handleQuickLogin('GURU001', 'guru123')}
-              className="p-2 text-left bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 text-xs transition-colors"
+              className="p-2.5 text-left rounded-xl border border-border bg-muted/40 hover:bg-muted hover:border-primary/40 transition-colors text-xs cursor-pointer group"
             >
-              <div className="font-semibold text-blue-700 flex items-center gap-1">
-                <UserCheck size={12} /> Guru TIK
+              <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                Guru TIK
               </div>
-              <div className="text-[10px] text-text-muted font-mono">GURU001</div>
+              <div className="text-[10px] text-muted-foreground font-mono mt-0.5">GURU001</div>
             </button>
 
             <button
               type="button"
               onClick={() => handleQuickLogin('ADMIN01', 'admin123')}
-              className="p-2 text-left bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-200 text-xs transition-colors"
+              className="p-2.5 text-left rounded-xl border border-border bg-muted/40 hover:bg-muted hover:border-primary/40 transition-colors text-xs cursor-pointer group"
             >
-              <div className="font-semibold text-red-700 flex items-center gap-1">
-                <Shield size={12} /> Admin
+              <div className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                Administrator
               </div>
-              <div className="text-[10px] text-text-muted font-mono">ADMIN01</div>
+              <div className="text-[10px] text-muted-foreground font-mono mt-0.5">ADMIN01</div>
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };

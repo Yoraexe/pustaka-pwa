@@ -1,12 +1,12 @@
 /**
  * @file src/client/components/catalog/AddBookModal.tsx
- * @description Modal interaktif formulir pendaftaran buku baru (Koleksi Fisik, E-Book Digital, & Hybrid) lengkap dengan upload file dan auto-barcode.
+ * @description Modal pendaftaran buku baru perpustakaan berbasis Shadcn UI Dialog, Tabs, Input, Label, dan Button.
  * @layer Presentation Component
  * 
- * Tujuan: Memfasilitasi Pustakawan & Admin menginput buku baru ke katalog perpustakaan sekolah.
- * Caller: src/client/pages/CatalogPage.tsx & src/client/components/circulation/CirculationDesk.tsx.
- * Dependensi: react, lucide-react, src/client/services/api.ts, shared/types.
- * Main Functions: AddBookModal.
+ * Tujuan: Memfasilitasi Pustakawan & Admin menginput buku baru (koleksi fisik, e-book, atau hybrid) dengan upload PDF & cover.
+ * Caller: src/client/pages/CatalogPage.tsx, src/client/components/circulation/CirculationDesk.tsx
+ * Dependensi: react, src/client/services/api.ts, shared/types, UI components (Dialog, Tabs, Button, Input, Label, Badge)
+ * Main Functions: AddBookModal
  * Side Effects: Melakukan multipart HTTP POST ke /api/books untuk menyimpan buku dan file.
  */
 
@@ -14,9 +14,18 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api.js';
 import type { Category, Book, BookCopy, BookType } from '../../../shared/types/index.js';
 import {
-  X, PlusCircle, BookOpen, Tablet, Layers, MapPin,
-  Upload, FileText, CheckCircle2, AlertTriangle, Loader2, Sparkles
-} from 'lucide-react';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '../ui/dialog.js';
+import { Tabs, TabsList, TabsTrigger } from '../ui/tabs.js';
+import { Button } from '../ui/button.js';
+import { Input } from '../ui/input.js';
+import { Label } from '../ui/label.js';
+import { Badge } from '../ui/badge.js';
+import { toast } from 'sonner';
 
 interface AddBookModalProps {
   isOpen: boolean;
@@ -27,7 +36,7 @@ interface AddBookModalProps {
 export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [categories, setCategories] = useState<Category[]>([]);
   const [bookType, setBookType] = useState<BookType>('HYBRID');
-  
+
   // Form fields
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
@@ -35,19 +44,19 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
   const [publicationYear, setPublicationYear] = useState<number>(new Date().getFullYear());
   const [categoryId, setCategoryId] = useState<number>(1);
   const [isbn, setIsbn] = useState('');
-  
+
   // Physical fields
   const [shelfLocation, setShelfLocation] = useState('RAK-INF-01');
   const [totalPhysicalCopies, setTotalPhysicalCopies] = useState<number>(3);
-  
+
   // Digital fields
   const [digitalLicenseCount, setDigitalLicenseCount] = useState<number>(5);
   const [ebookFile, setEbookFile] = useState<File | null>(null);
-  
+
   // Cover field
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverUrlInput, setCoverUrlInput] = useState('');
-  
+
   // Status state
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -67,12 +76,9 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
       }
     };
     loadCategories();
-    // Reset state saat modal dibuka
     setCreatedResult(null);
     setErrorMsg(null);
   }, [isOpen]);
-
-  if (!isOpen) return null;
 
   const isPhysical = bookType === 'HYBRID' || bookType === 'PHYSICAL_ONLY';
   const isDigital = bookType === 'HYBRID' || bookType === 'DIGITAL_ONLY';
@@ -81,25 +87,13 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
     e.preventDefault();
     setErrorMsg(null);
 
-    // Validasi dasar
-    if (!title.trim()) {
-      setErrorMsg('Judul buku wajib diisi.');
-      return;
-    }
-    if (!author.trim()) {
-      setErrorMsg('Nama penulis wajib diisi.');
-      return;
-    }
-    if (!publisher.trim()) {
-      setErrorMsg('Nama penerbit wajib diisi.');
+    if (!title.trim() || !author.trim() || !publisher.trim()) {
+      setErrorMsg('Judul, penulis, dan penerbit buku wajib diisi.');
       return;
     }
     if (isPhysical && !shelfLocation.trim()) {
       setErrorMsg('Lokasi rak wajib diisi untuk koleksi fisik.');
       return;
-    }
-    if (isDigital && bookType === 'DIGITAL_ONLY' && !ebookFile && !coverUrlInput) {
-      // Optional check
     }
 
     setIsSubmitting(true);
@@ -114,7 +108,6 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
       formData.append('bookType', bookType);
       if (isbn.trim()) formData.append('isbn', isbn.trim());
 
-      // Atribut fisik
       if (isPhysical) {
         formData.append('shelfLocation', shelfLocation.trim());
         formData.append('totalPhysicalCopies', String(totalPhysicalCopies));
@@ -122,7 +115,6 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
         formData.append('totalPhysicalCopies', '0');
       }
 
-      // Atribut digital
       if (isDigital) {
         formData.append('digitalLicenseCount', String(digitalLicenseCount));
         if (ebookFile) {
@@ -132,7 +124,6 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
         formData.append('digitalLicenseCount', '0');
       }
 
-      // Sampul buku
       if (coverFile) {
         formData.append('cover', coverFile);
       } else if (coverUrlInput.trim()) {
@@ -141,15 +132,20 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
 
       const result = await api.createBook(formData);
       setCreatedResult(result);
+      toast.success('Buku Berhasil Didaftarkan', {
+        description: `Koleksi "${result.title}" telah tersimpan di sistem perpustakaan.`,
+      });
       onSuccess(result);
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : 'Gagal mendaftarkan buku.');
+      const msg = err instanceof Error ? err.message : 'Gagal mendaftarkan buku.';
+      setErrorMsg(msg);
+      toast.error('Gagal Menyimpan', { description: msg });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleResetForm = () => {
+  const handleReset = () => {
     setTitle('');
     setAuthor('');
     setPublisher('');
@@ -166,416 +162,260 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fadeIn">
-      <div className="bg-surface-card w-full max-w-2xl rounded-3xl border border-border-subtle shadow-2xl overflow-hidden my-auto">
-        {/* Header Modal */}
-        <div className="p-5 sm:p-6 border-b border-border-subtle flex items-center justify-between bg-slate-50/70">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-2xl bg-primary-600 text-white flex items-center justify-center shadow-sm">
-              <PlusCircle size={22} />
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-6 sm:p-8">
+        <DialogHeader className="text-left">
+          <div className="flex items-center gap-2 mb-1">
+            <Badge variant="outline">Katalogisasi Staf</Badge>
+            <Badge variant={bookType === 'HYBRID' ? 'hybrid' : bookType === 'DIGITAL_ONLY' ? 'ebook' : 'physical'}>
+              {bookType === 'HYBRID' ? 'Format Hybrid' : bookType === 'DIGITAL_ONLY' ? 'E-Book Digital' : 'Koleksi Fisik'}
+            </Badge>
+          </div>
+          <DialogTitle className="text-xl sm:text-2xl font-bold">
+            Pendaftaran Koleksi Buku Baru
+          </DialogTitle>
+          <DialogDescription className="text-xs text-muted-foreground mt-1">
+            Daftarkan materi ajar kurikulum, e-book PDF resmi terproteksi, atau eksemplar fisik rak perpustakaan.
+          </DialogDescription>
+        </DialogHeader>
+
+        {errorMsg && (
+          <div className="p-3 bg-destructive/10 text-destructive border border-destructive/20 rounded-xl text-xs font-medium">
+            {errorMsg}
+          </div>
+        )}
+
+        {createdResult ? (
+          <div className="space-y-4 my-2 p-6 bg-muted/30 border border-border rounded-2xl">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-sm text-foreground">Buku Berhasil Terdaftar</h4>
+              <Badge variant="success">ID: {createdResult.id}</Badge>
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-text-main leading-tight">
-                Pendaftaran Buku Baru
-              </h2>
-              <p className="text-xs text-text-muted">
-                Katalog perpustakaan hybrid: fisik dengan barcode otomatis & e-book digital.
-              </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              <strong>{createdResult.title}</strong> oleh {createdResult.author} ({createdResult.publicationYear}) telah masuk ke katalog.
+            </p>
+
+            {createdResult.copies && createdResult.copies.length > 0 && (
+              <div className="pt-2">
+                <span className="text-[11px] font-semibold text-foreground block mb-2">
+                  Barcode Eksemplar Fisik yang Dihasilkan:
+                </span>
+                <div className="flex flex-wrap gap-2">
+                  {createdResult.copies.map((c) => (
+                    <span
+                      key={c.id}
+                      className="px-2.5 py-1 bg-background border border-border rounded-lg text-xs font-mono font-semibold"
+                    >
+                      {c.barcode}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="pt-4 border-t border-border flex items-center justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={handleReset} className="text-xs">
+                Daftarkan Koleksi Lainnya
+              </Button>
+              <Button size="sm" onClick={onClose} className="text-xs">
+                Selesai
+              </Button>
             </div>
           </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-5 my-2">
+            {/* Format Selector Tabs */}
+            <div className="space-y-1.5">
+              <Label>Format Koleksi</Label>
+              <Tabs
+                value={bookType}
+                onValueChange={(val) => setBookType(val as BookType)}
+                className="w-full"
+              >
+                <TabsList className="grid grid-cols-3 h-10 w-full rounded-xl bg-muted/60 p-1">
+                  <TabsTrigger value="HYBRID" className="text-xs rounded-lg">
+                    Hybrid (Fisik + E-Book)
+                  </TabsTrigger>
+                  <TabsTrigger value="DIGITAL_ONLY" className="text-xs rounded-lg">
+                    E-Book Digital Saja
+                  </TabsTrigger>
+                  <TabsTrigger value="PHYSICAL_ONLY" className="text-xs rounded-lg">
+                    Buku Fisik Saja
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
 
-          <button
-            onClick={onClose}
-            className="p-2 text-text-muted hover:text-text-main hover:bg-slate-200/60 rounded-xl transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Modal Body */}
-        <div className="p-5 sm:p-6 max-h-[75vh] overflow-y-auto">
-          {createdResult ? (
-            /* Tampilan Sukses dengan Daftar Barcode */
-            <div className="space-y-5 text-center py-4">
-              <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-xs animate-bounce">
-                <CheckCircle2 size={36} />
+            {/* General Metadata */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <Label htmlFor="title">Judul Buku / Materi Pelajaran *</Label>
+                <Input
+                  id="title"
+                  required
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Contoh: Informatika Kelas X Kurikulum Merdeka"
+                />
               </div>
 
               <div>
-                <h3 className="text-lg font-bold text-text-main">Buku Berhasil Didaftarkan!</h3>
-                <p className="text-xs text-text-muted mt-1 max-w-md mx-auto">
-                  Buku <strong>"{createdResult.title}"</strong> telah terdaftar di katalog perpustakaan sekolah.
-                </p>
+                <Label htmlFor="author">Nama Penulis / Tim Penyusun *</Label>
+                <Input
+                  id="author"
+                  required
+                  value={author}
+                  onChange={(e) => setAuthor(e.target.value)}
+                  placeholder="Contoh: Kemendikbudristek"
+                />
               </div>
 
-              {/* Rincian Eksemplar Fisik & Barcode Terbit */}
-              {createdResult.copies && createdResult.copies.length > 0 && (
-                <div className="bg-amber-50/80 border border-amber-200 rounded-2xl p-4 text-left">
-                  <div className="flex items-center gap-2 text-amber-900 font-bold text-xs mb-2">
-                    <Sparkles size={14} className="text-amber-600" />
-                    <span>{createdResult.copies.length} Barcode Eksemplar Fisik Otomatis Diterbitkan:</span>
-                  </div>
-                  <p className="text-[11px] text-amber-800 mb-3">
-                    Lokasi Rak: <strong>{createdResult.shelfLocation || 'Rak Meja Pustaka'}</strong>. Cetak atau catat barcode berikut pada fisik buku:
-                  </p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {createdResult.copies.map((copy) => (
-                      <div
-                        key={copy.id}
-                        className="bg-white border border-amber-300 px-2.5 py-1.5 rounded-lg text-center font-mono text-xs font-bold text-amber-950 shadow-xs"
-                      >
-                        {copy.barcode}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div>
+                <Label htmlFor="publisher">Penerbit *</Label>
+                <Input
+                  id="publisher"
+                  required
+                  value={publisher}
+                  onChange={(e) => setPublisher(e.target.value)}
+                  placeholder="Contoh: Pusat Perbukuan"
+                />
+              </div>
 
-              {/* Rincian E-Book Digital */}
-              {(createdResult.bookType === 'DIGITAL_ONLY' || createdResult.bookType === 'HYBRID') && (
-                <div className="bg-blue-50/80 border border-blue-200 rounded-2xl p-4 text-left text-xs">
-                  <div className="flex items-center gap-2 text-blue-900 font-bold mb-1">
-                    <Tablet size={14} className="text-blue-600" />
-                    <span>Layanan E-Book Digital Siap Digunakan</span>
-                  </div>
-                  <p className="text-blue-800 text-[11px]">
-                    Kuota Lisensi Simultan: <strong>{createdResult.digitalLicenseCount} siswa</strong>. Siswa dapat langsung meminjam dan membaca melalui aplikasi dengan watermark dinamis.
-                  </p>
-                </div>
-              )}
+              <div>
+                <Label htmlFor="category">Kategori Buku</Label>
+                <select
+                  id="category"
+                  value={categoryId}
+                  onChange={(e) => setCategoryId(Number(e.target.value))}
+                  className="flex h-10 w-full rounded-xl border border-input bg-background/60 px-3.5 py-2 text-xs sm:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 font-medium"
+                >
+                  {categories.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-3">
-                <button
-                  type="button"
-                  onClick={handleResetForm}
-                  className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-text-main rounded-xl text-xs font-semibold transition-colors"
-                >
-                  Tambah Buku Lainnya
-                </button>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="w-full sm:w-auto px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-sm"
-                >
-                  Selesai & Lihat Katalog
-                </button>
+              <div>
+                <Label htmlFor="publicationYear">Tahun Terbit</Label>
+                <Input
+                  id="publicationYear"
+                  type="number"
+                  required
+                  value={publicationYear}
+                  onChange={(e) => setPublicationYear(Number(e.target.value))}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="isbn">Nomor ISBN (Opsional)</Label>
+                <Input
+                  id="isbn"
+                  value={isbn}
+                  onChange={(e) => setIsbn(e.target.value)}
+                  placeholder="Contoh: 978-602-244-503-6"
+                  className="font-mono text-xs"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="coverUrl">URL Sampul (Opsional)</Label>
+                <Input
+                  id="coverUrl"
+                  type="url"
+                  value={coverUrlInput}
+                  onChange={(e) => setCoverUrlInput(e.target.value)}
+                  placeholder="https://... (atau unggah berkas)"
+                />
               </div>
             </div>
-          ) : (
-            /* Formulir Pendaftaran Buku */
-            <form onSubmit={handleSubmit} className="space-y-5">
-              {errorMsg && (
-                <div className="p-3.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs font-medium flex items-center gap-2">
-                  <AlertTriangle size={16} className="shrink-0" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
 
-              {/* 1. Format Buku Switcher */}
-              <div>
-                <label className="block text-xs font-bold text-text-main uppercase tracking-wider mb-2">
-                  Tipe Format Koleksi Perpustakaan
-                </label>
-                <div className="grid grid-cols-3 gap-2 p-1 bg-slate-100 rounded-2xl">
-                  <button
-                    type="button"
-                    onClick={() => setBookType('HYBRID')}
-                    className={`py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                      bookType === 'HYBRID'
-                        ? 'bg-white text-primary-700 shadow-xs'
-                        : 'text-text-muted hover:text-text-main'
-                    }`}
-                  >
-                    <Layers size={14} />
-                    <span>Hybrid (Keduanya)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setBookType('PHYSICAL_ONLY')}
-                    className={`py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                      bookType === 'PHYSICAL_ONLY'
-                        ? 'bg-white text-amber-700 shadow-xs'
-                        : 'text-text-muted hover:text-text-main'
-                    }`}
-                  >
-                    <BookOpen size={14} />
-                    <span>Fisik Saja</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setBookType('DIGITAL_ONLY')}
-                    className={`py-2 px-3 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
-                      bookType === 'DIGITAL_ONLY'
-                        ? 'bg-white text-blue-700 shadow-xs'
-                        : 'text-text-muted hover:text-text-main'
-                    }`}
-                  >
-                    <Tablet size={14} />
-                    <span>E-Book Digital</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* 2. Informasi Utama Buku */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-text-main mb-1">
-                    Judul Buku <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={title}
-                    onChange={e => setTitle(e.target.value)}
-                    placeholder="Contoh: Pemrograman Web Lanjut dengan React & TypeScript"
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
+            {/* Physical Inventory Settings */}
+            {isPhysical && (
+              <div className="p-4 bg-muted/30 border border-border rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-xs text-foreground uppercase tracking-wider font-mono">
+                    Inventaris Koleksi Fisik
+                  </h4>
+                  <span className="text-[10px] text-muted-foreground font-mono">Auto-Generate Barcode</span>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-text-main mb-1">
-                    Nama Penulis <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={author}
-                    onChange={e => setAuthor(e.target.value)}
-                    placeholder="Contoh: Sandhika Galih"
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-text-main mb-1">
-                    Penerbit <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={publisher}
-                    onChange={e => setPublisher(e.target.value)}
-                    placeholder="Contoh: Informatika Bandung"
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-text-main mb-1">
-                    Tahun Terbit
-                  </label>
-                  <input
-                    type="number"
-                    value={publicationYear}
-                    onChange={e => setPublicationYear(Number(e.target.value))}
-                    min={1950}
-                    max={2030}
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-text-main mb-1">
-                    Kategori Pelajaran
-                  </label>
-                  <select
-                    value={categoryId}
-                    onChange={e => setCategoryId(Number(e.target.value))}
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  >
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.id}>
-                        {cat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-text-main mb-1">
-                    Nomor ISBN (Opsional)
-                  </label>
-                  <input
-                    type="text"
-                    value={isbn}
-                    onChange={e => setIsbn(e.target.value)}
-                    placeholder="Contoh: 978-623-7131-40-1"
-                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono"
-                  />
-                </div>
-              </div>
-
-              {/* 3. Konfigurasi Sirkulasi Fisik (Jika HYBRID atau PHYSICAL_ONLY) */}
-              {isPhysical && (
-                <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-2xl space-y-3">
-                  <div className="flex items-center gap-2 text-amber-900 font-bold text-xs">
-                    <MapPin size={15} className="text-amber-700" />
-                    <span>Konfigurasi Sirkulasi Fisik & Rak</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-amber-950 mb-1">
-                        Nomor Lokasi Rak Fisik <span className="text-red-500">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required={isPhysical}
-                        value={shelfLocation}
-                        onChange={e => setShelfLocation(e.target.value)}
-                        placeholder="Contoh: RAK-INF-04"
-                        className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-amber-950 mb-1">
-                        Jumlah Eksemplar Fisik
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={100}
-                        value={totalPhysicalCopies}
-                        onChange={e => setTotalPhysicalCopies(Math.max(1, Number(e.target.value)))}
-                        className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      />
-                    </div>
-                  </div>
-
-                  <p className="text-[11px] text-amber-800 italic">
-                    💡 Sistem akan otomatis membuat {totalPhysicalCopies} barcode unik untuk ditempelkan pada fisik buku.
-                  </p>
-                </div>
-              )}
-
-              {/* 4. Konfigurasi E-Book Digital (Jika HYBRID atau DIGITAL_ONLY) */}
-              {isDigital && (
-                <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-3">
-                  <div className="flex items-center gap-2 text-blue-900 font-bold text-xs">
-                    <Tablet size={15} className="text-blue-700" />
-                    <span>Konfigurasi E-Book Digital & Berkas PDF</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-[11px] font-semibold text-blue-950 mb-1">
-                        Kuota Lisensi Simultan
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={100}
-                        value={digitalLicenseCount}
-                        onChange={e => setDigitalLicenseCount(Math.max(1, Number(e.target.value)))}
-                        className="w-full px-3 py-1.5 bg-white border border-blue-300 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      />
-                      <span className="text-[10px] text-blue-700">Maks. siswa yang dapat membaca bersamaan</span>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-blue-950 mb-1">
-                        Unggah Dokumen PDF E-Book
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="file"
-                          accept=".pdf,application/pdf"
-                          onChange={e => {
-                            if (e.target.files && e.target.files[0]) {
-                              setEbookFile(e.target.files[0]);
-                            }
-                          }}
-                          className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"
-                        />
-                      </div>
-                      {ebookFile ? (
-                        <span className="text-[10px] text-emerald-700 font-medium flex items-center gap-1 mt-1">
-                          <FileText size={11} />
-                          {ebookFile.name} ({(ebookFile.size / 1024 / 1024).toFixed(1)} MB)
-                        </span>
-                      ) : (
-                        <span className="text-[10px] text-text-muted mt-1 block">
-                          Opsional jika ingin membaca via Reflow Canvas atau unggah nanti.
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* 5. Gambar Sampul Buku */}
-              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-                <label className="block text-xs font-semibold text-text-main">
-                  Gambar Sampul Buku (Opsional)
-                </label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <span className="text-[11px] text-text-muted block mb-1">Unggah Berkas Gambar (JPG, PNG, WebP):</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={e => {
-                        if (e.target.files && e.target.files[0]) {
-                          setCoverFile(e.target.files[0]);
-                          setCoverUrlInput('');
-                        }
-                      }}
-                      className="w-full text-xs text-slate-500 file:mr-2 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-slate-700 file:text-white hover:file:bg-slate-800 cursor-pointer"
+                    <Label htmlFor="shelfLocation">Lokasi Rak Penyimpanan *</Label>
+                    <Input
+                      id="shelfLocation"
+                      value={shelfLocation}
+                      onChange={(e) => setShelfLocation(e.target.value)}
+                      placeholder="Contoh: RAK-INF-01"
+                      className="font-mono"
                     />
                   </div>
 
                   <div>
-                    <span className="text-[11px] text-text-muted block mb-1">Atau Masukkan URL Gambar Sampul:</span>
-                    <input
-                      type="url"
-                      value={coverUrlInput}
-                      onChange={e => {
-                        setCoverUrlInput(e.target.value);
-                        setCoverFile(null);
-                      }}
-                      placeholder="https://images.unsplash.com/..."
-                      className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    <Label htmlFor="totalPhysicalCopies">Jumlah Eksemplar Fisik</Label>
+                    <Input
+                      id="totalPhysicalCopies"
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={totalPhysicalCopies}
+                      onChange={(e) => setTotalPhysicalCopies(Number(e.target.value))}
                     />
                   </div>
                 </div>
               </div>
+            )}
 
-              {/* Modal Actions */}
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  disabled={isSubmitting}
-                  className="px-4 py-2 text-xs font-semibold text-text-muted hover:text-text-main hover:bg-slate-100 rounded-xl transition-colors"
-                >
-                  Batal
-                </button>
+            {/* Digital License Settings & Upload */}
+            {isDigital && (
+              <div className="p-4 bg-muted/30 border border-border rounded-2xl space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-bold text-xs text-foreground uppercase tracking-wider font-mono">
+                    Hak Akses Digital (E-Book)
+                  </h4>
+                  <span className="text-[10px] text-muted-foreground font-mono">Watermark Proteksi Siswa</span>
+                </div>
 
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm disabled:opacity-50"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 size={14} className="animate-spin" />
-                      <span>Menyimpan Buku...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Upload size={14} />
-                      <span>Daftarkan Buku ke Perpustakaan</span>
-                    </>
-                  )}
-                </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="digitalLicenseCount">Batas Kuota Pinjam Simultan</Label>
+                    <Input
+                      id="digitalLicenseCount"
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={digitalLicenseCount}
+                      onChange={(e) => setDigitalLicenseCount(Number(e.target.value))}
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="ebookFile">Unggah Berkas PDF Dokumen</Label>
+                    <Input
+                      id="ebookFile"
+                      type="file"
+                      accept=".pdf"
+                      onChange={(e) => setEbookFile(e.target.files?.[0] || null)}
+                    />
+                  </div>
+                </div>
               </div>
-            </form>
-          )}
-        </div>
-      </div>
-    </div>
+            )}
+
+            {/* Form Footer Actions */}
+            <div className="pt-4 border-t border-border flex items-center justify-end gap-2.5">
+              <Button type="button" variant="outline" onClick={onClose} className="text-xs">
+                Batal
+              </Button>
+              <Button type="submit" disabled={isSubmitting} className="text-xs font-semibold px-5">
+                {isSubmitting ? 'Mendaftarkan Buku...' : 'Simpan Koleksi Buku'}
+              </Button>
+            </div>
+          </form>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 };

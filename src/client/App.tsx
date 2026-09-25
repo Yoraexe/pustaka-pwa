@@ -22,6 +22,7 @@ import { LoginPage } from './pages/LoginPage.js';
 import { Toaster } from './components/ui/sonner.js';
 import { Button } from './components/ui/button.js';
 import { Badge } from './components/ui/badge.js';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from './components/ui/card.js';
 import {
   CommandDialog,
   CommandInput,
@@ -99,21 +100,25 @@ export const App: React.FC = () => {
           isAuthenticated && user ? (
             <MyBooksPage user={user} />
           ) : (
-            <div className="text-center py-16 bg-card rounded-3xl border border-border p-8 max-w-md mx-auto shadow-xs">
-              <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest block mb-2">
-                Autentikasi Diperlukan
-              </span>
-              <h2 className="text-lg font-bold text-foreground">Masuk untuk Melihat Rak Buku</h2>
-              <p className="text-xs text-muted-foreground mt-2 mb-6 leading-relaxed">
-                Silakan masuk menggunakan Nomor Induk Siswa Nasional (NISN) atau NIP untuk mengakses buku yang sedang dipinjam.
-              </p>
-              <Button
-                onClick={() => setIsLoginModalOpen(true)}
-                className="w-full text-xs font-semibold py-2.5 shadow-xs"
-              >
-                Masuk Akun Sekarang
-              </Button>
-            </div>
+            <Card className="text-center p-8 max-w-md mx-auto shadow-xs rounded-3xl border-border">
+              <CardHeader className="p-0 pb-6">
+                <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest block mb-2">
+                  Autentikasi Diperlukan
+                </span>
+                <CardTitle className="text-lg font-bold">Masuk untuk Melihat Rak Buku</CardTitle>
+                <CardDescription className="text-xs mt-2 leading-relaxed">
+                  Silakan masuk menggunakan Nomor Induk Siswa Nasional (NISN) atau NIP untuk mengakses buku yang sedang dipinjam.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Button
+                  onClick={() => setIsLoginModalOpen(true)}
+                  className="w-full text-xs font-semibold py-2.5 shadow-xs"
+                >
+                  Masuk Akun Sekarang
+                </Button>
+              </CardContent>
+            </Card>
           )
         )}
 
@@ -121,64 +126,70 @@ export const App: React.FC = () => {
           isAuthenticated && (user?.role === 'LIBRARIAN' || user?.role === 'ADMIN') ? (
             <CirculationDesk />
           ) : (
-            <div className="text-center py-16 bg-card rounded-3xl border border-border p-8 max-w-md mx-auto shadow-xs">
-              <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 uppercase tracking-widest block mb-2">
-                Hak Akses Terbatas
-              </span>
-              <h2 className="text-lg font-bold text-foreground">Akses Khusus Staf Perpustakaan</h2>
-              <p className="text-xs text-muted-foreground mt-2 leading-relaxed">
-                Halaman Meja Sirkulasi hanya dapat diakses oleh akun Pustakawan atau Administrator sekolah.
-              </p>
-            </div>
+            <Card className="text-center p-8 max-w-md mx-auto shadow-xs rounded-3xl border-border">
+              <CardHeader className="p-0">
+                <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 uppercase tracking-widest block mb-2">
+                  Hak Akses Terbatas
+                </span>
+                <CardTitle className="text-lg font-bold">Akses Khusus Staf Perpustakaan</CardTitle>
+                <CardDescription className="text-xs mt-2 leading-relaxed">
+                  Halaman Meja Sirkulasi hanya dapat diakses oleh akun Pustakawan atau Administrator sekolah.
+                </CardDescription>
+              </CardHeader>
+            </Card>
           )
         )}
 
         {currentTab === 'profile' && (
-          <div className="max-w-md mx-auto bg-card rounded-3xl border border-border shadow-xs p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold text-lg font-mono">
-                {user?.name?.slice(0, 2).toUpperCase() || 'US'}
-              </div>
-              <div>
-                <h3 className="font-bold text-base text-foreground">{user?.name}</h3>
-                <p className="text-xs text-muted-foreground font-mono">{user?.identityNumber}</p>
-                <div className="mt-1">
-                  <Badge variant="outline" className="font-normal text-[10px]">
-                    {user?.role}
-                  </Badge>
+          <Card className="max-w-md mx-auto rounded-3xl border-border shadow-xs p-6">
+            <CardHeader className="p-0 pb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center font-bold text-lg font-mono">
+                  {user?.name?.slice(0, 2).toUpperCase() || 'US'}
+                </div>
+                <div>
+                  <CardTitle className="text-base font-bold">{user?.name}</CardTitle>
+                  <CardDescription className="text-xs font-mono">{user?.identityNumber}</CardDescription>
+                  <div className="mt-1">
+                    <Badge variant="outline" className="font-normal text-[10px]">
+                      {user?.role}
+                    </Badge>
+                  </div>
                 </div>
               </div>
-            </div>
+            </CardHeader>
 
-            <div className="mt-6 pt-4 border-t border-border space-y-3 text-xs">
-              <div className="flex justify-between py-1">
-                <span className="text-muted-foreground">Kelas / Penugasan:</span>
-                <span className="font-semibold text-foreground">{user?.className || 'Staf Sekolah'}</span>
+            <CardContent className="p-0">
+              <div className="pt-4 border-t border-border space-y-3 text-xs">
+                <div className="flex justify-between py-1">
+                  <span className="text-muted-foreground">Kelas / Penugasan:</span>
+                  <span className="font-semibold text-foreground">{user?.className || 'Staf Sekolah'}</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-muted-foreground">Status Akun:</span>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">Aktif Terverifikasi</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-muted-foreground">Penyimpanan Offline:</span>
+                  <span className="font-semibold text-foreground">IndexedDB Siap</span>
+                </div>
               </div>
-              <div className="flex justify-between py-1">
-                <span className="text-muted-foreground">Status Akun:</span>
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400">Aktif Terverifikasi</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-muted-foreground">Penyimpanan Offline:</span>
-                <span className="font-semibold text-foreground">IndexedDB Siap</span>
-              </div>
-            </div>
 
-            <Button
-              variant="destructive"
-              onClick={() => {
-                logout();
-                setCurrentTab('catalog');
-                toast.info('Sesi Telah Berakhir', {
-                  description: 'Anda telah berhasil keluar dari akun perpustakaan.',
-                });
-              }}
-              className="mt-6 w-full text-xs font-semibold"
-            >
-              Keluar dari Akun
-            </Button>
-          </div>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  logout();
+                  setCurrentTab('catalog');
+                  toast.info('Sesi Telah Berakhir', {
+                    description: 'Anda telah berhasil keluar dari akun perpustakaan.',
+                  });
+                }}
+                className="mt-6 w-full text-xs font-semibold"
+              >
+                Keluar dari Akun
+              </Button>
+            </CardContent>
+          </Card>
         )}
       </main>
 
