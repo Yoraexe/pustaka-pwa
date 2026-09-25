@@ -22,7 +22,6 @@ import {
 import { Button } from '../components/ui/button.js';
 import { Input } from '../components/ui/input.js';
 import { Label } from '../components/ui/label.js';
-import { Badge } from '../components/ui/badge.js';
 import { toast } from 'sonner';
 
 interface LoginPageProps {
@@ -71,16 +70,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
     <Dialog open={true} onOpenChange={(open) => !open && onClose?.()}>
       <DialogContent className="max-w-md p-6 sm:p-8">
         <DialogHeader className="text-left">
-          <div className="flex items-center gap-2 mb-1">
-            <Badge variant="outline" className="font-mono text-[10px]">
-              Single Sign-On Sekolah
-            </Badge>
-          </div>
           <DialogTitle className="text-xl sm:text-2xl font-bold tracking-tight">
-            Masuk ke Pustaka Sekolah
+            Masuk
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground mt-1 leading-relaxed">
-            Gunakan Nomor Induk Siswa Nasional (NISN) atau NIP yang terdaftar pada sistem dapodik sekolah.
+            Masuk menggunakan NISN atau NIP terdaftar.
           </DialogDescription>
         </DialogHeader>
 
@@ -92,7 +86,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
 
         <form onSubmit={handleSubmit} className="space-y-4 my-2">
           <div>
-            <Label htmlFor="identityNumber">Nomor Identitas (NISN / NIP)</Label>
+            <Label htmlFor="identityNumber">NISN / NIP</Label>
             <Input
               id="identityNumber"
               type="text"
@@ -121,14 +115,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
             disabled={isSubmitting}
             className="w-full h-11 text-xs font-semibold shadow-xs"
           >
-            {isSubmitting ? 'Memverifikasi Kredensial...' : 'Masuk ke Akun'}
+            {isSubmitting ? 'Memproses...' : 'Masuk'}
           </Button>
         </form>
 
         {/* Quick Demo Access - Formatted as refined Shadcn Cards */}
         <div className="pt-4 border-t border-border space-y-2.5">
           <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground block text-center font-medium">
-            Akses Cepat Pengujian (Demo Sandbox)
+            Akun Demo
           </span>
 
           <div className="grid grid-cols-2 gap-2">

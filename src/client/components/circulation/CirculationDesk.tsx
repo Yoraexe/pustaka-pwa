@@ -179,16 +179,13 @@ export const CirculationDesk: React.FC = () => {
         <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
           <div>
             <div className="flex items-center gap-2 mb-1.5">
-              <Badge variant="outline" className="font-mono text-[10px]">
-                Operasional Sirkulasi
-              </Badge>
               <Badge variant="secondary" className="font-mono text-[10px]">
-                {loans.filter((l) => l.status === 'BORROWED').length} Pinjaman Berjalan
+                {loans.filter((l) => l.status === 'BORROWED').length} Dipinjam
               </Badge>
             </div>
-            <CardTitle className="text-xl sm:text-2xl font-bold">Meja Sirkulasi Buku Fisik</CardTitle>
+            <CardTitle className="text-xl sm:text-2xl font-bold">Meja Sirkulasi</CardTitle>
             <CardDescription className="text-xs mt-1 max-w-2xl">
-              Catat transaksi peminjaman buku fisik (check-out), proses pengembalian (check-in), verifikasi status denda, dan ekspor laporan berkala sekolah.
+              Layanan peminjaman dan pengembalian koleksi fisik perpustakaan.
             </CardDescription>
           </div>
 
@@ -200,14 +197,14 @@ export const CirculationDesk: React.FC = () => {
               disabled={isLoading}
               className="text-xs"
             >
-              {isLoading ? 'Menyegarkan...' : 'Segarkan Data'}
+              {isLoading ? 'Menyegarkan...' : 'Segarkan'}
             </Button>
             <Button
               size="sm"
               onClick={() => setIsAddBookModalOpen(true)}
               className="text-xs font-semibold"
             >
-              + Input Koleksi Baru
+              + Tambah Buku
             </Button>
           </div>
         </CardHeader>
@@ -217,10 +214,10 @@ export const CirculationDesk: React.FC = () => {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="bg-muted/60 p-1 rounded-2xl h-11 border border-border/80 inline-flex w-full sm:w-auto">
           <TabsTrigger value="checkout" className="rounded-xl px-4 py-1.5 text-xs font-semibold">
-            1. Peminjaman (Check-Out)
+            Peminjaman
           </TabsTrigger>
           <TabsTrigger value="return" className="rounded-xl px-4 py-1.5 text-xs font-semibold">
-            2. Pengembalian & Denda (Check-In)
+            Pengembalian
           </TabsTrigger>
         </TabsList>
 
@@ -228,9 +225,9 @@ export const CirculationDesk: React.FC = () => {
         <TabsContent value="checkout">
           <Card className="rounded-3xl border-border shadow-xs">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-bold">Formulir Peminjaman Eksemplar Fisik</CardTitle>
+              <CardTitle className="text-base font-bold">Peminjaman Fisik</CardTitle>
               <CardDescription className="text-xs">
-                Masukkan NISN/NIP siswa atau guru beserta barcode yang tertera pada label buku fisik.
+                Pindai atau masukkan NISN/NIP dan barcode eksemplar.
               </CardDescription>
             </CardHeader>
 
@@ -249,7 +246,7 @@ export const CirculationDesk: React.FC = () => {
 
               <form onSubmit={handleProcessCheckout} className="space-y-4 max-w-lg">
                 <div>
-                  <Label htmlFor="borrowerIdentity">Nomor Identitas Peminjam (NISN / NIP)</Label>
+                  <Label htmlFor="borrowerIdentity">NISN / NIP Peminjam</Label>
                   <Input
                     id="borrowerIdentity"
                     value={borrowerIdentity}
@@ -261,7 +258,7 @@ export const CirculationDesk: React.FC = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="checkoutBarcode">Kode Barcode Eksemplar Buku</Label>
+                  <Label htmlFor="checkoutBarcode">Barcode Eksemplar</Label>
                   <Input
                     id="checkoutBarcode"
                     value={checkoutBarcode}
@@ -273,7 +270,7 @@ export const CirculationDesk: React.FC = () => {
                 </div>
 
                 <Button type="submit" className="text-xs font-semibold shadow-xs">
-                  Proses Peminjaman Buku
+                  Proses Peminjaman
                 </Button>
               </form>
             </CardContent>
@@ -284,9 +281,9 @@ export const CirculationDesk: React.FC = () => {
         <TabsContent value="return">
           <Card className="rounded-3xl border-border shadow-xs">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base font-bold">Formulir Pengembalian Buku & Denda</CardTitle>
+              <CardTitle className="text-base font-bold">Pengembalian Fisik</CardTitle>
               <CardDescription className="text-xs">
-                Scan atau masukkan barcode eksemplar yang dikembalikan siswa untuk menutup status pinjaman.
+                Pindai atau masukkan barcode eksemplar yang dikembalikan.
               </CardDescription>
             </CardHeader>
 
@@ -302,12 +299,12 @@ export const CirculationDesk: React.FC = () => {
                   <div className="font-bold">{returnResult.message}</div>
                   {returnResult.overdueDays > 0 ? (
                     <div className="text-destructive font-semibold">
-                      Terlambat {returnResult.overdueDays} hari. Denda administratif: Rp{' '}
+                      Terlambat {returnResult.overdueDays} hari. Denda: Rp{' '}
                       {returnResult.fineAmount.toLocaleString('id-ID')}.
                     </div>
                   ) : (
                     <div className="text-emerald-700 dark:text-emerald-300">
-                      Buku dikembalikan tepat waktu tanpa denda keterlambatan.
+                      Buku dikembalikan tepat waktu.
                     </div>
                   )}
                 </div>
@@ -315,7 +312,7 @@ export const CirculationDesk: React.FC = () => {
 
               <form onSubmit={handleProcessReturn} className="space-y-4 max-w-lg">
                 <div>
-                  <Label htmlFor="returnBarcode">Kode Barcode Eksemplar</Label>
+                  <Label htmlFor="returnBarcode">Barcode Eksemplar</Label>
                   <Input
                     id="returnBarcode"
                     value={returnBarcode}
@@ -335,12 +332,12 @@ export const CirculationDesk: React.FC = () => {
                     className="rounded border-border text-primary focus:ring-primary w-4 h-4 accent-primary cursor-pointer"
                   />
                   <Label htmlFor="finePaid" className="mb-0 cursor-pointer font-medium">
-                    Tandai denda keterlambatan langsung lunas (jika ada denda)
+                    Tandai denda lunas
                   </Label>
                 </div>
 
                 <Button type="submit" variant="default" className="text-xs font-semibold shadow-xs">
-                  Proses Pengembalian Buku
+                  Proses Pengembalian
                 </Button>
               </form>
             </CardContent>
@@ -352,9 +349,9 @@ export const CirculationDesk: React.FC = () => {
       <Card className="rounded-3xl border-border shadow-xs overflow-hidden">
         <CardHeader className="p-4 sm:p-6 border-b border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <CardTitle className="text-sm sm:text-base font-bold">Catatan Log Sirkulasi Perpustakaan</CardTitle>
+            <CardTitle className="text-sm sm:text-base font-bold">Riwayat Sirkulasi</CardTitle>
             <CardDescription className="text-xs mt-0.5">
-              Total {loans.length} transaksi sirkulasi tercatat di sistem sekolah.
+              {loans.length} transaksi tercatat
             </CardDescription>
           </div>
 
@@ -364,7 +361,7 @@ export const CirculationDesk: React.FC = () => {
             onClick={handleExportCSV}
             className="self-start sm:self-auto text-xs font-semibold"
           >
-            Ekspor Laporan CSV
+            Ekspor CSV
           </Button>
         </CardHeader>
 
@@ -431,7 +428,7 @@ export const CirculationDesk: React.FC = () => {
             ) : (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                  Belum ada transaksi peminjaman yang tercatat.
+                  Belum ada transaksi tercatat.
                 </TableCell>
               </TableRow>
             )}

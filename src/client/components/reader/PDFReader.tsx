@@ -205,7 +205,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
             <h2 className="font-bold text-xs sm:text-sm truncate text-white">{book.title}</h2>
             <div className="flex items-center gap-1 text-[10px] text-slate-400">
               <ShieldCheck size={11} className="text-emerald-400 shrink-0" />
-              <span className="truncate">Proteksi Hak Cipta: {user.name}</span>
+              <span className="truncate">{user.name}</span>
             </div>
           </div>
         </div>
@@ -241,7 +241,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
             }`}
           >
             {isSavedOffline ? <CheckCircle2 size={14} /> : <DownloadCloud size={14} />}
-            <span className="hidden md:inline">{isSavedOffline ? 'Tersimpan Offline' : 'Unduh Offline'}</span>
+            <span className="hidden md:inline">{isSavedOffline ? 'Tersimpan' : 'Unduh Luring'}</span>
           </button>
         </div>
       </header>
@@ -252,8 +252,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
           <div className="flex items-center gap-2">
             <Bookmark size={14} className="text-amber-400 fill-amber-400 shrink-0" />
             <span>
-              Anda sebelumnya membaca hingga <strong>Halaman {savedProgress.page}</strong> (
-              {new Date(savedProgress.updatedAt).toLocaleDateString('id-ID')}).
+              Posisi terakhir: <strong>Halaman {savedProgress.page}</strong>
             </span>
           </div>
           <button
@@ -263,7 +262,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
             }}
             className="px-2.5 py-1 rounded bg-primary-600 hover:bg-primary-500 text-white font-semibold text-[11px] transition-colors"
           >
-            Lanjutkan ke Halaman {savedProgress.page}
+            Lanjut Hlm {savedProgress.page}
           </button>
         </div>
       )}
@@ -279,7 +278,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
         {isLoadingPdf ? (
           <div className="flex flex-col items-center justify-center gap-2 text-slate-400">
             <Loader2 size={32} className="animate-spin text-primary-500" />
-            <span className="text-xs font-medium">Menyiapkan dokumen e-book terproteksi...</span>
+            <span className="text-xs font-medium">Memuat dokumen...</span>
           </div>
         ) : targetPdfUrl ? (
           <div className="w-full h-full max-w-5xl bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-800">
@@ -298,15 +297,15 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
         ) : (
           <div className="text-center p-8 bg-slate-900 border border-slate-800 rounded-3xl max-w-md shadow-xl">
             <FileText size={44} className="mx-auto text-slate-500 mb-3" />
-            <h4 className="font-bold text-base text-white">Dokumen PDF Belum Tersedia</h4>
+            <h4 className="font-bold text-base text-white">Dokumen Belum Tersedia</h4>
             <p className="text-xs text-slate-400 mt-2 mb-5 leading-relaxed">
-              Berkas PDF untuk buku ini belum diunggah oleh Pustakawan ke basis data perpustakaan. Silakan hubungi meja sirkulasi atau akses koleksi buku digital lainnya.
+              Berkas PDF buku ini belum diunggah oleh staf perpustakaan.
             </p>
             <button
               onClick={onClose}
               className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors"
             >
-              Tutup Pembaca
+              Tutup
             </button>
           </div>
         )}

@@ -102,12 +102,9 @@ export const App: React.FC = () => {
           ) : (
             <Card className="text-center p-8 max-w-md mx-auto shadow-xs rounded-3xl border-border">
               <CardHeader className="p-0 pb-6">
-                <span className="text-[11px] font-mono text-muted-foreground uppercase tracking-widest block mb-2">
-                  Autentikasi Diperlukan
-                </span>
-                <CardTitle className="text-lg font-bold">Masuk untuk Melihat Rak Buku</CardTitle>
+                <CardTitle className="text-lg font-bold">Masuk ke Akun</CardTitle>
                 <CardDescription className="text-xs mt-2 leading-relaxed">
-                  Silakan masuk menggunakan Nomor Induk Siswa Nasional (NISN) atau NIP untuk mengakses buku yang sedang dipinjam.
+                  Masuk menggunakan NISN atau NIP untuk mengakses buku yang dipinjam.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
@@ -115,7 +112,7 @@ export const App: React.FC = () => {
                   onClick={() => setIsLoginModalOpen(true)}
                   className="w-full text-xs font-semibold py-2.5 shadow-xs"
                 >
-                  Masuk Akun Sekarang
+                  Masuk
                 </Button>
               </CardContent>
             </Card>
@@ -128,12 +125,9 @@ export const App: React.FC = () => {
           ) : (
             <Card className="text-center p-8 max-w-md mx-auto shadow-xs rounded-3xl border-border">
               <CardHeader className="p-0">
-                <span className="text-[11px] font-mono text-amber-600 dark:text-amber-400 uppercase tracking-widest block mb-2">
-                  Hak Akses Terbatas
-                </span>
-                <CardTitle className="text-lg font-bold">Akses Khusus Staf Perpustakaan</CardTitle>
+                <CardTitle className="text-lg font-bold">Akses Terbatas</CardTitle>
                 <CardDescription className="text-xs mt-2 leading-relaxed">
-                  Halaman Meja Sirkulasi hanya dapat diakses oleh akun Pustakawan atau Administrator sekolah.
+                  Halaman ini hanya dapat diakses oleh pustakawan atau admin sekolah.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -166,12 +160,8 @@ export const App: React.FC = () => {
                   <span className="font-semibold text-foreground">{user?.className || 'Staf Sekolah'}</span>
                 </div>
                 <div className="flex justify-between py-1">
-                  <span className="text-muted-foreground">Status Akun:</span>
-                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">Aktif Terverifikasi</span>
-                </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-muted-foreground">Penyimpanan Offline:</span>
-                  <span className="font-semibold text-foreground">IndexedDB Siap</span>
+                  <span className="text-muted-foreground">Status:</span>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">Aktif</span>
                 </div>
               </div>
 
@@ -180,13 +170,13 @@ export const App: React.FC = () => {
                 onClick={() => {
                   logout();
                   setCurrentTab('catalog');
-                  toast.info('Sesi Telah Berakhir', {
-                    description: 'Anda telah berhasil keluar dari akun perpustakaan.',
+                  toast.info('Keluar', {
+                    description: 'Anda telah keluar dari akun.',
                   });
                 }}
                 className="mt-6 w-full text-xs font-semibold"
               >
-                Keluar dari Akun
+                Keluar
               </Button>
             </CardContent>
           </Card>
@@ -212,17 +202,17 @@ export const App: React.FC = () => {
 
       {/* Global Command Palette (Ctrl+K / Cmd+K) */}
       <CommandDialog open={isCommandOpen} onOpenChange={setIsCommandOpen}>
-        <CommandInput placeholder="Ketik judul buku, pengarang, kurikulum, atau navigasi..." />
+        <CommandInput placeholder="Cari buku atau navigasi..." />
         <CommandList>
-          <CommandEmpty>Tidak ada hasil yang ditemukan.</CommandEmpty>
-          <CommandGroup heading="Navigasi Cepat">
+          <CommandEmpty>Tidak ada hasil.</CommandEmpty>
+          <CommandGroup heading="Navigasi">
             <CommandItem
               onSelect={() => {
                 setCurrentTab('catalog');
                 setIsCommandOpen(false);
               }}
             >
-              <span>Katalog Utama</span>
+              <span>Katalog</span>
             </CommandItem>
             {isAuthenticated && (
               <CommandItem
@@ -241,12 +231,12 @@ export const App: React.FC = () => {
                   setIsCommandOpen(false);
                 }}
               >
-                <span>Meja Sirkulasi Pustakawan</span>
+                <span>Meja Sirkulasi</span>
               </CommandItem>
             )}
           </CommandGroup>
 
-          <CommandGroup heading="Koleksi Buku Sekolah">
+          <CommandGroup heading="Katalog Buku">
             {commandBooks.map((book) => (
               <CommandItem
                 key={book.id}
@@ -277,10 +267,10 @@ export const App: React.FC = () => {
           onClose={() => setActiveDetailBook(null)}
           onBorrowDigital={async (book) => {
             if (!isAuthenticated) {
-              toast.warning('Akses Dibatasi', {
+              toast.warning('Perlu Masuk', {
                 description: 'Silakan masuk untuk meminjam buku.',
                 action: {
-                  label: 'Masuk Sekarang',
+                  label: 'Masuk',
                   onClick: () => setIsLoginModalOpen(true),
                 },
               });
@@ -289,7 +279,7 @@ export const App: React.FC = () => {
             try {
               await api.borrowDigitalBook(book.id);
               toast.success('Peminjaman Berhasil', {
-                description: `Buku "${book.title}" telah ditambahkan ke Rak Buku Saya.`,
+                description: `"${book.title}" berhasil dipinjam.`,
               });
               setCurrentTab('my-books');
             } catch (err: unknown) {

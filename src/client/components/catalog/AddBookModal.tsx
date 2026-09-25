@@ -166,16 +166,15 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-6 sm:p-8">
         <DialogHeader className="text-left">
           <div className="flex items-center gap-2 mb-1">
-            <Badge variant="outline">Katalogisasi Staf</Badge>
             <Badge variant={bookType === 'HYBRID' ? 'hybrid' : bookType === 'DIGITAL_ONLY' ? 'ebook' : 'physical'}>
-              {bookType === 'HYBRID' ? 'Format Hybrid' : bookType === 'DIGITAL_ONLY' ? 'E-Book Digital' : 'Koleksi Fisik'}
+              {bookType === 'HYBRID' ? 'Hybrid' : bookType === 'DIGITAL_ONLY' ? 'E-Book' : 'Fisik'}
             </Badge>
           </div>
           <DialogTitle className="text-xl sm:text-2xl font-bold">
-            Pendaftaran Koleksi Buku Baru
+            Tambah Buku
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground mt-1">
-            Daftarkan materi ajar kurikulum, e-book PDF resmi terproteksi, atau eksemplar fisik rak perpustakaan.
+            Daftarkan buku fisik atau e-book baru ke katalog.
           </DialogDescription>
         </DialogHeader>
 
@@ -188,17 +187,17 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
         {createdResult ? (
           <div className="space-y-4 my-2 p-6 bg-muted/30 border border-border rounded-2xl">
             <div className="flex items-center justify-between">
-              <h4 className="font-bold text-sm text-foreground">Buku Berhasil Terdaftar</h4>
+              <h4 className="font-bold text-sm text-foreground">Buku Terdaftar</h4>
               <Badge variant="success">ID: {createdResult.id}</Badge>
             </div>
             <p className="text-xs text-muted-foreground leading-relaxed">
-              <strong>{createdResult.title}</strong> oleh {createdResult.author} ({createdResult.publicationYear}) telah masuk ke katalog.
+              <strong>{createdResult.title}</strong> ({createdResult.publicationYear}) telah ditambahkan.
             </p>
 
             {createdResult.copies && createdResult.copies.length > 0 && (
               <div className="pt-2">
                 <span className="text-[11px] font-semibold text-foreground block mb-2">
-                  Barcode Eksemplar Fisik yang Dihasilkan:
+                  Barcode Eksemplar:
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {createdResult.copies.map((c) => (
@@ -215,7 +214,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
 
             <div className="pt-4 border-t border-border flex items-center justify-end gap-2">
               <Button variant="outline" size="sm" onClick={handleReset} className="text-xs">
-                Daftarkan Koleksi Lainnya
+                Tambah Buku Lagi
               </Button>
               <Button size="sm" onClick={onClose} className="text-xs">
                 Selesai
@@ -234,13 +233,13 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
               >
                 <TabsList className="grid grid-cols-3 h-10 w-full rounded-xl bg-muted/60 p-1">
                   <TabsTrigger value="HYBRID" className="text-xs rounded-lg">
-                    Hybrid (Fisik + E-Book)
+                    Hybrid
                   </TabsTrigger>
                   <TabsTrigger value="DIGITAL_ONLY" className="text-xs rounded-lg">
-                    E-Book Digital Saja
+                    E-Book
                   </TabsTrigger>
                   <TabsTrigger value="PHYSICAL_ONLY" className="text-xs rounded-lg">
-                    Buku Fisik Saja
+                    Buku Fisik
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
@@ -249,18 +248,18 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
             {/* General Metadata */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
-                <Label htmlFor="title">Judul Buku / Materi Pelajaran *</Label>
+                <Label htmlFor="title">Judul Buku *</Label>
                 <Input
                   id="title"
                   required
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
-                  placeholder="Contoh: Informatika Kelas X Kurikulum Merdeka"
+                  placeholder="Contoh: Informatika Kelas X"
                 />
               </div>
 
               <div>
-                <Label htmlFor="author">Nama Penulis / Tim Penyusun *</Label>
+                <Label htmlFor="author">Penulis *</Label>
                 <Input
                   id="author"
                   required
@@ -282,7 +281,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
               </div>
 
               <div>
-                <Label htmlFor="category">Kategori Buku</Label>
+                <Label htmlFor="category">Kategori</Label>
                 <select
                   id="category"
                   value={categoryId}
@@ -309,7 +308,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
               </div>
 
               <div>
-                <Label htmlFor="isbn">Nomor ISBN (Opsional)</Label>
+                <Label htmlFor="isbn">ISBN (Opsional)</Label>
                 <Input
                   id="isbn"
                   value={isbn}
@@ -320,13 +319,13 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
               </div>
 
               <div>
-                <Label htmlFor="coverUrl">URL Sampul (Opsional)</Label>
+                <Label htmlFor="coverUrl">URL Sampul</Label>
                 <Input
                   id="coverUrl"
                   type="url"
                   value={coverUrlInput}
                   onChange={(e) => setCoverUrlInput(e.target.value)}
-                  placeholder="https://... (atau unggah berkas)"
+                  placeholder="https://..."
                 />
               </div>
             </div>
@@ -336,14 +335,13 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
               <div className="p-4 bg-muted/30 border border-border rounded-2xl space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="font-bold text-xs text-foreground uppercase tracking-wider font-mono">
-                    Inventaris Koleksi Fisik
+                    Koleksi Fisik
                   </h4>
-                  <span className="text-[10px] text-muted-foreground font-mono">Auto-Generate Barcode</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <Label htmlFor="shelfLocation">Lokasi Rak Penyimpanan *</Label>
+                    <Label htmlFor="shelfLocation">Lokasi Rak *</Label>
                     <Input
                       id="shelfLocation"
                       value={shelfLocation}
@@ -354,7 +352,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
                   </div>
 
                   <div>
-                    <Label htmlFor="totalPhysicalCopies">Jumlah Eksemplar Fisik</Label>
+                    <Label htmlFor="totalPhysicalCopies">Jumlah Eksemplar</Label>
                     <Input
                       id="totalPhysicalCopies"
                       type="number"
@@ -373,14 +371,13 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
               <div className="p-4 bg-muted/30 border border-border rounded-2xl space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="font-bold text-xs text-foreground uppercase tracking-wider font-mono">
-                    Hak Akses Digital (E-Book)
+                    Akses Digital
                   </h4>
-                  <span className="text-[10px] text-muted-foreground font-mono">Watermark Proteksi Siswa</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <Label htmlFor="digitalLicenseCount">Batas Kuota Pinjam Simultan</Label>
+                    <Label htmlFor="digitalLicenseCount">Kuota Pinjam Simultan</Label>
                     <Input
                       id="digitalLicenseCount"
                       type="number"
@@ -392,7 +389,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
                   </div>
 
                   <div>
-                    <Label htmlFor="ebookFile">Unggah Berkas PDF Dokumen</Label>
+                    <Label htmlFor="ebookFile">Berkas PDF</Label>
                     <Input
                       id="ebookFile"
                       type="file"
@@ -410,7 +407,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
                 Batal
               </Button>
               <Button type="submit" disabled={isSubmitting} className="text-xs font-semibold px-5">
-                {isSubmitting ? 'Mendaftarkan Buku...' : 'Simpan Koleksi Buku'}
+                {isSubmitting ? 'Menyimpan...' : 'Simpan Buku'}
               </Button>
             </div>
           </form>

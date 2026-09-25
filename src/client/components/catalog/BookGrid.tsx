@@ -89,7 +89,7 @@ export const BookGrid: React.FC<BookGridProps> = ({
               type="text"
               value={searchTerm}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Cari judul buku, pengarang, kurikulum, topik..."
+              placeholder="Cari judul buku atau pengarang..."
               className="w-full pl-11 pr-20 py-2.5 bg-muted/40 border border-border/80 rounded-2xl text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:bg-background transition-all"
             />
             {onOpenCommand && (
@@ -138,8 +138,8 @@ export const BookGrid: React.FC<BookGridProps> = ({
             </TabsList>
           </Tabs>
 
-          <span className="text-[11px] text-muted-foreground hidden md:inline font-mono">
-            Menampilkan {displayedBooks.length} dari {books.length} Koleksi
+          <span className="text-xs text-muted-foreground hidden md:inline font-mono">
+            {displayedBooks.length} Buku
           </span>
         </div>
 
@@ -153,25 +153,19 @@ export const BookGrid: React.FC<BookGridProps> = ({
               onChange={(e) => setOnlyAvailable(e.target.checked)}
               className="rounded border-border text-primary focus:ring-primary w-4 h-4 accent-primary cursor-pointer"
             />
-            <span>Hanya Tampilkan yang Tersedia</span>
-            {onlyAvailable && (
-              <span className="text-[10px] font-mono bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded font-semibold border border-emerald-500/20">
-                Aktif
-              </span>
-            )}
+            <span>Tersedia saja</span>
           </label>
 
           {/* Sort Selector */}
           <div className="flex items-center gap-2">
-            <span className="text-[11px] text-muted-foreground hidden sm:inline">Urutan:</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'latest' | 'title' | 'year')}
               className="bg-muted/50 border border-border/80 rounded-xl px-2.5 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring font-medium"
             >
-              <option value="latest">Terbaru Ditambahkan</option>
+              <option value="latest">Terbaru</option>
               <option value="title">Judul (A-Z)</option>
-              <option value="year">Tahun Terbit (Terbaru)</option>
+              <option value="year">Tahun Terbit</option>
             </select>
           </div>
         </div>
@@ -229,14 +223,9 @@ export const BookGrid: React.FC<BookGridProps> = ({
         </div>
       ) : (
         <div className="text-center py-16 bg-card rounded-3xl border border-border p-8">
-          <span className="text-xs font-mono uppercase tracking-widest text-muted-foreground/80 block mb-2">
-            Pencarian Nihil
-          </span>
-          <h4 className="font-bold text-foreground text-base">Tidak ada koleksi buku yang cocok</h4>
-          <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto mb-4">
-            {onlyAvailable
-              ? 'Tidak ada buku yang saat ini berstatus tersedia untuk filter yang dipilih.'
-              : 'Coba gunakan kata kunci pencarian yang lain atau reset filter format dan kategori.'}
+          <h4 className="font-bold text-foreground text-sm">Tidak ada buku ditemukan</h4>
+          <p className="text-xs text-muted-foreground mt-1 mb-4">
+            Coba sesuaikan kata kunci pencarian atau filter format.
           </p>
           {(searchTerm || selectedCategory !== undefined || selectedType !== 'ALL' || onlyAvailable) && (
             <Button
@@ -250,7 +239,7 @@ export const BookGrid: React.FC<BookGridProps> = ({
               }}
               className="text-xs"
             >
-              Reset Semua Filter
+              Reset Filter
             </Button>
           )}
         </div>

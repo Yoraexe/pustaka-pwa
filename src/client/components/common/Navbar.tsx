@@ -37,11 +37,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             P
           </div>
           <div>
-            <span className="font-extrabold text-base sm:text-lg text-foreground tracking-tight leading-none block">
-              PustakaSekolah
-            </span>
-            <span className="text-[10px] sm:text-[11px] text-muted-foreground font-medium block">
-              Digital & Physical PWA Library
+            <span className="font-bold text-base sm:text-lg text-foreground tracking-tight block">
+              Pustaka Sekolah
             </span>
           </div>
         </div>

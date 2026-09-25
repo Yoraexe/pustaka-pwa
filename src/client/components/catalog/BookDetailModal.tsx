@@ -100,7 +100,7 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
             {isPhysical && (
               <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-xs space-y-2">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-amber-900 dark:text-amber-200">Koleksi Fisik Perpustakaan</h4>
+                  <h4 className="font-bold text-amber-900 dark:text-amber-200">Koleksi Fisik</h4>
                   <button
                     type="button"
                     onClick={() => handleCopy(book.shelfLocation || 'Utama', 'Kode Lokasi Rak')}
@@ -110,8 +110,8 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
                     Rak: {book.shelfLocation || 'Utama'} (Salin)
                   </button>
                 </div>
-                <p className="text-amber-800 dark:text-amber-300/90 leading-relaxed">
-                  Tersedia <strong>{book.availablePhysicalCopies}</strong> dari total {book.totalPhysicalCopies} eksemplar fisik di perpustakaan.
+                <p className="text-amber-800 dark:text-amber-300/90">
+                  Tersedia <strong>{book.availablePhysicalCopies}</strong> dari {book.totalPhysicalCopies} eksemplar.
                 </p>
               </div>
             )}
@@ -119,13 +119,13 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
             {isDigital && (
               <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-xs space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-bold text-blue-900 dark:text-blue-200">Format Digital (In-App Reader)</h4>
+                  <h4 className="font-bold text-blue-900 dark:text-blue-200">Format Digital</h4>
                   <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-500/15 px-2 py-0.5 rounded-full">
                     Akses Luring
                   </span>
                 </div>
-                <p className="text-blue-800 dark:text-blue-300/90 text-[11px] leading-relaxed">
-                  Dapat dibaca langsung di browser atau disimpan luring (IndexedDB) dengan proteksi watermark nama siswa dan penyimpanan progres halaman otomatis.
+                <p className="text-blue-800 dark:text-blue-300/90 text-xs">
+                  Dapat dibaca langsung atau disimpan untuk akses luring.
                 </p>
               </div>
             )}
@@ -139,7 +139,7 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
 
           {isBorrowed ? (
             <div className="inline-flex items-center px-4 py-2 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-semibold border border-emerald-500/20">
-              Buku Ini Sedang Anda Pinjam
+              Sedang Dipinjam
             </div>
           ) : isDigital ? (
             <Button
@@ -154,7 +154,7 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
             </Button>
           ) : (
             <div className="inline-flex items-center px-4 py-2 bg-muted text-muted-foreground rounded-xl text-xs font-medium">
-              Kunjungi meja perpustakaan untuk meminjam fisik
+              Tersedia di meja sirkulasi
             </div>
           )}
         </DialogFooter>

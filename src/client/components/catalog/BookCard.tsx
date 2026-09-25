@@ -108,7 +108,7 @@ export const BookCard: React.FC<BookCardProps> = ({
 
             {isDigital && (
               <div className="text-primary font-medium truncate text-[11px]">
-                E-Book Digital Siap Baca
+                E-Book Digital
               </div>
             )}
           </div>
@@ -141,7 +141,7 @@ export const BookCard: React.FC<BookCardProps> = ({
               onClick={() => onSelectDetail?.(book)}
               className="w-full text-muted-foreground font-semibold text-xs"
             >
-              Pinjam di Perpustakaan
+              Pinjam Fisik
             </Button>
           )}
         </div>

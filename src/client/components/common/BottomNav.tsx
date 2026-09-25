@@ -20,7 +20,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab, o
 
   return (
     <div className="md:hidden fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur-md border-t border-border z-40 pb-safe shadow-lg">
-      <div className="grid grid-cols-4 h-16 max-w-md mx-auto">
+      <div className={`grid ${isStaff ? 'grid-cols-4' : 'grid-cols-3'} h-16 max-w-md mx-auto`}>
         {/* Tab 1: Katalog */}
         <button
           onClick={() => onSelectTab('catalog')}
@@ -49,8 +49,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab, o
           <span className="text-[10px] sm:text-[11px]">Rak Saya</span>
         </button>
 
-        {/* Tab 3: Sirkulasi (Staff Only) atau Hybrid Info */}
-        {isStaff ? (
+        {/* Tab 3: Sirkulasi (Staff Only) */}
+        {isStaff && (
           <button
             onClick={() => onSelectTab('circulation')}
             className={`flex flex-col items-center justify-center gap-1 transition-all min-h-[44px] ${
@@ -59,14 +59,6 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab, o
           >
             <Layers size={20} />
             <span className="text-[10px] sm:text-[11px]">Sirkulasi</span>
-          </button>
-        ) : (
-          <button
-            onClick={() => onSelectTab('catalog')}
-            className="flex flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground min-h-[44px]"
-          >
-            <span className="text-base">📚</span>
-            <span className="text-[10px] sm:text-[11px]">Hybrid</span>
           </button>
         )}
 

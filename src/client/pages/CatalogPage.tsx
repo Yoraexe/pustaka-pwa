@@ -147,10 +147,6 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
         />
 
         <div className="relative z-10 max-w-3xl">
-          <div className="inline-block px-3 py-1 rounded-full bg-white/10 backdrop-blur-md text-slate-300 text-xs font-mono font-medium mb-4 border border-white/10">
-            Sistem Informasi Perpustakaan Terpadu
-          </div>
-
           {/* Aceternity FlipWords Headline */}
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-extrabold tracking-tight text-white leading-tight">
             Pusat Literasi Digital &{' '}
@@ -160,12 +156,12 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
             />
           </h1>
 
-          <p className="mt-4 text-xs sm:text-sm text-slate-300/90 leading-relaxed max-w-2xl font-normal">
-            Akses materi ajar sekolah secara luring, baca e-book resmi terproteksi hak cipta, dan lacak ketersediaan buku fisik di rak perpustakaan sekolah langsung dari peramban Anda.
+          <p className="mt-3 text-xs sm:text-sm text-slate-300/80 max-w-xl font-normal">
+            Katalog terpadu e-book kurikulum luring dan sirkulasi rak fisik sekolah.
           </p>
 
           {/* Action CTAs */}
-          <div className="mt-7 flex flex-wrap items-center gap-3">
+          <div className="mt-6 flex flex-wrap items-center gap-3">
             {onOpenCommand && (
               <MovingBorderButton
                 borderRadius="0.875rem"
@@ -190,17 +186,15 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
           </div>
 
           {isAuthenticated && (user?.role === 'LIBRARIAN' || user?.role === 'ADMIN') && (
-            <div className="mt-7 pt-5 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <span className="text-xs text-slate-400 font-medium">
-                Pustakawan: Daftarkan eksemplar fisik atau berkas PDF e-book baru ke basis data.
-              </span>
+            <div className="mt-6 pt-4 border-t border-slate-800/80 flex items-center justify-between">
+              <span className="text-xs text-slate-400 font-medium">Panel Staf</span>
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={() => setIsAddBookOpen(true)}
-                className="self-start sm:self-auto font-semibold text-xs shadow-xs bg-white text-slate-900 hover:bg-slate-100 px-4 py-2"
+                className="font-semibold text-xs shadow-xs bg-white text-slate-900 hover:bg-slate-100 px-4 py-2"
               >
-                Tambah Koleksi Buku
+                + Tambah Koleksi Buku
               </Button>
             </div>
           )}
@@ -209,49 +203,44 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
 
       {/* Aceternity UI Bento Grid - Pustaka Feature Showcase */}
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="font-bold text-base text-foreground tracking-tight">
-            Etalase Layanan Pustaka
-          </h2>
-          <span className="text-xs text-muted-foreground hidden sm:inline">
-            Akses langsung format & modul prioritas
-          </span>
-        </div>
+        <h2 className="font-bold text-base text-foreground tracking-tight">
+          Layanan Pustaka
+        </h2>
 
-        <BentoGrid className="md:auto-rows-[11rem]">
+        <BentoGrid className="md:auto-rows-[10rem]">
           <BentoGridItem
             className="md:col-span-2"
-            badge={<Badge variant="ebook">PWA Offline-First</Badge>}
-            title="E-Book Kurikulum Bebas Kuota"
-            description="Akses puluhan modul ajar digital resmi, simpan ke memori IndexedDB perangkat Anda, dan baca dokumen secara luring kapan saja dengan proteksi identitas siswa."
-            actionText="Filter Koleksi Digital"
+            badge={<Badge variant="ebook">E-Book</Badge>}
+            title="Koleksi Digital Luring"
+            description="Baca langsung di browser atau simpan ke perangkat untuk akses tanpa internet."
+            actionText="Koleksi Digital"
             onClick={() => setSelectedType('DIGITAL_ONLY')}
           />
 
           <BentoGridItem
             className="md:col-span-1"
-            badge={<Badge variant="physical">Sirkulasi Real-Time</Badge>}
-            title="Koleksi Fisik & Lokasi Rak"
-            description="Pantau ketersediaan stok buku cetak di rak perpustakaan secara transparan sebelum melakukan peminjaman langsung."
-            actionText="Filter Koleksi Fisik"
+            badge={<Badge variant="physical">Fisik</Badge>}
+            title="Koleksi Rak"
+            description="Pantau ketersediaan eksemplar di rak secara real-time."
+            actionText="Koleksi Fisik"
             onClick={() => setSelectedType('PHYSICAL_ONLY')}
           />
 
           <BentoGridItem
             className="md:col-span-1"
-            badge={<Badge variant="outline">Shortcut ⌘K</Badge>}
-            title="Pencarian Kilat Command"
-            description="Telusuri katalog, kurikulum, dan navigasi aplikasi dalam hitungan milidetik langsung dari keyboard."
+            badge={<Badge variant="outline">Shortcut</Badge>}
+            title="Pencarian Kilat ⌘K"
+            description="Cari judul buku dan pengarang langsung dari keyboard."
             actionText="Buka Pencarian"
             onClick={() => onOpenCommand?.()}
           />
 
           <BentoGridItem
             className="md:col-span-2"
-            badge={<Badge variant="hybrid">Kurikulum Merdeka</Badge>}
-            title="Modul Informatika & Sains Komputasional"
-            description="Temukan buku pegangan siswa terbitan resmi Kemendikbudristek untuk jenjang sekolah menengah dengan format hybrid."
-            actionText="Cari Topik Informatika"
+            badge={<Badge variant="hybrid">Kurikulum</Badge>}
+            title="Informatika & Sains"
+            description="Modul ajar resmi dan buku pegangan siswa terbitan Kemendikbudristek."
+            actionText="Topik Informatika"
             onClick={() => setSearchTerm('Informatika')}
           />
         </BentoGrid>
@@ -259,11 +248,9 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
 
       {/* Main Catalog Grid */}
       <div className="space-y-4 pt-2">
-        <div className="flex items-center justify-between">
-          <h2 className="font-bold text-lg text-foreground tracking-tight">
-            Katalog Buku Lengkap
-          </h2>
-        </div>
+        <h2 className="font-bold text-lg text-foreground tracking-tight">
+          Katalog Buku
+        </h2>
 
         <BookGrid
           books={books}

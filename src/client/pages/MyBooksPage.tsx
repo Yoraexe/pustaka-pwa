@@ -104,8 +104,8 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
     if (!bookToReturn) return;
     try {
       await api.returnDigitalBook(bookToReturn.id);
-      toast.success('Pengembalian Sukses', {
-        description: `E-book "${bookToReturn.title}" berhasil dikembalikan. Tercatat di portofolio riwayat selesai.`,
+      toast.success('Pengembalian Berhasil', {
+        description: `"${bookToReturn.title}" telah dikembalikan.`,
       });
       setBookToReturn(null);
       fetchMyLoans();
@@ -121,13 +121,13 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
     try {
       await offlineStorage.removeEbook(bookToDeleteOffline.id);
       toast.info('Salinan Dihapus', {
-        description: `Berkas luring "${bookToDeleteOffline.title}" telah dihapus dari memori perangkat.`,
+        description: `Berkas "${bookToDeleteOffline.title}" telah dihapus.`,
       });
       setBookToDeleteOffline(null);
       fetchMyLoans();
     } catch {
       toast.error('Gagal Menghapus', {
-        description: 'Terjadi kendala saat menghapus data offline dari IndexedDB.',
+        description: 'Terjadi kendala saat menghapus data dari penyimpanan perangkat.',
       });
     }
   };
@@ -163,12 +163,9 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
       {/* Portfolio Header & Reading Metrics */}
       <div className="bg-card p-6 sm:p-8 rounded-3xl border border-border shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <div className="text-primary text-[11px] font-mono font-semibold uppercase tracking-wider mb-1">
-            Portofolio Literasi Siswa & Guru
-          </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">Rak Buku Saya</h1>
           <p className="text-xs text-muted-foreground mt-1 max-w-xl">
-            Kelola buku yang sedang aktif dipinjam, tinjau rekam jejak literasi buku yang telah selesai dibaca, dan akses dokumen luring perangkat.
+            Kelola pinjaman aktif, riwayat bacaan, dan berkas luring.
           </p>
         </div>
 
@@ -182,14 +179,14 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
           </div>
 
           <div className="bg-muted/40 border border-border p-3 rounded-2xl text-center">
-            <span className="text-[10px] text-muted-foreground block font-medium">Telah Selesai</span>
+            <span className="text-[10px] text-muted-foreground block font-medium">Selesai</span>
             <span className="text-base sm:text-lg font-bold text-primary font-mono">
               {historyLoans.length}
             </span>
           </div>
 
           <div className="bg-muted/40 border border-border p-3 rounded-2xl text-center">
-            <span className="text-[10px] text-muted-foreground block font-medium">Siap Luring</span>
+            <span className="text-[10px] text-muted-foreground block font-medium">Luring</span>
             <span className="text-base sm:text-lg font-bold text-emerald-600 dark:text-emerald-400 font-mono">
               {offlineBooks.length}
             </span>
@@ -215,7 +212,7 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
           </TabsTrigger>
 
           <TabsTrigger value="offline" className="rounded-xl px-4 py-1.5 text-xs font-semibold gap-2">
-            <span>Tersimpan Luring</span>
+            <span>Luring</span>
             <span className="text-[10px] font-mono bg-background/80 px-1.5 py-0.2 rounded-full border border-border">
               {offlineBooks.length}
             </span>
@@ -247,9 +244,9 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                       <div className="flex items-center justify-between gap-2 mb-3">
                         {loan.loanType === 'DIGITAL' ? (
                           <div className="flex items-center gap-1.5">
-                            <Badge variant="ebook">E-Book Digital</Badge>
+                            <Badge variant="ebook">E-Book</Badge>
                             {savedOfflineIds.has(loan.bookId) && (
-                              <Badge variant="success">Tersimpan Luring</Badge>
+                              <Badge variant="success">Luring</Badge>
                             )}
                           </div>
                         ) : (
@@ -307,7 +304,7 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                         </>
                       ) : (
                         <div className="w-full text-center py-2 text-xs text-muted-foreground bg-muted/50 rounded-xl font-medium">
-                          Kembalikan di Meja Pustakawan
+                          Kembalikan di meja sirkulasi
                         </div>
                       )}
                     </div>
@@ -317,15 +314,15 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
             </div>
           ) : (
             <div className="text-center py-16 bg-card rounded-3xl border border-border p-8">
-              <h3 className="font-bold text-base text-foreground">Tidak ada pinjaman aktif</h3>
-              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                Anda sedang tidak meminjam buku fisik ataupun e-book. Kunjungi Katalog Buku untuk mulai meminjam.
+              <h3 className="font-semibold text-sm text-foreground">Tidak ada pinjaman aktif</h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
+                Koleksi yang sedang dipinjam akan muncul di sini.
               </p>
             </div>
           )}
         </TabsContent>
 
-        {/* TAB 2: Riwayat Selesai (Portofolio Literasi) */}
+        {/* TAB 2: Riwayat Selesai */}
         <TabsContent value="history" className="space-y-4">
           {historyLoans.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
@@ -340,7 +337,7 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                         {loan.loanType === 'DIGITAL' ? 'E-Book' : 'Buku Fisik'}
                       </Badge>
                       <span className="text-[10px] font-mono text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                        Selesai Dikembalikan
+                        Dikembalikan
                       </span>
                     </div>
 
@@ -358,7 +355,7 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
 
                   <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
                     <span className="text-[11px] text-muted-foreground">
-                      Status Denda: {loan.fineAmount > 0 ? `Rp ${loan.fineAmount.toLocaleString('id-ID')} (Lunas)` : 'Bebas Denda'}
+                      Denda: {loan.fineAmount > 0 ? `Rp ${loan.fineAmount.toLocaleString('id-ID')} (Lunas)` : 'Nihil'}
                     </span>
 
                     {loan.loanType === 'DIGITAL' && (
@@ -377,15 +374,15 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
             </div>
           ) : (
             <div className="text-center py-16 bg-card rounded-3xl border border-border p-8">
-              <h3 className="font-bold text-base text-foreground">Belum ada riwayat selesai</h3>
-              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                Buku yang telah Anda baca dan kembalikan akan otomatis terdata di sini sebagai catatan rekam literasi sekolah.
+              <h3 className="font-semibold text-sm text-foreground">Belum ada riwayat</h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
+                Buku yang sudah dikembalikan akan tercatat di sini.
               </p>
             </div>
           )}
         </TabsContent>
 
-        {/* TAB 3: Tersimpan Luring (IndexedDB) */}
+        {/* TAB 3: Tersimpan Luring */}
         <TabsContent value="offline" className="space-y-4">
           {offlineBooks.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -396,7 +393,7 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                 >
                   <div>
                     <div className="flex items-center justify-between gap-1 mb-2">
-                      <Badge variant="success">IndexedDB Luring</Badge>
+                      <Badge variant="success">Luring</Badge>
                       <span className="text-[10px] text-muted-foreground font-mono">
                         {(item.size / 1024 / 1024).toFixed(1)} MB
                       </span>
@@ -437,9 +434,9 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
             </div>
           ) : (
             <div className="text-center py-16 bg-card rounded-3xl border border-border p-8">
-              <h3 className="font-bold text-base text-foreground">Tidak ada buku tersimpan luring</h3>
-              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                Buka e-book yang sedang Anda pinjam, lalu tekan tombol "Unduh Offline" untuk menyimpannya ke memori perangkat.
+              <h3 className="font-semibold text-sm text-foreground">Tidak ada buku luring</h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
+                Unduh e-book saat membaca untuk dapat dibaca tanpa internet.
               </p>
             </div>
           )}
@@ -462,16 +459,15 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Kembalikan E-Book Sekarang?</AlertDialogTitle>
+            <AlertDialogTitle>Kembalikan E-Book?</AlertDialogTitle>
             <AlertDialogDescription>
-              Apakah Anda yakin ingin mengembalikan e-book <strong>"{bookToReturn?.title}"</strong>?
-              Buku ini akan dipindahkan ke tab <em>Riwayat Selesai</em> dan kuota pinjaman Anda akan bertambah 1.
+              Kembalikan <strong>"{bookToReturn?.title}"</strong> dan kosongkan kuota pinjaman Anda?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
             <AlertDialogAction onClick={confirmReturnDigital}>
-              Ya, Kembalikan Buku
+              Kembalikan
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -484,10 +480,9 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hapus Salinan Offline?</AlertDialogTitle>
+            <AlertDialogTitle>Hapus Berkas Luring?</AlertDialogTitle>
             <AlertDialogDescription>
-              Hapus berkas e-book <strong>"{bookToDeleteOffline?.title}"</strong> dari penyimpanan lokal IndexedDB perangkat ini?
-              Anda tetap dapat mengunduhnya kembali sewaktu-waktu saat terhubung ke jaringan internet.
+              Hapus salinan luring <strong>"{bookToDeleteOffline?.title}"</strong> dari perangkat ini?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -496,7 +491,7 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
               onClick={confirmDeleteOffline}
               className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
-              Hapus dari Perangkat
+              Hapus
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

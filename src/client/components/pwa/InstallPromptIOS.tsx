@@ -43,13 +43,10 @@ export const InstallPromptIOS: React.FC = () => {
         </button>
 
         <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary-50 flex items-center justify-center text-primary-600 font-bold shrink-0">
-            📖
-          </div>
           <div>
-            <h4 className="font-semibold text-sm">Pasang Pustaka di iPhone Anda</h4>
-            <p className="text-xs text-text-muted mt-1">
-              Akses cepat tanpa browser bar dan membaca buku lancar layaknya aplikasi App Store:
+            <h4 className="font-semibold text-sm">Pasang Aplikasi</h4>
+            <p className="text-xs text-text-muted mt-0.5">
+              Tambahkan ke layar utama untuk akses cepat:
             </p>
           </div>
         </div>
@@ -59,7 +56,7 @@ export const InstallPromptIOS: React.FC = () => {
             <span className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center font-bold text-[10px]">1</span>
             <span>Tekan ikon <strong>Share</strong></span>
             <Share size={14} className="text-primary-600 inline" />
-            <span>di toolbar bawah Safari.</span>
+            <span>di toolbar bawah.</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center font-bold text-[10px]">2</span>
@@ -68,7 +65,7 @@ export const InstallPromptIOS: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <span className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center font-bold text-[10px]">3</span>
-            <span>Tekan <strong>Add</strong> di pojok kanan atas.</span>
+            <span>Tekan <strong>Add</strong> di kanan atas.</span>
           </div>
         </div>
 
@@ -76,7 +73,7 @@ export const InstallPromptIOS: React.FC = () => {
           onClick={handleDismiss}
           className="mt-3 w-full py-1.5 text-center text-xs font-semibold text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors"
         >
-          Mengerti
+          Tutup
         </button>
       </div>
     </div>

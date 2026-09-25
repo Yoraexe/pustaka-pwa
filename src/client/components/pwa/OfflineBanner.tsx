@@ -29,7 +29,7 @@ export const OfflineBanner: React.FC = () => {
     <div className="bg-amber-500 text-white px-4 py-2 text-xs md:text-sm font-medium flex items-center justify-center gap-2 shadow-sm sticky top-0 z-50 animate-fadeIn">
       <WifiOff size={16} className="shrink-0" />
       <span>
-        Mode Offline aktif. Anda tetap dapat membaca buku yang telah disimpan di <strong>Rak Buku Saya</strong>.
+        Koneksi terputus. Buku yang tersimpan luring tetap dapat dibaca.
       </span>
     </div>
   );
