@@ -90,13 +90,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={onOpenCommand}
-              className="hidden lg:flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-border text-xs transition-colors"
+              className="hidden lg:flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground border border-border text-xs transition-colors cursor-pointer"
             >
               <Search size={14} />
               <span>Cari katalog...</span>
-              <kbd className="text-[10px] font-mono bg-background border px-1.5 py-0.5 rounded shadow-2xs">
-                ⌘K
-              </kbd>
             </button>
           )}
 

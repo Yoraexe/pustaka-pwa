@@ -32,48 +32,58 @@ export const InstallPromptIOS: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-16 md:bottom-6 z-40 px-4 flex justify-center animate-slideUp">
-      <div className="bg-surface-card border border-primary-100 shadow-xl rounded-2xl p-4 max-w-sm w-full text-text-main relative">
+    <div className="fixed inset-x-0 bottom-20 md:bottom-8 z-50 px-4 flex justify-center animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <div className="bg-card border border-border shadow-2xl rounded-3xl p-5 max-w-sm w-full text-card-foreground relative">
         <button
           onClick={handleDismiss}
-          className="absolute top-3 right-3 text-text-muted hover:text-text-main p-1"
+          className="absolute top-4 right-4 text-muted-foreground hover:text-foreground p-1 rounded-lg transition-colors cursor-pointer"
           aria-label="Tutup"
         >
-          <X size={18} />
+          <X size={16} />
         </button>
 
-        <div className="flex items-start gap-3">
-          <div>
-            <h4 className="font-semibold text-sm">Pasang Aplikasi</h4>
-            <p className="text-xs text-text-muted mt-0.5">
-              Tambahkan ke layar utama untuk akses cepat:
-            </p>
-          </div>
+        <div className="pr-6">
+          <h4 className="font-bold text-sm text-foreground">Pasang Aplikasi Pustaka</h4>
+          <p className="text-xs text-muted-foreground mt-1">
+            Akses katalog dan bacaan luring lebih cepat dari layar utama iPhone/iPad:
+          </p>
         </div>
 
-        <div className="mt-3 space-y-2 border-t border-slate-100 pt-3 text-xs text-text-main">
-          <div className="flex items-center gap-2">
-            <span className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center font-bold text-[10px]">1</span>
-            <span>Tekan ikon <strong>Share</strong></span>
-            <Share size={14} className="text-primary-600 inline" />
-            <span>di toolbar bawah.</span>
+        <div className="mt-4 space-y-2.5 border-t border-border pt-3.5 text-xs text-foreground">
+          <div className="flex items-center gap-2.5">
+            <span className="w-5 h-5 rounded-full bg-muted border border-border flex items-center justify-center font-mono font-bold text-[10px] shrink-0">
+              1
+            </span>
+            <span>
+              Tekan tombol <strong>Share</strong>{' '}
+              <Share size={13} className="text-primary inline mx-0.5 align-middle" /> di Safari.
+            </span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center font-bold text-[10px]">2</span>
-            <span>Pilih <strong>Add to Home Screen</strong></span>
-            <PlusSquare size={14} className="text-primary-600 inline" />
+          <div className="flex items-center gap-2.5">
+            <span className="w-5 h-5 rounded-full bg-muted border border-border flex items-center justify-center font-mono font-bold text-[10px] shrink-0">
+              2
+            </span>
+            <span>
+              Pilih <strong>Add to Home Screen</strong>{' '}
+              <PlusSquare size={13} className="text-primary inline mx-0.5 align-middle" />.
+            </span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="w-5 h-5 rounded-full bg-slate-100 flex items-center justify-center font-bold text-[10px]">3</span>
-            <span>Tekan <strong>Add</strong> di kanan atas.</span>
+          <div className="flex items-center gap-2.5">
+            <span className="w-5 h-5 rounded-full bg-muted border border-border flex items-center justify-center font-mono font-bold text-[10px] shrink-0">
+              3
+            </span>
+            <span>
+              Tekan <strong>Add</strong> di pojok kanan atas layar.
+            </span>
           </div>
         </div>
 
         <button
+          type="button"
           onClick={handleDismiss}
-          className="mt-3 w-full py-1.5 text-center text-xs font-semibold text-primary-600 bg-primary-50 rounded-lg hover:bg-primary-100 transition-colors"
+          className="mt-4 w-full py-2 text-center text-xs font-semibold text-primary bg-primary/10 rounded-xl hover:bg-primary/20 transition-colors cursor-pointer border border-primary/20"
         >
-          Tutup
+          Mengerti
         </button>
       </div>
     </div>

@@ -35,6 +35,16 @@ bookRouter.get('/', async (req: Request, res: Response, next: NextFunction): Pro
   }
 });
 
+// GET /api/books/copies/available (Daftar Eksemplar Fisik yang Tersedia untuk Peminjaman)
+bookRouter.get('/copies/available', async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const availableCopies = await bookService.getAvailableCopies();
+    res.json({ success: true, data: availableCopies });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/books/:id
 bookRouter.get('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {

@@ -10,8 +10,9 @@
  * Side Effects: Membaca clipboard API, trigger Sonner toast feedback, memanggil callback onBorrowDigital.
  */
 
-import React from 'react';
-import type { Book } from '../../../shared/types/index.js';
+import React, { useState, useEffect } from 'react';
+import type { Book, BookCopy } from '../../../shared/types/index.js';
+import { api } from '../../services/api.js';
 import {
   Dialog,
   DialogContent,
@@ -28,6 +29,7 @@ interface BookDetailModalProps {
   book: Book;
   onClose: () => void;
   onBorrowDigital?: (book: Book) => void;
+  onReservePhysical?: (book: Book) => void;
   isBorrowed?: boolean;
 }
 
@@ -35,10 +37,25 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
   book,
   onClose,
   onBorrowDigital,
+  onReservePhysical,
   isBorrowed = false,
 }) => {
+  const hasEbook = Boolean(book.ebookFilePath);
   const isDigital = book.bookType === 'DIGITAL_ONLY' || book.bookType === 'HYBRID';
   const isPhysical = book.bookType === 'PHYSICAL_ONLY' || book.bookType === 'HYBRID';
+  const [copies, setCopies] = useState<BookCopy[]>(book.copies || []);
+
+  useEffect(() => {
+    if (isPhysical && (!book.copies || book.copies.length === 0)) {
+      api.getBookById(book.id)
+        .then((b: Book) => {
+          if (b.copies) setCopies(b.copies);
+        })
+        .catch((err: unknown) => console.error('Failed to load copies', err));
+    } else if (book.copies) {
+      setCopies(book.copies);
+    }
+  }, [book.id, isPhysical, book.copies]);
 
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text).then(() => {
@@ -113,6 +130,37 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
                 <p className="text-amber-800 dark:text-amber-300/90">
                   Tersedia <strong>{book.availablePhysicalCopies}</strong> dari {book.totalPhysicalCopies} eksemplar.
                 </p>
+
+                {/* Daftar Barcode Eksemplar */}
+                {copies.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-amber-500/20">
+                    <span className="text-[10px] text-amber-900/80 dark:text-amber-300/80 font-mono uppercase tracking-wider block mb-1.5 font-semibold">
+                      Barcode Eksemplar ({copies.length}):
+                    </span>
+                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+                      {copies.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          onClick={() => handleCopy(c.barcode, 'Barcode Eksemplar')}
+                          className={`px-2 py-1 rounded-lg text-[10px] font-mono border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                            c.status === 'AVAILABLE'
+                              ? 'bg-background hover:bg-emerald-500/10 border-emerald-500/30 text-foreground font-semibold shadow-2xs'
+                              : 'bg-muted/70 border-border text-muted-foreground line-through opacity-70'
+                          }`}
+                          title={`Barcode: ${c.barcode} (${c.status === 'AVAILABLE' ? 'Tersedia di rak' : 'Sedang dipinjam'}) - Klik untuk salin`}
+                        >
+                          <span>{c.barcode}</span>
+                          <span
+                            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                              c.status === 'AVAILABLE' ? 'bg-emerald-500' : 'bg-muted-foreground'
+                            }`}
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -120,42 +168,75 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
               <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-xs space-y-1.5">
                 <div className="flex items-center justify-between">
                   <h4 className="font-bold text-blue-900 dark:text-blue-200">Format Digital</h4>
-                  <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-500/15 px-2 py-0.5 rounded-full">
-                    Akses Luring
+                  <span
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                      hasEbook
+                        ? 'text-blue-700 dark:text-blue-300 bg-blue-500/15'
+                        : 'text-amber-700 dark:text-amber-300 bg-amber-500/15'
+                    }`}
+                  >
+                    {hasEbook ? 'Akses Luring & Daring' : 'Dokumen PDF Menunggu'}
                   </span>
                 </div>
                 <p className="text-blue-800 dark:text-blue-300/90 text-xs">
-                  Dapat dibaca langsung atau disimpan untuk akses luring.
+                  {hasEbook
+                    ? 'Dapat dibaca langsung di browser atau disimpan untuk akses luring tanpa internet.'
+                    : 'Berkas e-book belum diunggah oleh staf perpustakaan.'}
                 </p>
               </div>
             )}
           </div>
         </div>
 
-        <DialogFooter className="border-t border-border pt-4">
+        <DialogFooter className="border-t border-border pt-4 flex-wrap gap-2">
           <Button variant="outline" onClick={onClose} className="text-xs">
             Tutup
           </Button>
 
-          {isBorrowed ? (
+          {isBorrowed && (
             <div className="inline-flex items-center px-4 py-2 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-semibold border border-emerald-500/20">
               Sedang Dipinjam
             </div>
-          ) : isDigital ? (
-            <Button
-              variant="default"
-              onClick={() => {
-                onBorrowDigital?.(book);
-                onClose();
-              }}
-              className="text-xs font-semibold"
-            >
-              Pinjam E-Book (7 Hari)
-            </Button>
-          ) : (
-            <div className="inline-flex items-center px-4 py-2 bg-muted text-muted-foreground rounded-xl text-xs font-medium">
-              Tersedia di meja sirkulasi
-            </div>
+          )}
+
+          {/* Opsi Pinjam E-Book Digital */}
+          {isDigital && !isBorrowed && (
+            hasEbook ? (
+              <Button
+                variant={book.bookType === 'DIGITAL_ONLY' ? 'default' : 'secondary'}
+                onClick={() => {
+                  onBorrowDigital?.(book);
+                  onClose();
+                }}
+                className="text-xs font-semibold"
+              >
+                Pinjam E-Book (7 Hari)
+              </Button>
+            ) : (
+              <div className="inline-flex items-center px-3 py-1.5 bg-muted text-muted-foreground rounded-xl text-xs font-medium">
+                E-Book Belum Tersedia
+              </div>
+            )
+          )}
+
+          {/* Opsi Reservasi Buku Fisik */}
+          {isPhysical && !isBorrowed && (
+            book.availablePhysicalCopies > 0 ? (
+              <Button
+                variant={book.bookType === 'PHYSICAL_ONLY' ? 'default' : 'outline'}
+                onClick={() => {
+                  onReservePhysical?.(book);
+                  onClose();
+                }}
+                className="text-xs font-semibold border-amber-500/40 hover:bg-amber-500/10 text-amber-900 dark:text-amber-200"
+              >
+                Reservasi Buku Fisik
+              </Button>
+            ) : (
+              <div className="inline-flex items-center px-3 py-1.5 bg-muted text-muted-foreground rounded-xl text-xs font-medium">
+                Stok Fisik Habis
+              </div>
+            )
           )}
         </DialogFooter>
       </DialogContent>

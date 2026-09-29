@@ -10,14 +10,41 @@
  * Side Effects: Membuat record buku dan file mock di ./uploads/ saat pengujian berjalan.
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../src/server/app.js';
+import { db } from '../../src/server/db/index.js';
+import { books, bookCopies, loans } from '../../src/server/db/schema.js';
+import { eq } from 'drizzle-orm';
+import fs from 'fs';
+import path from 'path';
 
 describe('Book Creation & Ingestion API Integration Tests', () => {
   const app = createApp();
   let studentToken = '';
   let librarianToken = '';
+  const createdBookIds: number[] = [];
+  const createdFilePaths: string[] = [];
+
+  afterAll(async () => {
+    // 1. Clean up created books, copies, loans from test
+    for (const bookId of createdBookIds) {
+      db.delete(loans).where(eq(loans.bookId, bookId)).run();
+      db.delete(bookCopies).where(eq(bookCopies.bookId, bookId)).run();
+      db.delete(books).where(eq(books.id, bookId)).run();
+    }
+
+    // 2. Clean up created mock files
+    for (const filePath of createdFilePaths) {
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+        }
+      } catch {
+        // Ignore file cleanup error
+      }
+    }
+  });
 
   beforeAll(async () => {
     // 1. Login sebagai Siswa
@@ -95,6 +122,7 @@ describe('Book Creation & Ingestion API Integration Tests', () => {
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
     const createdBook = res.body.data;
+    createdBookIds.push(createdBook.id);
     expect(createdBook.title).toBe('Fisika Kuantum Eksperimental');
     expect(createdBook.bookType).toBe('PHYSICAL_ONLY');
     expect(createdBook.totalPhysicalCopies).toBe(3);
@@ -114,8 +142,8 @@ describe('Book Creation & Ingestion API Integration Tests', () => {
       .post('/api/books')
       .set('Authorization', `Bearer ${librarianToken}`)
       .field('title', 'Kumpulan Esai Sains Digital')
-      .field('author', 'Tim Guru Digital', )
-      .field('publisher', 'SMAN 1 Merdeka Cyber', )
+      .field('author', 'Tim Guru Digital')
+      .field('publisher', 'SMAN 1 Merdeka Cyber')
       .field('publicationYear', '2026')
       .field('categoryId', '1')
       .field('bookType', 'DIGITAL_ONLY')
@@ -125,6 +153,10 @@ describe('Book Creation & Ingestion API Integration Tests', () => {
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
     const digitalBook = res.body.data;
+    createdBookIds.push(digitalBook.id);
+    if (digitalBook.ebookFilePath) {
+      createdFilePaths.push(path.resolve(digitalBook.ebookFilePath));
+    }
     expect(digitalBook.bookType).toBe('DIGITAL_ONLY');
     expect(digitalBook.totalPhysicalCopies).toBe(0);
     expect(digitalBook.availablePhysicalCopies).toBe(0);
@@ -164,6 +196,13 @@ describe('Book Creation & Ingestion API Integration Tests', () => {
     expect(res.status).toBe(201);
     expect(res.body.success).toBe(true);
     const hybridBook = res.body.data;
+    createdBookIds.push(hybridBook.id);
+    if (hybridBook.ebookFilePath) {
+      createdFilePaths.push(path.resolve(hybridBook.ebookFilePath));
+    }
+    if (hybridBook.coverUrl && hybridBook.coverUrl.startsWith('/uploads/')) {
+      createdFilePaths.push(path.resolve('.' + hybridBook.coverUrl));
+    }
     expect(hybridBook.bookType).toBe('HYBRID');
     expect(hybridBook.totalPhysicalCopies).toBe(2);
     expect(hybridBook.shelfLocation).toBe('RAK-BIO-02');

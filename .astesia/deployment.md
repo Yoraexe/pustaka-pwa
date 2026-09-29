@@ -18,9 +18,14 @@ npm run db:seed
 
 # 3. Jalankan server backend (port 3001) dan client Vite PWA (port 5173) secara bersamaan:
 npm run dev
+
+# 4. (OPSIONAL) Akses Publik Gratis dari HP/Internet Luar via Cloudflare Tunnel:
+npm run dev:public
+# atau klik ganda file: start-server-public.bat
 ```
 
-Aplikasi PWA dapat langsung diakses melalui browser di: `http://localhost:5173`.
+Aplikasi PWA lokal: `http://localhost:5173`.  
+Jika menjalankan `npm run dev:public`, salin URL HTTPS acak (`https://xxxx.trycloudflare.com`) dari terminal untuk pengujian PWA di smartphone luar jaringan.
 
 ---
 

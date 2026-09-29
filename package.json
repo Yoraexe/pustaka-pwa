@@ -5,15 +5,17 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:public": "concurrently -n \"SERVER,CLIENT,TUNNEL\" -c \"blue,green,magenta\" \"npm run dev:server\" \"npm run dev:client\" \"npm run tunnel\"",
     "dev:server": "tsx watch src/server/index.ts",
     "dev:client": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "start": "node --loader tsx src/server/index.ts",
-    "test": "vitest run",
+    "test": "vitest run --no-file-parallelism",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
-    "db:seed": "tsx src/server/db/seed.ts"
+    "db:seed": "tsx src/server/db/seed.ts",
+    "tunnel": "cloudflared tunnel --url http://localhost:5173"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.23",

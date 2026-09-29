@@ -51,6 +51,21 @@ export const CreateBookSchema = z.object({
   digitalLicenseCount: z.coerce.number().int().min(0).default(5),
   totalPhysicalCopies: z.coerce.number().int().min(0).default(1),
   shelfLocation: z.string().optional().nullable()
+}).superRefine((data, ctx) => {
+  if (data.bookType === 'DIGITAL_ONLY' && !data.ebookFilePath) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Berkas e-book PDF wajib dilampirkan untuk buku berjenis DIGITAL_ONLY',
+      path: ['ebookFilePath']
+    });
+  }
+  if (data.bookType === 'PHYSICAL_ONLY' && data.totalPhysicalCopies < 1) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'Jumlah eksemplar fisik minimal 1 untuk buku berjenis PHYSICAL_ONLY',
+      path: ['totalPhysicalCopies']
+    });
+  }
 });
 
 export type CreateBookInput = z.infer<typeof CreateBookSchema>;
@@ -74,3 +89,21 @@ export const ReturnPhysicalLoanSchema = z.object({
 });
 
 export type ReturnPhysicalLoanInput = z.infer<typeof ReturnPhysicalLoanSchema>;
+
+export const ReservePhysicalLoanSchema = z.object({
+  bookId: z.coerce.number().int().positive('ID Buku tidak valid')
+});
+
+export type ReservePhysicalLoanInput = z.infer<typeof ReservePhysicalLoanSchema>;
+
+export const ClaimReservationSchema = z.object({
+  reservationCode: z.string().min(3, 'Kode reservasi wajib diisi').trim()
+});
+
+export type ClaimReservationInput = z.infer<typeof ClaimReservationSchema>;
+
+export const CancelReservationSchema = z.object({
+  loanId: z.coerce.number().int().positive('ID Peminjaman/Reservasi tidak valid')
+});
+
+export type CancelReservationInput = z.infer<typeof CancelReservationSchema>;

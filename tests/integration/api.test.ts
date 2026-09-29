@@ -4,13 +4,22 @@
  * @layer Quality Assurance (Integration Test)
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterAll } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../src/server/app.js';
+import { db } from '../../src/server/db/index.js';
+import { users } from '../../src/server/db/schema.js';
+import { inArray } from 'drizzle-orm';
 
 describe('Pustaka Sekolah API Integration Tests', () => {
   const app = createApp();
   let studentToken = '';
+  let adminToken = '';
+  const testIdentities = ['NISN_API_001', 'NIP_API_002'];
+
+  afterAll(() => {
+    db.delete(users).where(inArray(users.identityNumber, testIdentities)).run();
+  });
 
   it('GET /api/health harus mengembalikan status healthy', async () => {
     const res = await request(app).get('/api/health');
@@ -32,6 +41,17 @@ describe('Pustaka Sekolah API Integration Tests', () => {
     expect(res.body.data.token).toBeDefined();
     expect(res.body.data.user.role).toBe('STUDENT');
     studentToken = res.body.data.token;
+
+    // Login juga sebagai Admin untuk pengujian endpoint terproteksi
+    const adminLogin = await request(app)
+      .post('/api/auth/login')
+      .send({
+        identityNumber: 'ADMIN01',
+        password: 'admin123'
+      });
+    expect(adminLogin.status).toBe(200);
+    expect(adminLogin.body.data.user.role).toBe('ADMIN');
+    adminToken = adminLogin.body.data.token;
   });
 
   it('GET /api/books/categories harus mengembalikan daftar kategori buku', async () => {
@@ -104,5 +124,47 @@ describe('Pustaka Sekolah API Integration Tests', () => {
     expect(pdfRes.headers['cache-control']).toContain('must-revalidate');
     expect(pdfRes.headers['content-length']).toBeDefined();
     expect(Number(pdfRes.headers['content-length'])).toBeGreaterThan(0);
+  });
+
+  it('GET /api/books/copies/available harus mengembalikan daftar eksemplar fisik di rak', async () => {
+    const res = await request(app).get('/api/books/copies/available');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    if (res.body.data.length > 0) {
+      const copy = res.body.data[0];
+      expect(copy.barcode).toBeDefined();
+      expect(copy.bookTitle).toBeDefined();
+      expect(copy.status).toBe('AVAILABLE');
+    }
+  });
+
+  it('POST /api/auth/import-users harus menolak pengguna non-admin (403 Forbidden)', async () => {
+    const csvContent = 'identityNumber,name,role,email,password\nNISN_API_001,Siswa Test,Siswa,,pass123';
+    const res = await request(app)
+      .post('/api/auth/import-users')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ csvContent });
+
+    expect(res.status).toBe(403);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('POST /api/auth/import-users harus berhasil mengimpor pengguna jika dipanggil oleh Admin', async () => {
+    const csvContent = [
+      'identityNumber,name,role,email,password',
+      'NISN_API_001,Siswa API Test,Siswa,siswa.api@test.com,rahasia123',
+      'NIP_API_002,Guru API Test,Guru,guru.api@test.com,rahasia123',
+    ].join('\n');
+
+    const res = await request(app)
+      .post('/api/auth/import-users')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ csvContent });
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.totalRows).toBe(2);
+    expect(res.body.data.importedCount).toBe(2);
   });
 });

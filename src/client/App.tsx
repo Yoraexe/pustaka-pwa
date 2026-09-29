@@ -15,6 +15,7 @@ import { useAuth } from './hooks/useAuth.js';
 import { Navbar } from './components/common/Navbar.js';
 import { BottomNav } from './components/common/BottomNav.js';
 import { OfflineBanner } from './components/pwa/OfflineBanner.js';
+import { InstallPromptIOS } from './components/pwa/InstallPromptIOS.js';
 import { CatalogPage } from './pages/CatalogPage.js';
 import { MyBooksPage } from './pages/MyBooksPage.js';
 import { CirculationDesk } from './components/circulation/CirculationDesk.js';
@@ -77,6 +78,9 @@ export const App: React.FC = () => {
 
       {/* Offline Status Bar */}
       <OfflineBanner />
+
+      {/* iOS PWA Add to Home Screen Prompt */}
+      <InstallPromptIOS />
 
       {/* Desktop / Tablet Top Header */}
       <Navbar
@@ -284,6 +288,27 @@ export const App: React.FC = () => {
               setCurrentTab('my-books');
             } catch (err: unknown) {
               toast.error(err instanceof Error ? err.message : 'Gagal meminjam e-book.');
+            }
+          }}
+          onReservePhysical={async (book) => {
+            if (!isAuthenticated) {
+              toast.warning('Perlu Masuk', {
+                description: 'Silakan masuk untuk mereservasi buku fisik.',
+                action: {
+                  label: 'Masuk',
+                  onClick: () => setIsLoginModalOpen(true),
+                },
+              });
+              return;
+            }
+            try {
+              const res = await api.reservePhysicalBook(book.id);
+              toast.success('Reservasi Berhasil!', {
+                description: `Tiket ${res.reservationCode} dibuat. Silakan ambil di perpustakaan dalam 24 jam.`,
+              });
+              setCurrentTab('my-books');
+            } catch (err: unknown) {
+              toast.error(err instanceof Error ? err.message : 'Gagal mereservasi buku fisik.');
             }
           }}
         />

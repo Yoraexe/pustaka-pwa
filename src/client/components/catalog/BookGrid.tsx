@@ -30,7 +30,6 @@ interface BookGridProps {
   onSelectDetail: (book: Book) => void;
   borrowedBookIds: Set<number>;
   isLoading: boolean;
-  onOpenCommand?: () => void;
 }
 
 export const BookGrid: React.FC<BookGridProps> = ({
@@ -46,7 +45,6 @@ export const BookGrid: React.FC<BookGridProps> = ({
   onSelectDetail,
   borrowedBookIds,
   isLoading,
-  onOpenCommand,
 }) => {
   const [onlyAvailable, setOnlyAvailable] = useState<boolean>(false);
   const [sortBy, setSortBy] = useState<'latest' | 'title' | 'year'>('latest');
@@ -84,35 +82,25 @@ export const BookGrid: React.FC<BookGridProps> = ({
         {/* Search Input Box */}
         <div className="flex items-center gap-2">
           <div className="relative flex-1">
-            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Cari judul buku atau pengarang..."
-              className="w-full pl-11 pr-20 py-2.5 bg-muted/40 border border-border/80 rounded-2xl text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:bg-background transition-all"
+              placeholder="Cari judul buku, penulis, atau topik pelajaran..."
+              className="w-full pl-11 pr-10 py-2.5 bg-muted/40 border border-border/80 rounded-2xl text-xs sm:text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:bg-background transition-all"
             />
-            {onOpenCommand && (
+            {searchTerm && (
               <button
                 type="button"
-                onClick={onOpenCommand}
-                className="hidden sm:inline-flex items-center absolute right-3 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-lg bg-background border border-border text-[10px] text-muted-foreground font-mono shadow-xs hover:text-foreground"
+                onClick={() => onSearchChange('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground text-xs rounded-full cursor-pointer transition-colors"
+                title="Hapus pencarian"
               >
-                ⌘K
+                ✕
               </button>
             )}
           </div>
-
-          {onOpenCommand && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="sm:hidden shrink-0 rounded-2xl font-mono text-xs px-3"
-              onClick={onOpenCommand}
-            >
-              ⌘K
-            </Button>
-          )}
         </div>
 
         {/* Format Selector Tabs */}

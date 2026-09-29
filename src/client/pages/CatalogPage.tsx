@@ -18,11 +18,9 @@ import { BookGrid } from '../components/catalog/BookGrid.js';
 import { BookDetailModal } from '../components/catalog/BookDetailModal.js';
 import { AddBookModal } from '../components/catalog/AddBookModal.js';
 import { Button } from '../components/ui/button.js';
-import { Badge } from '../components/ui/badge.js';
 import { Spotlight } from '../components/ui/spotlight.js';
 import { FlipWords } from '../components/ui/flip-words.js';
 import { MovingBorderButton } from '../components/ui/moving-border.js';
-import { BentoGrid, BentoGridItem } from '../components/ui/bento-grid.js';
 import { toast } from 'sonner';
 
 interface CatalogPageProps {
@@ -134,6 +132,36 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
     }
   };
 
+  const handleReservePhysical = async (book: Book) => {
+    if (!isAuthenticated) {
+      toast.warning('Akses Dibatasi', {
+        description: 'Silakan masuk terlebih dahulu menggunakan NISN atau NIP untuk mereservasi buku fisik.',
+        action: {
+          label: 'Masuk Sekarang',
+          onClick: onOpenLogin,
+        },
+      });
+      return;
+    }
+
+    try {
+      const res = await api.reservePhysicalBook(book.id);
+      toast.success('Reservasi Berhasil!', {
+        description: `Buku "${book.title}" berhasil direservasi (Kode: ${res.reservationCode}). Silakan ambil di perpustakaan dalam 24 jam.`,
+        action: {
+          label: 'Lihat Tiket',
+          onClick: onNavigateToMyBooks,
+        },
+      });
+      fetchBooks();
+      await fetchUserBorrows();
+    } catch (err: unknown) {
+      toast.error('Gagal Reservasi', {
+        description: err instanceof Error ? err.message : 'Terjadi kendala saat memproses reservasi fisik.',
+      });
+    }
+  };
+
 
 
   return (
@@ -171,7 +199,6 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
                 className="bg-card hover:bg-muted text-foreground font-semibold text-xs px-4 py-2 border-border shadow-2xs"
               >
                 <span>Cari Buku</span>
-                <kbd className="ml-2 text-[10px] bg-muted px-1.5 py-0.5 rounded font-mono border border-border">⌘K</kbd>
               </MovingBorderButton>
             )}
 
@@ -198,46 +225,21 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
         </div>
       </div>
 
-      {/* Aceternity UI Bento Grid - Pustaka Feature Highlights (Clean 4-Card Equal Row) */}
-      <BentoGrid>
-        <BentoGridItem
-          badge={<Badge variant="ebook">E-Book</Badge>}
-          title="Koleksi Digital"
-          description="Akses e-book luring langsung di perangkat tanpa kuota."
-          actionText="Buka Digital"
-          onClick={() => setSelectedType('DIGITAL_ONLY')}
-        />
-
-        <BentoGridItem
-          badge={<Badge variant="physical">Fisik</Badge>}
-          title="Koleksi Rak"
-          description="Pantau ketersediaan eksemplar di rak sekolah."
-          actionText="Buka Fisik"
-          onClick={() => setSelectedType('PHYSICAL_ONLY')}
-        />
-
-        <BentoGridItem
-          badge={<Badge variant="outline">Shortcut</Badge>}
-          title="Pencarian Cepat"
-          description="Temukan buku instan menggunakan tombol pintas."
-          actionText="Buka ⌘K"
-          onClick={() => onOpenCommand?.()}
-        />
-
-        <BentoGridItem
-          badge={<Badge variant="hybrid">Kurikulum</Badge>}
-          title="Kurikulum Merdeka"
-          description="Modul ajar resmi terbitan Kemendikbudristek."
-          actionText="Lihat Topik"
-          onClick={() => setSearchTerm('Informatika')}
-        />
-      </BentoGrid>
-
       {/* Main Catalog Grid */}
-      <div className="space-y-4 pt-2">
-        <h2 className="font-bold text-lg text-foreground tracking-tight">
-          Katalog Buku
-        </h2>
+      <div className="space-y-4 pt-1">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-bold text-lg text-foreground tracking-tight">
+              Katalog Buku
+            </h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Jelajahi dan pinjam buku kurikulum resmi, modul ajar, dan koleksi fisik sekolah.
+            </p>
+          </div>
+          <span className="text-xs text-muted-foreground font-mono bg-muted/60 border border-border px-2.5 py-1 rounded-full">
+            {books.length} Koleksi
+          </span>
+        </div>
 
         <BookGrid
           books={books}
@@ -252,7 +254,6 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
           onSelectDetail={setSelectedDetailBook}
           borrowedBookIds={borrowedBookIds}
           isLoading={isLoading}
-          onOpenCommand={onOpenCommand}
         />
       </div>
 
@@ -262,6 +263,7 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
           book={selectedDetailBook}
           onClose={() => setSelectedDetailBook(null)}
           onBorrowDigital={handleBorrowDigital}
+          onReservePhysical={handleReservePhysical}
           isBorrowed={borrowedBookIds.has(selectedDetailBook.id)}
         />
       )}

@@ -26,6 +26,14 @@ export class BookService {
     return book;
   }
 
+  async getBookCopies(id: number): Promise<BookCopy[]> {
+    return this.bookRepo.findCopiesByBookId(id);
+  }
+
+  async getAvailableCopies() {
+    return this.bookRepo.findAvailableCopies();
+  }
+
   async addNewBook(input: CreateBookInput): Promise<Book & { copies: BookCopy[] }> {
     const createdBook = await this.bookRepo.create(input);
     const copies: BookCopy[] = [];

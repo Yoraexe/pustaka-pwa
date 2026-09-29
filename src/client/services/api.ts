@@ -6,7 +6,7 @@
 
 import type {
   ApiResponse, AuthSession, Book, BookCopy, BookFilterInput,
-  Category, CreateBookInput, Loan, LoginInput
+  Category, CreateBookInput, Loan, LoginInput, CsvImportResult, AvailableCopy
 } from '../../shared/types/index.js';
 
 const API_BASE = '/api';
@@ -80,13 +80,30 @@ class ApiClient {
     return this.request<AuthSession['user']>('/auth/me');
   }
 
-  logout() {
+  logout(): void {
     this.setToken(null);
+  }
+
+  async importUsersCsv(data: FormData | { csvText: string }): Promise<CsvImportResult> {
+    const isFormData = data instanceof FormData;
+    const body = isFormData ? data : JSON.stringify(data);
+    return this.request<CsvImportResult>('/auth/import-users', {
+      method: 'POST',
+      body
+    });
   }
 
   // --- Books & Catalog ---
   async getCategories(): Promise<Category[]> {
     return this.request<Category[]>('/books/categories');
+  }
+
+  async getBookById(id: number): Promise<Book> {
+    return this.request<Book>(`/books/${id}`);
+  }
+
+  async getAvailableCopies(): Promise<AvailableCopy[]> {
+    return this.request<AvailableCopy[]>('/books/copies/available');
   }
 
   async getBooks(filters: BookFilterInput = {}): Promise<Book[]> {
@@ -188,6 +205,32 @@ class ApiClient {
 
   async getAllLoans(): Promise<Loan[]> {
     return this.request<Loan[]>('/circulation/all');
+  }
+
+  // --- Physical Book Reservation ---
+  async reservePhysicalBook(bookId: number): Promise<Loan> {
+    return this.request<Loan>('/circulation/physical/reserve', {
+      method: 'POST',
+      body: JSON.stringify({ bookId })
+    });
+  }
+
+  async claimReservation(reservationCode: string): Promise<Loan> {
+    return this.request<Loan>('/circulation/physical/claim', {
+      method: 'POST',
+      body: JSON.stringify({ reservationCode })
+    });
+  }
+
+  async cancelReservation(loanId: number): Promise<void> {
+    return this.request<void>('/circulation/physical/cancel-reserve', {
+      method: 'POST',
+      body: JSON.stringify({ loanId })
+    });
+  }
+
+  async getReservations(activeOnly = true): Promise<Loan[]> {
+    return this.request<Loan[]>(`/circulation/reservations?active=${activeOnly}`);
   }
 }
 

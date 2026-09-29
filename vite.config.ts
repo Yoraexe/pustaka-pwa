@@ -72,8 +72,29 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src')
     }
   },
+  build: {
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-ui': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-alert-dialog',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-slot',
+            '@radix-ui/react-tooltip'
+          ],
+          'vendor-motion': ['framer-motion'],
+          'vendor-icons': ['lucide-react']
+        }
+      }
+    }
+  },
   server: {
     port: 5173,
+    host: true,
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://localhost:3001',

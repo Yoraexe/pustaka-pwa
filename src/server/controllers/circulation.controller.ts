@@ -6,7 +6,14 @@
 
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { circulationService } from '../services/circulation.service.js';
-import { DigitalLoanSchema, PhysicalLoanSchema, ReturnPhysicalLoanSchema } from '../../shared/schemas/index.js';
+import {
+  DigitalLoanSchema,
+  PhysicalLoanSchema,
+  ReturnPhysicalLoanSchema,
+  ReservePhysicalLoanSchema,
+  ClaimReservationSchema,
+  CancelReservationSchema
+} from '../../shared/schemas/index.js';
 import { authenticateToken, requireRole } from '../middleware/auth.middleware.js';
 
 export const circulationRouter = Router();
@@ -91,6 +98,64 @@ circulationRouter.get('/all', authenticateToken, requireRole(['LIBRARIAN', 'ADMI
     res.json({
       success: true,
       data: loans
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 7. Physical Loan - Reserve (Siswa / Guru)
+circulationRouter.post('/physical/reserve', authenticateToken, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const input = ReservePhysicalLoanSchema.parse(req.body);
+    const reservation = await circulationService.reservePhysicalBook(req.user!, input.bookId);
+    res.status(201).json({
+      success: true,
+      message: `Buku berhasil direservasi. Kode tiket Anda: ${reservation.reservationCode}. Tunjukkan ke pustakawan dalam waktu 24 jam.`,
+      data: reservation
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 8. Physical Loan - Claim Reservation (Meja Pustakawan)
+circulationRouter.post('/physical/claim', authenticateToken, requireRole(['LIBRARIAN', 'ADMIN']), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const input = ClaimReservationSchema.parse(req.body);
+    const loan = await circulationService.claimPhysicalReservation(req.user!, input.reservationCode);
+    res.json({
+      success: true,
+      message: `Klaim tiket reservasi ${input.reservationCode} berhasil. Peminjaman fisik telah dicatat.`,
+      data: loan
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 9. Physical Loan - Cancel Reservation (Siswa atau Pustakawan)
+circulationRouter.post('/physical/cancel-reserve', authenticateToken, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const input = CancelReservationSchema.parse(req.body);
+    await circulationService.cancelPhysicalReservation(req.user!, input.loanId);
+    res.json({
+      success: true,
+      message: 'Tiket reservasi berhasil dibatalkan dan stok eksemplar telah dipulihkan.'
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 10. Physical Loan - All Reservations List (Meja Pustakawan)
+circulationRouter.get('/reservations', authenticateToken, requireRole(['LIBRARIAN', 'ADMIN']), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const activeOnly = req.query.active !== 'false';
+    const reservations = await circulationService.getAllReservations(activeOnly);
+    res.json({
+      success: true,
+      data: reservations
     });
   } catch (err) {
     next(err);

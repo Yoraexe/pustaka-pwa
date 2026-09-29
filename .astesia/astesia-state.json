@@ -134,9 +134,43 @@
       "timestamp": "2026-09-22T22:04:00+08:00",
       "action": "UI/UX Modernization executed (Anti-AI Slop)",
       "agent_note": "Integrated Shadcn UI primitives (Dialog, AlertDialog, Tabs, Sonner, Command Palette) with tactile Aceternity accents (CardSpotlight, BentoGrid). Eliminated native alert/confirm."
+    },
+    {
+      "layer": "engineering",
+      "timestamp": "2026-09-25T18:22:00+08:00",
+      "action": "Feature Completion & Defect Remediation",
+      "agent_note": "Fixed non-functioning and missing features: Admin CSV member import (backend route, service with flexible header parsing, UserImportModal), circulation shelf copy selection & direct return action, book cover image file upload in AddBookModal, physical copy barcode viewer with click-to-copy in BookDetailModal, iOS PWA install prompt mounted, PDFReader zoom/pagination/memory leak fix, purged test DB pollution and added afterAll test fixtures cleanup. 27 Vitest tests passing 100% and zero-error production build."
+    },
+    {
+      "layer": "devops",
+      "timestamp": "2026-09-25T21:08:00+08:00",
+      "action": "Local Development Hosting via Cloudflare Tunnel Setup",
+      "agent_note": "Configured zero-cost public access for development/demo: installed cloudflared, configured vite.config.ts allowedHosts & host binding, added npm run dev:public and start-server-public.bat."
+    },
+    {
+      "layer": "quality",
+      "timestamp": "2026-09-29T14:05:00+08:00",
+      "action": "Quality Hardening & Edge-Case Remediation",
+      "agent_note": "Remediated schema validation for DIGITAL_ONLY books (mandatory PDF upload enforcement in CreateBookSchema & AddBookModal), safeguarded BookDetailModal against borrowing unattached digital documents, hardened Vitest test runner with --no-file-parallelism for SQLite safety, and optimized Vite production bundle splitting into modular vendor chunks (reduced main chunk from 857kB to 319kB)."
+    },
+    {
+      "layer": "engineering",
+      "timestamp": "2026-09-29T17:45:00+08:00",
+      "action": "Physical & Hybrid Book Reservation Workflow (Option A)",
+      "agent_note": "Implemented end-to-end self-service physical book reservation: DB migration (reservation_code, reserved_until, RESERVED/CANCELLED enum), Drizzle schema, atomicity with BEGIN IMMEDIATE/COMMIT, circulation service with 24h expiration and quota check, REST endpoints (/reserve, /claim, /cancel-reserve, /reservations), BookDetailModal reservation action, MyBooksPage Tiket Reservasi tab with copy ticket code, countdown, and cancellation dialog, CirculationDesk Klaim Reservasi tab with 1-click handover and code validation. 32 Vitest unit/integration tests passing 100% and production build verified."
     }
   ],
   "decisions": [
+    {
+      "id": "DEC-007",
+      "title": "Physical & Hybrid Book Reservation (Option A: Pick-up Ticket)",
+      "rationale": "Memberikan pemustaka kemampuan memesan buku fisik/hybrid langsung dari aplikasi dengan kunci eksemplar 24 jam dan tiket unik (RSV-...) yang diserahkan di meja sirkulasi pustakawan."
+    },
+    {
+      "id": "DEC-006",
+      "title": "Zero-Cost Local Development Hosting via Cloudflare Tunnel",
+      "rationale": "Memungkinkan akses publik HTTPS gratis untuk pengujian PWA di smartphone/internet luar tanpa merusak arsitektur SQLite/local storage."
+    },
     {
       "id": "DEC-001",
       "title": "Hybrid Library Model (Digital & Physical)",
@@ -187,7 +221,7 @@
       "frontend": "TailwindCSS + PDF.js Canvas Reader"
     },
     "created_at": "2026-09-22T20:13:30+08:00",
-    "last_updated": "2026-09-22T20:23:40+08:00"
+    "last_updated": "2026-09-29T17:45:00+08:00"
   },
   "context_paths": {
     "brd": "./.astesia/brd.md",

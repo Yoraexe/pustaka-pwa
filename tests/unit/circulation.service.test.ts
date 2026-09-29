@@ -26,7 +26,7 @@ describe('CirculationService Unit Tests', () => {
     librarianUser = librarian;
 
     const allBooks = await bookRepository.findBooks({ bookType: 'ALL' });
-    const hybrid = allBooks.find(b => b.bookType === 'HYBRID');
+    const hybrid = allBooks.find(b => b.bookType === 'HYBRID' && Boolean(b.ebookFilePath));
     const physical = allBooks.find(b => b.bookType === 'PHYSICAL_ONLY');
 
     if (!hybrid || !physical) throw new Error('Seed books not found');
@@ -97,6 +97,68 @@ describe('CirculationService Unit Tests', () => {
     expect(returnResult.overdueDays).toBe(0);
     expect(returnResult.fineAmount).toBe(0);
     expect(returnResult.message).toContain('tepat waktu');
+  });
+
+  describe('Physical Book Reservation (Option A)', () => {
+    let reservationCode: string;
+    let reservationLoanId: number;
+
+    beforeAll(async () => {
+      // Bersihkan jika ada sisa reservasi dari run sebelumnya
+      const activeRes = await circulationService.getAllReservations(true);
+      for (const res of activeRes) {
+        if (res.userId === studentUser.id) {
+          await circulationService.cancelPhysicalReservation(studentUser, res.id);
+        }
+      }
+    });
+
+    it('harus berhasil mereservasi buku fisik dan menerbitkan kode tiket RSV-...', async () => {
+      const reservation = await circulationService.reservePhysicalBook(studentUser, physicalOnlyBookId);
+      expect(reservation).toBeDefined();
+      expect(reservation.status).toBe('RESERVED');
+      expect(reservation.loanType).toBe('PHYSICAL');
+      expect(reservation.reservationCode).toMatch(/^RSV-[A-Z0-9-]+$/);
+      expect(reservation.reservedUntil).toBeDefined();
+      expect(reservation.copyBarcode).toBeDefined();
+
+      reservationCode = reservation.reservationCode!;
+      reservationLoanId = reservation.id;
+    });
+
+    it('harus menolak reservasi ganda untuk buku yang sama oleh pemustaka yang sama', async () => {
+      await expect(
+        circulationService.reservePhysicalBook(studentUser, physicalOnlyBookId)
+      ).rejects.toThrow('Anda sudah memiliki tiket reservasi aktif untuk buku ini');
+    });
+
+    it('harus berhasil membatalkan reservasi oleh pemustaka', async () => {
+      await expect(
+        circulationService.cancelPhysicalReservation(studentUser, reservationLoanId)
+      ).resolves.toBeUndefined();
+
+      // Verifikasi bisa reservasi kembali setelah pembatalan
+      const reReserve = await circulationService.reservePhysicalBook(studentUser, physicalOnlyBookId);
+      expect(reReserve.status).toBe('RESERVED');
+      reservationCode = reReserve.reservationCode!;
+    });
+
+    it('harus menolak klaim reservasi jika dilakukan oleh siswa (bukan staf/pustakawan)', async () => {
+      await expect(
+        circulationService.claimPhysicalReservation(studentUser, reservationCode)
+      ).rejects.toThrow('Hanya pustakawan atau admin yang berwenang');
+    });
+
+    it('harus berhasil klaim reservasi di meja sirkulasi oleh pustakawan menjadi status BORROWED', async () => {
+      const claimedLoan = await circulationService.claimPhysicalReservation(librarianUser, reservationCode);
+      expect(claimedLoan.status).toBe('BORROWED');
+      expect(claimedLoan.loanType).toBe('PHYSICAL');
+
+      // Kembalikan buku untuk merapikan state test
+      if (claimedLoan.copyBarcode) {
+        await circulationService.returnPhysicalBook(librarianUser, claimedLoan.copyBarcode);
+      }
+    });
   });
 });
 

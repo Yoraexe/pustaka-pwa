@@ -45,6 +45,8 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
   const [activeTab, setActiveTab] = useState<string>('active');
   const [bookToReturn, setBookToReturn] = useState<{ id: number; title: string } | null>(null);
   const [bookToDeleteOffline, setBookToDeleteOffline] = useState<{ id: number; title: string } | null>(null);
+  const [reservations, setReservations] = useState<Loan[]>([]);
+  const [reservationToCancel, setReservationToCancel] = useState<{ id: number; title: string; code: string } | null>(null);
 
   const maxQuota = user.role === 'TEACHER' ? 5 : 2;
 
@@ -58,6 +60,7 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
         const parsed: Loan[] = JSON.parse(cachedLoans);
         setActiveLoans(parsed.filter((l) => l.status === 'BORROWED'));
         setHistoryLoans(parsed.filter((l) => l.status === 'RETURNED'));
+        setReservations(parsed.filter((l) => l.status === 'RESERVED'));
       } catch {
         // Abaikan parse error
       }
@@ -72,14 +75,16 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
       console.warn('Gagal membaca IndexedDB offline books:', err);
     }
 
-    // 3. Ambil data sirkulasi riil (aktif & riwayat selesai) dari server
+    // 3. Ambil data sirkulasi riil (aktif, riwayat selesai, dan reservasi) dari server
     try {
       const allLoans = await api.getMyLoans(false);
       const active = allLoans.filter((l) => l.status === 'BORROWED');
       const finished = allLoans.filter((l) => l.status === 'RETURNED');
+      const reserved = allLoans.filter((l) => l.status === 'RESERVED');
 
       setActiveLoans(active);
       setHistoryLoans(finished);
+      setReservations(reserved);
 
       const offlineIds = new Set<number>();
       for (const loan of allLoans) {
@@ -95,6 +100,22 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
       setIsLoading(false);
     }
   }, []);
+
+  const confirmCancelReservation = async () => {
+    if (!reservationToCancel) return;
+    try {
+      await api.cancelReservation(reservationToCancel.id);
+      toast.success('Reservasi Dibatalkan', {
+        description: `Tiket "${reservationToCancel.code}" telah dibatalkan dan stok dikembalikan.`,
+      });
+      setReservationToCancel(null);
+      fetchMyLoans();
+    } catch (err: unknown) {
+      toast.error('Gagal Membatalkan Reservasi', {
+        description: err instanceof Error ? err.message : 'Terjadi kendala saat membatalkan reservasi.',
+      });
+    }
+  };
 
   useEffect(() => {
     fetchMyLoans();
@@ -169,12 +190,19 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
           </p>
         </div>
 
-        {/* 3 Metrics Cards */}
-        <div className="grid grid-cols-3 gap-2.5 sm:gap-4 shrink-0">
+        {/* 4 Metrics Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 shrink-0">
           <div className="bg-muted/40 border border-border p-3 rounded-2xl text-center">
             <span className="text-[10px] text-muted-foreground block font-medium">Pinjaman Aktif</span>
             <span className="text-base sm:text-lg font-bold text-foreground font-mono">
               {activeLoans.length}/{maxQuota}
+            </span>
+          </div>
+
+          <div className="bg-muted/40 border border-border p-3 rounded-2xl text-center">
+            <span className="text-[10px] text-muted-foreground block font-medium">Reservasi</span>
+            <span className="text-base sm:text-lg font-bold text-amber-600 dark:text-amber-400 font-mono">
+              {reservations.length}
             </span>
           </div>
 
@@ -194,13 +222,20 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* Tabs Navigation: Aktif vs Riwayat Selesai vs Dokumen Offline */}
+      {/* Tabs Navigation: Aktif vs Reservasi vs Riwayat Selesai vs Dokumen Offline */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="bg-muted/60 p-1 rounded-2xl h-11 border border-border/80 inline-flex">
+        <TabsList className="bg-muted/60 p-1 rounded-2xl h-11 border border-border/80 inline-flex flex-wrap sm:flex-nowrap">
           <TabsTrigger value="active" className="rounded-xl px-4 py-1.5 text-xs font-semibold gap-2">
             <span>Pinjaman Aktif</span>
             <span className="text-[10px] font-mono bg-background/80 px-1.5 py-0.2 rounded-full border border-border">
               {activeLoans.length}
+            </span>
+          </TabsTrigger>
+
+          <TabsTrigger value="reservations" className="rounded-xl px-4 py-1.5 text-xs font-semibold gap-2">
+            <span>Tiket Reservasi</span>
+            <span className="text-[10px] font-mono bg-background/80 px-1.5 py-0.2 rounded-full border border-border">
+              {reservations.length}
             </span>
           </TabsTrigger>
 
@@ -317,6 +352,106 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
               <h3 className="font-semibold text-sm text-foreground">Tidak ada pinjaman aktif</h3>
               <p className="text-xs text-muted-foreground mt-1 max-w-xs mx-auto">
                 Koleksi yang sedang dipinjam akan muncul di sini.
+              </p>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* TAB: Tiket Reservasi Buku Fisik */}
+        <TabsContent value="reservations" className="space-y-4">
+          {reservations.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+              {reservations.map((loan) => {
+                const reservedUntil = loan.reservedUntil ? new Date(loan.reservedUntil) : null;
+                const now = new Date();
+                const hoursLeft = reservedUntil
+                  ? Math.max(0, Math.ceil((reservedUntil.getTime() - now.getTime()) / (1000 * 60 * 60)))
+                  : 0;
+
+                return (
+                  <div
+                    key={loan.id}
+                    className="bg-card rounded-3xl border border-amber-500/30 shadow-xs p-5 flex flex-col justify-between hover:shadow-md transition-shadow relative overflow-hidden"
+                  >
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-bl-full pointer-events-none" />
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <Badge variant="physical" className="text-[10px]">
+                          Menunggu Pengambilan
+                        </Badge>
+                        <span className="text-[11px] font-mono font-bold text-amber-600 dark:text-amber-400">
+                          {hoursLeft > 0 ? `Sisa ${hoursLeft} Jam` : 'Kedaluwarsa'}
+                        </span>
+                      </div>
+
+                      <h3 className="font-bold text-sm text-foreground line-clamp-2 leading-snug">
+                        {loan.bookTitle}
+                      </h3>
+
+                      {/* Ticket Code Box */}
+                      <div className="mt-3 p-3 bg-muted/50 rounded-2xl border border-dashed border-border/80 flex items-center justify-between">
+                        <div>
+                          <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono block">
+                            Kode Tiket Pengambilan
+                          </span>
+                          <span className="text-base font-black font-mono tracking-wider text-primary">
+                            {loan.reservationCode || `RSV-${loan.id}`}
+                          </span>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 px-2.5 text-xs font-semibold"
+                          onClick={() => {
+                            if (loan.reservationCode) {
+                              navigator.clipboard.writeText(loan.reservationCode);
+                              toast.success('Kode Disalin!', {
+                                description: `Kode ${loan.reservationCode} disalin ke clipboard.`,
+                              });
+                            }
+                          }}
+                        >
+                          Salin
+                        </Button>
+                      </div>
+
+                      <div className="mt-3 space-y-1 text-[11px] text-muted-foreground font-mono">
+                        <div>Eksemplar: <span className="text-foreground font-semibold">{loan.copyBarcode || '-'}</span></div>
+                        <div>Lokasi Rak: <span className="text-foreground font-semibold">{loan.shelfLocation || 'Meja Sirkulasi'}</span></div>
+                        <div>
+                          Batas Ambil:{' '}
+                          <span className="text-foreground">
+                            {reservedUntil ? reservedUntil.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-5 pt-3.5 border-t border-border flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          setReservationToCancel({
+                            id: loan.id,
+                            title: loan.bookTitle || 'Buku Fisik',
+                            code: loan.reservationCode || '',
+                          })
+                        }
+                        className="w-full text-xs text-destructive hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
+                      >
+                        Batalkan Reservasi
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-16 bg-card rounded-3xl border border-border p-8">
+              <h3 className="font-semibold text-sm text-foreground">Tidak ada tiket reservasi aktif</h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                Pilih buku fisik atau buku hybrid dari katalog, lalu klik "Reservasi Buku Fisik" untuk mengambil tiket.
               </p>
             </div>
           )}
@@ -492,6 +627,31 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
               className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
               Hapus
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Alert Dialog: Cancel Physical Book Reservation Confirmation */}
+      <AlertDialog
+        open={!!reservationToCancel}
+        onOpenChange={(open: boolean) => !open && setReservationToCancel(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Batalkan Reservasi Tiket?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Batalkan tiket reservasi <strong>"{reservationToCancel?.code}"</strong> untuk buku{' '}
+              <strong>"{reservationToCancel?.title}"</strong>? Eksemplar buku fisik akan segera dibuka kembali untuk dipinjam pemustaka lain.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Kembali</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmCancelReservation}
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+            >
+              Batalkan Tiket
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

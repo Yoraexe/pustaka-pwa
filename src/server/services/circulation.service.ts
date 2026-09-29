@@ -212,6 +212,153 @@ export class CirculationService {
   async getAllCirculationLoans(limit = 100): Promise<Loan[]> {
     return this.loanRepo.findAllLoans(limit);
   }
+
+  /**
+   * 7. Reservasi Mandiri Buku Fisik oleh Pengguna (Siswa/Guru)
+   */
+  async reservePhysicalBook(user: User, bookId: number): Promise<Loan> {
+    const book = await this.bookRepo.findById(bookId);
+    if (!book) {
+      throw new Error(`Buku dengan ID ${bookId} tidak ditemukan.`);
+    }
+
+    if (book.bookType === 'DIGITAL_ONLY') {
+      throw new Error('Buku ini hanya tersedia dalam format digital e-book dan tidak dapat direservasi secara fisik.');
+    }
+
+    // 1. Cek apakah user sudah meminjam buku fisik ini secara aktif
+    const existingLoan = await this.loanRepo.findActiveLoan(user.id, bookId, 'PHYSICAL');
+    if (existingLoan) {
+      throw new Error('Anda sedang meminjam buku fisik ini. Kembalikan terlebih dahulu sebelum meminjam kembali.');
+    }
+
+    // 2. Cek apakah user sudah memiliki tiket reservasi aktif untuk buku ini
+    const existingRes = await this.loanRepo.findActiveReservation(user.id, bookId);
+    if (existingRes) {
+      throw new Error(`Anda sudah memiliki tiket reservasi aktif untuk buku ini (Kode: ${existingRes.reservationCode}).`);
+    }
+
+    // 3. Cek kuota peminjaman dan reservasi fisik aktif pengguna
+    const limit = user.role === 'TEACHER' ? config.TEACHER_LOAN_LIMIT : config.STUDENT_LOAN_LIMIT;
+    const currentActiveCount = await this.loanRepo.countActiveUserPhysicalLoansAndReservations(user.id);
+    if (currentActiveCount >= limit) {
+      throw new Error(`Batas maksimal sirkulasi fisik (${limit} buku) tercapai. Anda tidak dapat membuat reservasi baru.`);
+    }
+
+    // 4. Cari eksemplar fisik yang tersedia
+    const availableCopy = await this.bookRepo.findFirstAvailableCopy(bookId);
+    if (!availableCopy || book.availablePhysicalCopies <= 0) {
+      throw new Error('Seluruh eksemplar fisik buku ini sedang dipinjam atau direservasi oleh siswa lain.');
+    }
+
+    // 5. Buat kode reservasi unik & batas waktu pengambilan (24 jam)
+    const reservationCode = `RSV-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const reservedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    // 6. Kunci eksemplar fisik dan kurangi stok tersedia secara atomik
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      await this.bookRepo.updateCopyStatus(availableCopy.id, 'RESERVED');
+      await this.bookRepo.updateAvailableCopies(book.id, -1);
+
+      const reservation = await this.loanRepo.createReservation({
+        userId: user.id,
+        bookId: book.id,
+        copyId: availableCopy.id,
+        reservationCode,
+        reservedUntil: reservedUntil.toISOString()
+      });
+
+      sqlite.exec('COMMIT');
+      return reservation;
+    } catch (err) {
+      sqlite.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  /**
+   * 8. Klaim & Serah Terima Buku Fisik di Meja Pustakawan Berdasarkan Kode Reservasi
+   */
+  async claimPhysicalReservation(librarianUser: User, reservationCode: string): Promise<Loan> {
+    if (librarianUser.role !== 'LIBRARIAN' && librarianUser.role !== 'ADMIN') {
+      throw new Error('Hanya pustakawan atau admin yang berwenang memproses serah terima reservasi fisik.');
+    }
+
+    const reservation = await this.loanRepo.findReservationByCode(reservationCode.trim().toUpperCase());
+    if (!reservation) {
+      throw new Error(`Tiket reservasi dengan kode "${reservationCode}" tidak ditemukan atau sudah tidak aktif.`);
+    }
+
+    if (reservation.status !== 'RESERVED') {
+      throw new Error(`Status reservasi ini sudah ${reservation.status}.`);
+    }
+
+    if (reservation.reservedUntil && new Date(reservation.reservedUntil) < new Date()) {
+      throw new Error('Batas waktu pengambilan untuk tiket reservasi ini telah kedaluwarsa.');
+    }
+
+    const borrower = await this.userRepo.findById(reservation.userId);
+    const loanDays = borrower?.role === 'TEACHER' ? config.TEACHER_LOAN_DAYS : config.STUDENT_LOAN_DAYS;
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + loanDays);
+    dueDate.setHours(23, 59, 59, 999);
+
+    const nowIso = new Date().toISOString();
+
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      if (reservation.copyId) {
+        await this.bookRepo.updateCopyStatus(reservation.copyId, 'BORROWED');
+      }
+      await this.loanRepo.updateClaimReservation(reservation.id, nowIso, dueDate.toISOString());
+      sqlite.exec('COMMIT');
+
+      return {
+        ...reservation,
+        borrowDate: nowIso,
+        dueDate: dueDate.toISOString(),
+        status: 'BORROWED'
+      };
+    } catch (err) {
+      sqlite.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  /**
+   * 9. Pembatalan Tiket Reservasi Fisik (oleh Siswa Pemilik atau Pustakawan)
+   */
+  async cancelPhysicalReservation(actorUser: User, loanId: number): Promise<void> {
+    const loan = await this.loanRepo.findById(loanId);
+    if (!loan || loan.status !== 'RESERVED') {
+      throw new Error('Tiket reservasi tidak ditemukan atau sudah tidak aktif.');
+    }
+
+    if (actorUser.role !== 'LIBRARIAN' && actorUser.role !== 'ADMIN' && loan.userId !== actorUser.id) {
+      throw new Error('Anda tidak memiliki wewenang untuk membatalkan reservasi ini.');
+    }
+
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      await this.loanRepo.updateCancelReservation(loan.id);
+      if (loan.copyId) {
+        await this.bookRepo.updateCopyStatus(loan.copyId, 'AVAILABLE');
+      }
+      await this.bookRepo.updateAvailableCopies(loan.bookId, 1);
+      sqlite.exec('COMMIT');
+    } catch (err) {
+      sqlite.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  /**
+   * 10. Daftar Seluruh Tiket Reservasi Aktif untuk Meja Pustakawan
+   */
+  async getAllReservations(activeOnly = true): Promise<Loan[]> {
+    return this.loanRepo.findAllReservations(activeOnly);
+  }
 }
 
 export const circulationService = new CirculationService();

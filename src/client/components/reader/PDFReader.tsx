@@ -16,7 +16,8 @@ import { api } from '../../services/api.js';
 import { offlineStorage } from '../../services/offlineStorage.js';
 import {
   ArrowLeft, ShieldCheck, DownloadCloud,
-  FileText, CheckCircle2, Loader2, Bookmark
+  FileText, CheckCircle2, Loader2, Bookmark,
+  ChevronLeft, ChevronRight, ZoomIn, ZoomOut
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -35,6 +36,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
   const [isSavedOffline, setIsSavedOffline] = useState<boolean>(false);
   const [isLoadingPdf, setIsLoadingPdf] = useState<boolean>(true);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  const [zoomLevel, setZoomLevel] = useState<number>(100);
 
   // Real Reading Progress & Bookmark
   const storageKey = `pustaka_progress_${user.id}_${book.id}`;
@@ -44,6 +46,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
 
   const watermarkOverlayRef = useRef<HTMLCanvasElement | null>(null);
   const currentBlobRef = useRef<Blob | null>(null);
+  const pdfBlobUrlRef = useRef<string | null>(null);
 
   const cacheKey = `/api/books/${book.id}/stream-pdf`;
 
@@ -96,6 +99,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
         if (active && blob) {
           currentBlobRef.current = blob;
           const url = URL.createObjectURL(blob);
+          pdfBlobUrlRef.current = url;
           setPdfBlobUrl(url);
         }
       } catch (err) {
@@ -109,11 +113,18 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
 
     return () => {
       active = false;
-      if (pdfBlobUrl) {
-        URL.revokeObjectURL(pdfBlobUrl);
+      if (pdfBlobUrlRef.current) {
+        URL.revokeObjectURL(pdfBlobUrlRef.current);
+        pdfBlobUrlRef.current = null;
       }
     };
   }, [book.id, cacheKey]);
+
+  const goToPage = (page: number) => {
+    const target = Math.max(1, page);
+    setActivePage(target);
+    setCurrentPageInput(target);
+  };
 
   // 3. Simpan Progres Halaman Terakhir ke localStorage
   const handleSaveProgress = (pageToSave: number) => {
@@ -187,7 +198,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
     ctx.restore();
   }, [user]);
 
-  const targetPdfUrl = pdfBlobUrl ? `${pdfBlobUrl}#page=${activePage}&toolbar=1&navpanes=0` : null;
+  const targetPdfUrl = pdfBlobUrl ? `${pdfBlobUrl}#page=${activePage}&zoom=${zoomLevel}&toolbar=1&navpanes=0` : null;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-900 text-slate-100 select-none">
@@ -196,12 +207,12 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
         <div className="flex items-center gap-3">
           <button
             onClick={onClose}
-            className="p-2 rounded-xl hover:bg-white/10 transition-colors flex items-center gap-1.5 text-xs font-semibold text-slate-200"
+            className="p-2 rounded-xl hover:bg-white/10 transition-colors flex items-center gap-1.5 text-xs font-semibold text-slate-200 cursor-pointer"
           >
             <ArrowLeft size={16} />
             <span className="hidden sm:inline">Kembali</span>
           </button>
-          <div className="truncate max-w-[150px] sm:max-w-xs md:max-w-md">
+          <div className="truncate max-w-[140px] sm:max-w-xs md:max-w-md">
             <h2 className="font-bold text-xs sm:text-sm truncate text-white">{book.title}</h2>
             <div className="flex items-center gap-1 text-[10px] text-slate-400">
               <ShieldCheck size={11} className="text-emerald-400 shrink-0" />
@@ -212,29 +223,77 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
 
         {/* Action Controls */}
         <div className="flex items-center gap-2">
-          {/* Bookmark Quick Save */}
-          <div className="flex items-center bg-slate-800/80 rounded-xl px-2 py-1 border border-slate-700 text-xs">
-            <span className="text-[11px] text-slate-400 mr-1.5 hidden sm:inline">Hlm:</span>
+          {/* Zoom Controls */}
+          <div className="hidden sm:flex items-center bg-slate-800/80 rounded-xl px-1.5 py-1 border border-slate-700 text-xs">
+            <button
+              type="button"
+              onClick={() => setZoomLevel((prev) => Math.max(50, prev - 25))}
+              className="p-1 rounded hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+              title="Perkecil Tampilan"
+            >
+              <ZoomOut size={13} />
+            </button>
+            <span className="text-[10px] font-mono px-1.5 text-slate-300 min-w-[36px] text-center">{zoomLevel}%</span>
+            <button
+              type="button"
+              onClick={() => setZoomLevel((prev) => Math.min(200, prev + 25))}
+              className="p-1 rounded hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+              title="Perbesar Tampilan"
+            >
+              <ZoomIn size={13} />
+            </button>
+          </div>
+
+          {/* Page Navigation & Bookmark */}
+          <div className="flex items-center bg-slate-800/80 rounded-xl px-1.5 py-1 border border-slate-700 text-xs">
+            <button
+              type="button"
+              onClick={() => goToPage(activePage - 1)}
+              disabled={activePage <= 1}
+              className="p-1 rounded hover:bg-slate-700 disabled:opacity-40 disabled:hover:bg-transparent text-slate-300 hover:text-white transition-colors cursor-pointer"
+              title="Halaman Sebelumnya"
+            >
+              <ChevronLeft size={15} />
+            </button>
+            <span className="text-[10px] text-slate-400 mx-1 hidden sm:inline">Hlm:</span>
             <input
               type="number"
               min={1}
               value={currentPageInput}
-              onChange={(e) => setCurrentPageInput(Math.max(1, parseInt(e.target.value) || 1))}
-              className="w-12 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-center text-xs font-mono text-white focus:outline-none focus:border-primary-500"
+              onChange={(e) => {
+                const val = parseInt(e.target.value);
+                if (!isNaN(val)) setCurrentPageInput(val);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  goToPage(currentPageInput);
+                }
+              }}
+              onBlur={() => goToPage(currentPageInput)}
+              className="w-10 bg-slate-900 border border-slate-700 rounded px-1 py-0.5 text-center text-xs font-mono text-white focus:outline-none focus:border-primary-500"
             />
             <button
-              onClick={() => handleSaveProgress(currentPageInput)}
-              className="ml-1.5 p-1 rounded hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+              type="button"
+              onClick={() => goToPage(activePage + 1)}
+              className="p-1 rounded hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+              title="Halaman Selanjutnya"
+            >
+              <ChevronRight size={15} />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSaveProgress(activePage)}
+              className="ml-1 p-1 rounded hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
               title="Simpan Bookmark Halaman"
             >
-              <Bookmark size={14} className={savedProgress?.page === currentPageInput ? 'text-amber-400 fill-amber-400' : ''} />
+              <Bookmark size={14} className={savedProgress?.page === activePage ? 'text-amber-400 fill-amber-400' : ''} />
             </button>
           </div>
 
           {/* Real Offline Download */}
           <button
             onClick={handleSaveOffline}
-            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${
               isSavedOffline
                 ? 'text-emerald-300 bg-emerald-950/80 border border-emerald-700/60'
                 : 'bg-primary-600 text-white hover:bg-primary-500'

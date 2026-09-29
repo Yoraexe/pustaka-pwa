@@ -12,8 +12,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api.js';
-import type { Loan } from '../../../shared/types/index.js';
+import { useAuth } from '../../hooks/useAuth.js';
+import type { Loan, AvailableCopy } from '../../../shared/types/index.js';
 import { AddBookModal } from '../catalog/AddBookModal.js';
+import { UserImportModal } from '../admin/UserImportModal.js';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs.js';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card.js';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../ui/table.js';
@@ -24,10 +26,13 @@ import { Badge } from '../ui/badge.js';
 import { toast } from 'sonner';
 
 export const CirculationDesk: React.FC = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<string>('checkout');
   const [loans, setLoans] = useState<Loan[]>([]);
+  const [availableCopies, setAvailableCopies] = useState<AvailableCopy[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isAddBookModalOpen, setIsAddBookModalOpen] = useState<boolean>(false);
+  const [isUserImportModalOpen, setIsUserImportModalOpen] = useState<boolean>(false);
 
   // Form Check-out
   const [borrowerIdentity, setBorrowerIdentity] = useState<string>('');
@@ -44,6 +49,11 @@ export const CirculationDesk: React.FC = () => {
   } | null>(null);
   const [returnError, setReturnError] = useState<string | null>(null);
 
+  // Form & Tab Reservasi
+  const [reservations, setReservations] = useState<Loan[]>([]);
+  const [claimCode, setClaimCode] = useState<string>('');
+  const [claimMsg, setClaimMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
   const fetchCirculationHistory = async () => {
     setIsLoading(true);
     try {
@@ -57,9 +67,57 @@ export const CirculationDesk: React.FC = () => {
     }
   };
 
+  const fetchAvailableCopies = async () => {
+    try {
+      const data = await api.getAvailableCopies();
+      setAvailableCopies(data);
+    } catch (err) {
+      console.warn('Gagal memuat eksemplar tersedia:', err);
+    }
+  };
+
+  const fetchReservations = async () => {
+    try {
+      const data = await api.getReservations(true);
+      setReservations(data);
+    } catch (err) {
+      console.warn('Gagal memuat tiket reservasi:', err);
+    }
+  };
+
   useEffect(() => {
     fetchCirculationHistory();
+    fetchAvailableCopies();
+    fetchReservations();
   }, []);
+
+  const handleProcessClaim = async (codeToClaim?: string) => {
+    const targetCode = (codeToClaim || claimCode).trim();
+    setClaimMsg(null);
+
+    if (!targetCode) {
+      setClaimMsg({ type: 'error', text: 'Kode tiket reservasi wajib diisi.' });
+      return;
+    }
+
+    try {
+      const loan = await api.claimReservation(targetCode);
+      const msg = `Reservasi "${targetCode}" berhasil diklaim untuk ${loan.userName || 'Pemustaka'}. Buku resmi dipinjamkan!`;
+      setClaimMsg({ type: 'success', text: msg });
+      toast.success('Klaim Reservasi Berhasil', { description: msg });
+      setClaimCode('');
+      fetchCirculationHistory();
+      fetchReservations();
+      fetchAvailableCopies();
+    } catch (err: unknown) {
+      const errText = err instanceof Error ? err.message : 'Gagal memproses klaim reservasi.';
+      setClaimMsg({ type: 'error', text: errText });
+      toast.error('Gagal Klaim Reservasi', { description: errText });
+    }
+  };
+
+  // Filter active physical loans with barcodes for quick return picker
+  const activePhysicalLoans = loans.filter((l) => l.status === 'BORROWED' && l.loanType === 'PHYSICAL' && !!l.copyBarcode);
 
   const handleProcessCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,6 +135,7 @@ export const CirculationDesk: React.FC = () => {
       toast.success('Peminjaman Berhasil', { description: msg });
       setCheckoutBarcode('');
       fetchCirculationHistory();
+      fetchAvailableCopies();
     } catch (err: unknown) {
       const errText = err instanceof Error ? err.message : 'Gagal memproses peminjaman.';
       setCheckoutMsg({ type: 'error', text: errText });
@@ -104,6 +163,7 @@ export const CirculationDesk: React.FC = () => {
       toast.success('Pengembalian Berhasil', { description: res.message });
       setReturnBarcode('');
       fetchCirculationHistory();
+      fetchAvailableCopies();
     } catch (err: unknown) {
       const errText = err instanceof Error ? err.message : 'Gagal memproses pengembalian.';
       setReturnError(errText);
@@ -193,12 +253,25 @@ export const CirculationDesk: React.FC = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={fetchCirculationHistory}
+              onClick={() => {
+                fetchCirculationHistory();
+                fetchAvailableCopies();
+              }}
               disabled={isLoading}
               className="text-xs"
             >
               {isLoading ? 'Menyegarkan...' : 'Segarkan'}
             </Button>
+            {user?.role === 'ADMIN' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsUserImportModalOpen(true)}
+                className="text-xs font-semibold"
+              >
+                Impor Anggota (CSV)
+              </Button>
+            )}
             <Button
               size="sm"
               onClick={() => setIsAddBookModalOpen(true)}
@@ -215,6 +288,14 @@ export const CirculationDesk: React.FC = () => {
         <TabsList className="bg-muted/60 p-1 rounded-2xl h-11 border border-border/80 inline-flex w-full sm:w-auto">
           <TabsTrigger value="checkout" className="rounded-xl px-4 py-1.5 text-xs font-semibold">
             Peminjaman
+          </TabsTrigger>
+          <TabsTrigger value="reservations" className="rounded-xl px-4 py-1.5 text-xs font-semibold gap-1.5">
+            <span>Klaim Reservasi</span>
+            {reservations.length > 0 && (
+              <span className="text-[10px] font-mono bg-amber-500/20 text-amber-700 dark:text-amber-300 px-1.5 py-0.2 rounded-full border border-amber-500/30">
+                {reservations.length}
+              </span>
+            )}
           </TabsTrigger>
           <TabsTrigger value="return" className="rounded-xl px-4 py-1.5 text-xs font-semibold">
             Pengembalian
@@ -258,15 +339,51 @@ export const CirculationDesk: React.FC = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="checkoutBarcode">Barcode Eksemplar</Label>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <Label htmlFor="checkoutBarcode">Barcode Eksemplar</Label>
+                    {availableCopies.length > 0 && (
+                      <span className="text-[11px] text-muted-foreground font-mono">
+                        {availableCopies.length} eksemplar tersedia di rak
+                      </span>
+                    )}
+                  </div>
                   <Input
                     id="checkoutBarcode"
                     value={checkoutBarcode}
                     onChange={(e) => setCheckoutBarcode(e.target.value)}
-                    placeholder="Contoh: FISIK-1-001"
+                    placeholder="Contoh: BK-0001-01"
                     className="font-mono text-xs"
                     required
                   />
+
+                  {/* Quick Copy Selector */}
+                  {availableCopies.length > 0 && (
+                    <div className="mt-2.5">
+                      <span className="text-[10px] text-muted-foreground uppercase font-mono tracking-wider block mb-1">
+                        Pilih Cepat dari Rak:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-1.5 bg-muted/30 border border-border rounded-xl">
+                        {availableCopies.slice(0, 15).map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => setCheckoutBarcode(c.barcode)}
+                            className={`px-2 py-1 rounded-lg text-[11px] font-mono transition-colors border text-left cursor-pointer ${
+                              checkoutBarcode === c.barcode
+                                ? 'bg-primary text-primary-foreground border-primary font-bold shadow-xs'
+                                : 'bg-background hover:bg-muted text-foreground border-border'
+                            }`}
+                            title={`${c.bookTitle} (Rak: ${c.shelfLocation || '-'})`}
+                          >
+                            <span>{c.barcode}</span>
+                            <span className="text-[9px] opacity-75 ml-1 truncate max-w-[120px] inline-block align-bottom">
+                              {c.bookTitle}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <Button type="submit" className="text-xs font-semibold shadow-xs">
@@ -277,7 +394,128 @@ export const CirculationDesk: React.FC = () => {
           </Card>
         </TabsContent>
 
-        {/* Tab 2: Check-In */}
+        {/* Tab 2: Klaim Reservasi */}
+        <TabsContent value="reservations">
+          <Card className="rounded-3xl border-border shadow-xs">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-bold">Klaim Tiket Reservasi Buku Fisik</CardTitle>
+              <CardDescription className="text-xs">
+                Masukkan atau pilih kode tiket pemustaka untuk menyerahkan buku fisik secara resmi.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-6">
+              {claimMsg && (
+                <div
+                  className={`p-3.5 rounded-xl text-xs font-medium border ${
+                    claimMsg.type === 'success'
+                      ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/20'
+                      : 'bg-destructive/10 text-destructive border-destructive/20'
+                  }`}
+                >
+                  {claimMsg.text}
+                </div>
+              )}
+
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleProcessClaim();
+                }}
+                className="space-y-4 max-w-lg"
+              >
+                <div>
+                  <Label htmlFor="claimCode">Kode Tiket Reservasi</Label>
+                  <div className="flex gap-2 mt-1.5">
+                    <Input
+                      id="claimCode"
+                      value={claimCode}
+                      onChange={(e) => setClaimCode(e.target.value.toUpperCase())}
+                      placeholder="Contoh: RSV-ABC123XY"
+                      className="font-mono text-xs uppercase"
+                      required
+                    />
+                    <Button type="submit" className="text-xs font-semibold shrink-0">
+                      Klaim & Serahkan
+                    </Button>
+                  </div>
+                </div>
+              </form>
+
+              {/* Active Reservations List */}
+              <div className="pt-2">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 font-mono">
+                  Daftar Tiket Aktif Menunggu Pengambilan ({reservations.length})
+                </h4>
+
+                {reservations.length > 0 ? (
+                  <div className="border border-border rounded-2xl overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Kode Tiket</TableHead>
+                          <TableHead>Pemustaka</TableHead>
+                          <TableHead>Judul Buku</TableHead>
+                          <TableHead>Barcode / Lokasi Rak</TableHead>
+                          <TableHead>Batas Waktu</TableHead>
+                          <TableHead className="text-right">Aksi</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reservations.map((r) => {
+                          const reservedUntil = r.reservedUntil ? new Date(r.reservedUntil) : null;
+                          const now = new Date();
+                          const hoursLeft = reservedUntil
+                            ? Math.max(0, Math.ceil((reservedUntil.getTime() - now.getTime()) / (1000 * 60 * 60)))
+                            : 0;
+
+                          return (
+                            <TableRow key={r.id}>
+                              <TableCell className="font-mono font-bold text-primary text-xs">
+                                {r.reservationCode}
+                              </TableCell>
+                              <TableCell>
+                                <div className="font-semibold text-foreground text-xs">{r.userName || 'Pemustaka'}</div>
+                                <div className="text-[10px] text-muted-foreground font-mono">{r.userIdentity || '-'}</div>
+                              </TableCell>
+                              <TableCell className="font-medium text-xs max-w-xs truncate" title={r.bookTitle}>
+                                {r.bookTitle}
+                              </TableCell>
+                              <TableCell>
+                                <div className="font-mono text-xs">{r.copyBarcode || '-'}</div>
+                                <div className="text-[10px] text-muted-foreground">Rak: {r.shelfLocation || 'Sirkulasi'}</div>
+                              </TableCell>
+                              <TableCell className="font-mono text-xs">
+                                <span className={hoursLeft <= 3 ? 'text-destructive font-bold' : 'text-foreground'}>
+                                  {hoursLeft > 0 ? `Sisa ${hoursLeft} jam` : 'Kedaluwarsa'}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <Button
+                                  size="sm"
+                                  className="h-7 px-3 text-xs font-semibold"
+                                  onClick={() => handleProcessClaim(r.reservationCode ?? undefined)}
+                                >
+                                  Klaim
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : (
+                  <div className="text-center py-8 bg-muted/20 border border-dashed border-border rounded-2xl text-xs text-muted-foreground">
+                    Tidak ada tiket reservasi yang menunggu pengambilan saat ini.
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Tab 3: Check-In */}
         <TabsContent value="return">
           <Card className="rounded-3xl border-border shadow-xs">
             <CardHeader className="pb-3">
@@ -317,10 +555,39 @@ export const CirculationDesk: React.FC = () => {
                     id="returnBarcode"
                     value={returnBarcode}
                     onChange={(e) => setReturnBarcode(e.target.value)}
-                    placeholder="Contoh: FISIK-1-001"
+                    placeholder="Contoh: BK-0001-01"
                     className="font-mono text-xs"
                     required
                   />
+
+                  {/* Quick Return Selector */}
+                  {activePhysicalLoans.length > 0 && (
+                    <div className="mt-2.5">
+                      <span className="text-[10px] text-muted-foreground uppercase font-mono tracking-wider block mb-1">
+                        Pilih Cepat dari Pinjaman Aktif:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto p-1.5 bg-muted/30 border border-border rounded-xl">
+                        {activePhysicalLoans.map((l) => (
+                          <button
+                            key={l.id}
+                            type="button"
+                            onClick={() => setReturnBarcode(l.copyBarcode!)}
+                            className={`px-2 py-1 rounded-lg text-[11px] font-mono transition-colors border text-left cursor-pointer ${
+                              returnBarcode === l.copyBarcode
+                                ? 'bg-primary text-primary-foreground border-primary font-bold shadow-xs'
+                                : 'bg-background hover:bg-muted text-foreground border-border'
+                            }`}
+                            title={`${l.bookTitle} (${l.userName || l.userIdentity})`}
+                          >
+                            <span>{l.copyBarcode}</span>
+                            <span className="text-[9px] opacity-75 ml-1 truncate max-w-[120px] inline-block align-bottom">
+                              {l.bookTitle}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2 pt-1">
@@ -375,6 +642,7 @@ export const CirculationDesk: React.FC = () => {
               <TableHead>Jatuh Tempo</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Denda</TableHead>
+              <TableHead className="text-right">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -408,6 +676,14 @@ export const CirculationDesk: React.FC = () => {
                       <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
                         Dipinjam
                       </span>
+                    ) : l.status === 'RESERVED' ? (
+                      <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2.5 py-0.5 rounded-full border border-amber-500/20">
+                        Reservasi
+                      </span>
+                    ) : l.status === 'CANCELLED' ? (
+                      <span className="text-[10px] font-medium text-destructive bg-destructive/10 px-2.5 py-0.5 rounded-full border border-destructive/20">
+                        Dibatalkan
+                      </span>
                     ) : (
                       <span className="text-[10px] font-medium text-muted-foreground bg-muted px-2.5 py-0.5 rounded-full border border-border">
                         Kembali
@@ -423,11 +699,43 @@ export const CirculationDesk: React.FC = () => {
                       <span className="text-muted-foreground">-</span>
                     )}
                   </TableCell>
+                  <TableCell className="text-right">
+                    {l.status === 'RESERVED' && l.reservationCode ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2.5 text-[11px] font-semibold text-amber-600 border-amber-500/30 hover:bg-amber-500 hover:text-white"
+                        onClick={() => {
+                          setClaimCode(l.reservationCode!);
+                          setActiveTab('reservations');
+                        }}
+                      >
+                        Klaim Tiket
+                      </Button>
+                    ) : l.status === 'BORROWED' && l.loanType === 'PHYSICAL' && l.copyBarcode ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2.5 text-[11px] font-semibold text-primary hover:text-primary-foreground hover:bg-primary"
+                        onClick={() => {
+                          setReturnBarcode(l.copyBarcode!);
+                          setActiveTab('return');
+                          toast.info(`Barcode ${l.copyBarcode} dipilih`, {
+                            description: 'Silakan klik "Proses Pengembalian" pada form di atas.',
+                          });
+                        }}
+                      >
+                        Kembalikan
+                      </Button>
+                    ) : (
+                      <span className="text-[11px] text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                   Belum ada transaksi tercatat.
                 </TableCell>
               </TableRow>
@@ -442,6 +750,17 @@ export const CirculationDesk: React.FC = () => {
         onClose={() => setIsAddBookModalOpen(false)}
         onSuccess={() => {
           setIsAddBookModalOpen(false);
+          fetchCirculationHistory();
+          fetchAvailableCopies();
+        }}
+      />
+
+      {/* Modal Impor Anggota CSV */}
+      <UserImportModal
+        isOpen={isUserImportModalOpen}
+        onClose={() => setIsUserImportModalOpen(false)}
+        onSuccess={() => {
+          setIsUserImportModalOpen(false);
           fetchCirculationHistory();
         }}
       />

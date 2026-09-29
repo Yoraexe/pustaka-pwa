@@ -50,7 +50,7 @@ export const bookCopies = sqliteTable('book_copies', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   bookId: integer('book_id').references(() => books.id, { onDelete: 'cascade' }).notNull(),
   barcode: text('barcode').notNull().unique(), // e.g. "BK-00101"
-  status: text('status', { enum: ['AVAILABLE', 'BORROWED', 'DAMAGED', 'LOST'] }).notNull().default('AVAILABLE'),
+  status: text('status', { enum: ['AVAILABLE', 'BORROWED', 'RESERVED', 'DAMAGED', 'LOST'] }).notNull().default('AVAILABLE'),
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull()
 });
 
@@ -64,9 +64,11 @@ export const loans = sqliteTable('loans', {
   borrowDate: text('borrow_date').default(sql`CURRENT_TIMESTAMP`).notNull(),
   dueDate: text('due_date').notNull(),
   returnDate: text('return_date'), // null jika sedang dipinjam
-  status: text('status', { enum: ['BORROWED', 'RETURNED', 'OVERDUE'] }).notNull().default('BORROWED'),
+  status: text('status', { enum: ['BORROWED', 'RETURNED', 'OVERDUE', 'RESERVED', 'CANCELLED'] }).notNull().default('BORROWED'),
   fineAmount: integer('fine_amount').notNull().default(0), // dalam Rupiah
   isFinePaid: integer('is_fine_paid', { mode: 'boolean' }).notNull().default(false),
+  reservationCode: text('reservation_code'),
+  reservedUntil: text('reserved_until'),
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull()
 });
 

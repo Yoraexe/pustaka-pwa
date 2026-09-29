@@ -40,10 +40,11 @@ export interface Book {
   totalPhysicalCopies: number;
   availablePhysicalCopies: number;
   shelfLocation?: string | null;
+  copies?: BookCopy[];
   createdAt: string;
 }
 
-export type CopyStatus = 'AVAILABLE' | 'BORROWED' | 'DAMAGED' | 'LOST';
+export type CopyStatus = 'AVAILABLE' | 'BORROWED' | 'RESERVED' | 'DAMAGED' | 'LOST';
 
 export interface BookCopy {
   id: number;
@@ -53,7 +54,7 @@ export interface BookCopy {
 }
 
 export type LoanType = 'DIGITAL' | 'PHYSICAL';
-export type LoanStatus = 'BORROWED' | 'RETURNED' | 'OVERDUE';
+export type LoanStatus = 'BORROWED' | 'RETURNED' | 'OVERDUE' | 'RESERVED' | 'CANCELLED';
 
 export interface Loan {
   id: number;
@@ -63,6 +64,7 @@ export interface Loan {
   bookId: number;
   bookTitle?: string;
   bookCover?: string | null;
+  shelfLocation?: string | null;
   copyId?: number | null;
   copyBarcode?: string | null;
   loanType: LoanType;
@@ -72,6 +74,8 @@ export interface Loan {
   status: LoanStatus;
   fineAmount: number;
   isFinePaid: boolean;
+  reservationCode?: string | null;
+  reservedUntil?: string | null;
 }
 
 export interface AuthSession {
@@ -90,6 +94,18 @@ export interface ApiResponse<T = unknown> {
   };
 }
 
+export interface AvailableCopy extends BookCopy {
+  bookTitle: string;
+  shelfLocation?: string | null;
+}
+
+export interface CsvImportResult {
+  totalRows: number;
+  importedCount: number;
+  skippedCount: number;
+  errors: Array<{ row: number; identity: string; reason: string }>;
+}
+
 // Re-export input types from schemas
 export type {
   LoginInput,
@@ -98,6 +114,9 @@ export type {
   CreateBookInput,
   DigitalLoanInput,
   PhysicalLoanInput,
-  ReturnPhysicalLoanInput
+  ReturnPhysicalLoanInput,
+  ReservePhysicalLoanInput,
+  ClaimReservationInput,
+  CancelReservationInput
 } from '../schemas/index.js';
 

@@ -7,7 +7,7 @@
 import { db } from '../db/index.js';
 import { books, categories, bookCopies, type BookTable } from '../db/schema.js';
 import { eq, and, sql } from 'drizzle-orm';
-import type { Book, BookCopy, Category, CreateBookInput, BookFilterInput } from '../../shared/types/index.js';
+import type { Book, BookCopy, Category, CreateBookInput, BookFilterInput, AvailableCopy } from '../../shared/types/index.js';
 
 export class BookRepository {
   async findAllCategories(): Promise<Category[]> {
@@ -81,7 +81,41 @@ export class BookRepository {
     .limit(1);
 
     if (rows.length === 0) return null;
-    return this.mapToDomain(rows[0].book, rows[0].categoryName);
+    const domainBook = this.mapToDomain(rows[0].book, rows[0].categoryName);
+    const copies = await this.findCopiesByBookId(id);
+    domainBook.copies = copies;
+    return domainBook;
+  }
+
+  async findCopiesByBookId(bookId: number): Promise<BookCopy[]> {
+    const rows = await db.select().from(bookCopies).where(eq(bookCopies.bookId, bookId)).orderBy(bookCopies.id);
+    return rows.map(r => ({
+      id: r.id,
+      bookId: r.bookId,
+      barcode: r.barcode,
+      status: r.status as BookCopy['status']
+    }));
+  }
+
+  async findAvailableCopies(): Promise<AvailableCopy[]> {
+    const rows = await db.select({
+      copy: bookCopies,
+      bookTitle: books.title,
+      shelfLocation: books.shelfLocation
+    })
+    .from(bookCopies)
+    .innerJoin(books, eq(bookCopies.bookId, books.id))
+    .where(eq(bookCopies.status, 'AVAILABLE'))
+    .orderBy(bookCopies.barcode);
+
+    return rows.map(r => ({
+      id: r.copy.id,
+      bookId: r.copy.bookId,
+      barcode: r.copy.barcode,
+      status: r.copy.status as BookCopy['status'],
+      bookTitle: r.bookTitle,
+      shelfLocation: r.shelfLocation
+    }));
   }
 
   async create(data: CreateBookInput): Promise<Book> {
@@ -125,6 +159,21 @@ export class BookRepository {
     };
   }
 
+  async findFirstAvailableCopy(bookId: number): Promise<BookCopy | null> {
+    const rows = await db.select()
+      .from(bookCopies)
+      .where(and(eq(bookCopies.bookId, bookId), eq(bookCopies.status, 'AVAILABLE')))
+      .limit(1);
+
+    if (rows.length === 0) return null;
+    return {
+      id: rows[0].id,
+      bookId: rows[0].bookId,
+      barcode: rows[0].barcode,
+      status: rows[0].status as BookCopy['status']
+    };
+  }
+
   async findCopyByBarcode(barcode: string): Promise<(BookCopy & { book: Book }) | null> {
     const rows = await db.select({
       copy: bookCopies,
@@ -155,11 +204,17 @@ export class BookRepository {
   }
 
   async updateAvailableCopies(bookId: number, delta: number): Promise<void> {
-    await db.update(books)
-      .set({
-        availablePhysicalCopies: sql`${books.availablePhysicalCopies} + ${delta}`
-      })
-      .where(eq(books.id, bookId));
+    const book = await db.select({ total: books.totalPhysicalCopies, avail: books.availablePhysicalCopies })
+      .from(books)
+      .where(eq(books.id, bookId))
+      .limit(1);
+
+    if (book.length > 0) {
+      const newAvail = Math.max(0, Math.min(book[0].total, book[0].avail + delta));
+      await db.update(books)
+        .set({ availablePhysicalCopies: newAvail })
+        .where(eq(books.id, bookId));
+    }
   }
 
   private mapToDomain(raw: BookTable, categoryName: string): Book {
