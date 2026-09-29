@@ -13,10 +13,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api.js';
 import { useAuth } from '../hooks/useAuth.js';
-import type { Book, Category, BookType } from '../../shared/types/index.js';
+import type { Book, Category, BookType, Loan } from '../../shared/types/index.js';
 import { BookGrid } from '../components/catalog/BookGrid.js';
 import { BookDetailModal } from '../components/catalog/BookDetailModal.js';
 import { AddBookModal } from '../components/catalog/AddBookModal.js';
+import { PDFReader } from '../components/reader/PDFReader.js';
 import { Button } from '../components/ui/button.js';
 import { Spotlight } from '../components/ui/spotlight.js';
 import { FlipWords } from '../components/ui/flip-words.js';
@@ -44,6 +45,8 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
 
   const [selectedDetailBook, setSelectedDetailBook] = useState<Book | null>(null);
   const [borrowedBookIds, setBorrowedBookIds] = useState<Set<number>>(new Set());
+  const [userLoans, setUserLoans] = useState<Loan[]>([]);
+  const [readingBook, setReadingBook] = useState<Book | null>(null);
   const [isAddBookOpen, setIsAddBookOpen] = useState<boolean>(false);
 
   // Fetch Categories
@@ -63,10 +66,12 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
   const fetchUserBorrows = useCallback(async () => {
     if (!isAuthenticated) {
       setBorrowedBookIds(new Set());
+      setUserLoans([]);
       return;
     }
     try {
       const myLoans = await api.getMyLoans(true);
+      setUserLoans(myLoans);
       const ids = new Set(myLoans.map((l) => l.bookId));
       setBorrowedBookIds(ids);
     } catch {
@@ -258,13 +263,38 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
       </div>
 
       {/* Book Detail Modal (Shadcn Dialog) */}
-      {selectedDetailBook && (
-        <BookDetailModal
-          book={selectedDetailBook}
-          onClose={() => setSelectedDetailBook(null)}
-          onBorrowDigital={handleBorrowDigital}
-          onReservePhysical={handleReservePhysical}
-          isBorrowed={borrowedBookIds.has(selectedDetailBook.id)}
+      {selectedDetailBook && (() => {
+        const digitalLoan = userLoans.find(
+          (l) => l.bookId === selectedDetailBook.id && l.loanType === 'DIGITAL' && l.status === 'BORROWED'
+        );
+        const physicalLoan = userLoans.find(
+          (l) => l.bookId === selectedDetailBook.id && l.loanType === 'PHYSICAL' && l.status === 'BORROWED'
+        );
+        const physicalReservation = userLoans.find(
+          (l) => l.bookId === selectedDetailBook.id && l.loanType === 'PHYSICAL' && l.status === 'RESERVED'
+        );
+
+        return (
+          <BookDetailModal
+            book={selectedDetailBook}
+            onClose={() => setSelectedDetailBook(null)}
+            onBorrowDigital={handleBorrowDigital}
+            onReservePhysical={handleReservePhysical}
+            onOpenReader={(b) => setReadingBook(b)}
+            isDigitalBorrowed={!!digitalLoan}
+            isPhysicalBorrowed={!!physicalLoan}
+            isPhysicalReserved={!!physicalReservation}
+            reservationCode={physicalReservation?.reservationCode}
+          />
+        );
+      })()}
+
+      {/* PDF Reader Modal if opened from BookDetailModal */}
+      {readingBook && user && (
+        <PDFReader
+          book={readingBook}
+          user={user}
+          onClose={() => setReadingBook(null)}
         />
       )}
 

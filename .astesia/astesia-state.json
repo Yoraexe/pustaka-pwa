@@ -83,6 +83,7 @@
     "src/client/components/catalog/BookDetailModal.tsx",
     "src/client/components/reader/PDFReader.tsx",
     "src/client/components/circulation/CirculationDesk.tsx",
+    "src/client/components/circulation/BarcodeScannerModal.tsx",
     "src/client/pages/CatalogPage.tsx",
     "src/client/pages/MyBooksPage.tsx",
     "src/client/pages/LoginPage.tsx",
@@ -90,7 +91,8 @@
     "src/client/main.tsx",
     "tests/unit/auth.service.test.ts",
     "tests/unit/circulation.service.test.ts",
-    "tests/integration/api.test.ts"
+    "tests/integration/api.test.ts",
+    "tests/integration/book.create.test.ts"
   ],
   "history": [
     {
@@ -158,6 +160,12 @@
       "timestamp": "2026-09-29T17:45:00+08:00",
       "action": "Physical & Hybrid Book Reservation Workflow (Option A)",
       "agent_note": "Implemented end-to-end self-service physical book reservation: DB migration (reservation_code, reserved_until, RESERVED/CANCELLED enum), Drizzle schema, atomicity with BEGIN IMMEDIATE/COMMIT, circulation service with 24h expiration and quota check, REST endpoints (/reserve, /claim, /cancel-reserve, /reservations), BookDetailModal reservation action, MyBooksPage Tiket Reservasi tab with copy ticket code, countdown, and cancellation dialog, CirculationDesk Klaim Reservasi tab with 1-click handover and code validation. 32 Vitest unit/integration tests passing 100% and production build verified."
+    },
+    {
+      "layer": "engineering",
+      "timestamp": "2026-09-29T20:30:00+08:00",
+      "action": "Comprehensive Audit Remediation & Hardening",
+      "agent_note": "Remediated 10 audit findings: Restricted static serving exclusively to covers (preventing direct unwatermarked PDF download), protected /stream-pdf with digital loan authorization check (403 for non-borrowers), added is_renewed column to loans schema, implemented atomic 1-time physical loan renewal (+7 days) in CirculationService and exposed POST /api/circulation/physical/renew, enforced circulation suspension checks (unpaid fines & overdue loans), changed PDFReader URL to #toolbar=0&navpanes=0 to prevent native print/download bypass, ensured offline IndexedDB eviction on e-book return, decoupled digital and physical borrowing in BookDetailModal for hybrid books, added WebRTC camera-based BarcodeScannerModal and renew buttons to CirculationDesk and MyBooksPage, and expanded Vitest test suite to 36 tests passing 100% with clean Vite production build."
     }
   ],
   "decisions": [
@@ -221,7 +229,7 @@
       "frontend": "TailwindCSS + PDF.js Canvas Reader"
     },
     "created_at": "2026-09-22T20:13:30+08:00",
-    "last_updated": "2026-09-29T17:45:00+08:00"
+    "last_updated": "2026-09-29T20:30:00+08:00"
   },
   "context_paths": {
     "brd": "./.astesia/brd.md",

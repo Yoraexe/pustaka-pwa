@@ -30,6 +30,11 @@ interface BookDetailModalProps {
   onClose: () => void;
   onBorrowDigital?: (book: Book) => void;
   onReservePhysical?: (book: Book) => void;
+  onOpenReader?: (book: Book) => void;
+  isDigitalBorrowed?: boolean;
+  isPhysicalBorrowed?: boolean;
+  isPhysicalReserved?: boolean;
+  reservationCode?: string | null;
   isBorrowed?: boolean;
 }
 
@@ -38,12 +43,21 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
   onClose,
   onBorrowDigital,
   onReservePhysical,
+  onOpenReader,
+  isDigitalBorrowed,
+  isPhysicalBorrowed,
+  isPhysicalReserved,
+  reservationCode,
   isBorrowed = false,
 }) => {
   const hasEbook = Boolean(book.ebookFilePath);
   const isDigital = book.bookType === 'DIGITAL_ONLY' || book.bookType === 'HYBRID';
   const isPhysical = book.bookType === 'PHYSICAL_ONLY' || book.bookType === 'HYBRID';
   const [copies, setCopies] = useState<BookCopy[]>(book.copies || []);
+
+  const digitalActive = isDigitalBorrowed ?? isBorrowed;
+  const physicalActive = isPhysicalBorrowed ?? isBorrowed;
+  const physicalReserved = isPhysicalReserved ?? false;
 
   useEffect(() => {
     if (isPhysical && (!book.copies || book.copies.length === 0)) {
@@ -193,15 +207,27 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
             Tutup
           </Button>
 
-          {isBorrowed && (
-            <div className="inline-flex items-center px-4 py-2 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-semibold border border-emerald-500/20">
-              Sedang Dipinjam
-            </div>
-          )}
-
-          {/* Opsi Pinjam E-Book Digital */}
-          {isDigital && !isBorrowed && (
-            hasEbook ? (
+          {/* Opsi Pinjam / Baca E-Book Digital */}
+          {isDigital && (
+            digitalActive ? (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center px-3 py-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-semibold border border-emerald-500/20">
+                  E-Book Dipinjam
+                </span>
+                {onOpenReader && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      onOpenReader(book);
+                      onClose();
+                    }}
+                    className="text-xs font-semibold"
+                  >
+                    Baca Sekarang
+                  </Button>
+                )}
+              </div>
+            ) : hasEbook ? (
               <Button
                 variant={book.bookType === 'DIGITAL_ONLY' ? 'default' : 'secondary'}
                 onClick={() => {
@@ -219,9 +245,17 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
             )
           )}
 
-          {/* Opsi Reservasi Buku Fisik */}
-          {isPhysical && !isBorrowed && (
-            book.availablePhysicalCopies > 0 ? (
+          {/* Opsi Pinjam / Reservasi Buku Fisik */}
+          {isPhysical && (
+            physicalActive ? (
+              <div className="inline-flex items-center px-3 py-1.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 rounded-xl text-xs font-semibold border border-blue-500/20">
+                Buku Fisik Dipinjam
+              </div>
+            ) : physicalReserved ? (
+              <div className="inline-flex items-center px-3 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-xl text-xs font-semibold border border-amber-500/20">
+                Fisik Direservasi {reservationCode ? `(${reservationCode})` : ''}
+              </div>
+            ) : book.availablePhysicalCopies > 0 ? (
               <Button
                 variant={book.bookType === 'PHYSICAL_ONLY' ? 'default' : 'outline'}
                 onClick={() => {

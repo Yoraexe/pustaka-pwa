@@ -2,10 +2,17 @@
  * @file src/server/controllers/book.controller.ts
  * @description Thin controller untuk penanganan rute katalog buku dan streaming PDF e-book terproteksi.
  * @layer Controller Layer (HTTP Interface)
+ * 
+ * Tujuan: Menyediakan antarmuka REST API untuk penelusuran katalog, ketersediaan eksemplar, penambahan buku baru, dan streaming PDF e-book berlisensi.
+ * Caller: src/server/app.ts (mounted at /api/books).
+ * Dependensi: express, bookService, circulationService, shared/schemas, auth.middleware, upload.middleware, path, fs.
+ * Main Functions: bookRouter (GET /categories, GET /, GET /copies/available, GET /:id, POST /, GET /:id/stream-pdf).
+ * Side Effects: Membaca berkas PDF dari sistem penyimpanan lokal dan mengalirkannya ke respons HTTP.
  */
 
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { bookService } from '../services/book.service.js';
+import { circulationService } from '../services/circulation.service.js';
 import { BookFilterSchema, CreateBookSchema } from '../../shared/schemas/index.js';
 import { authenticateToken, requireRole } from '../middleware/auth.middleware.js';
 import { uploadBookFiles } from '../middleware/upload.middleware.js';
@@ -89,6 +96,19 @@ bookRouter.get('/:id/stream-pdf', authenticateToken, async (req: Request, res: R
   try {
     const id = Number(req.params.id);
     const book = await bookService.getBookDetail(id);
+
+    // Validasi Otorisasi: Wajib memiliki pinjaman aktif jika role adalah Siswa/Guru (BRD Seksi 3.2 & AC-2.2)
+    const hasAccess = await circulationService.hasActiveDigitalAccess(req.user!, id);
+    if (!hasAccess) {
+      res.status(403).json({
+        success: false,
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Anda belum meminjam e-book ini atau masa peminjaman telah berakhir.'
+        }
+      });
+      return;
+    }
 
     if (!book.ebookFilePath) {
       res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'File PDF tidak tersedia untuk buku ini.' } });

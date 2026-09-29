@@ -164,13 +164,37 @@ describe('Book Creation & Ingestion API Integration Tests', () => {
     expect(digitalBook.ebookFilePath).toBeDefined();
     expect(digitalBook.ebookFilePath).toContain('.pdf');
 
-    // Verifikasi bahwa berkas PDF yang baru diunggah dapat di-stream oleh siswa
-    const streamRes = await request(app)
+    // 1. Verifikasi bahwa berkas PDF tidak dapat di-stream oleh siswa yang belum meminjam (403)
+    const unauthorizedStream = await request(app)
       .get(`/api/books/${digitalBook.id}/stream-pdf`)
       .set('Authorization', `Bearer ${studentToken}`);
+    expect(unauthorizedStream.status).toBe(403);
 
-    expect(streamRes.status).toBe(200);
-    expect(streamRes.headers['content-type']).toContain('application/pdf');
+    // 2. Staf/Pustakawan dapat mengakses stream PDF langsung untuk kurasi/pratinjau (200)
+    const librarianStream = await request(app)
+      .get(`/api/books/${digitalBook.id}/stream-pdf`)
+      .set('Authorization', `Bearer ${librarianToken}`);
+    expect(librarianStream.status).toBe(200);
+    expect(librarianStream.headers['content-type']).toContain('application/pdf');
+
+    // 3. Siswa meminjam buku digital
+    await request(app)
+      .post('/api/circulation/digital/borrow')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ bookId: digitalBook.id });
+
+    // 4. Setelah meminjam, siswa berhak streaming berkas PDF (200)
+    const authorizedStream = await request(app)
+      .get(`/api/books/${digitalBook.id}/stream-pdf`)
+      .set('Authorization', `Bearer ${studentToken}`);
+    expect(authorizedStream.status).toBe(200);
+    expect(authorizedStream.headers['content-type']).toContain('application/pdf');
+
+    // 5. Kembalikan untuk membersihkan state
+    await request(app)
+      .post('/api/circulation/digital/return')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ bookId: digitalBook.id });
   });
 
   it('POST /api/books harus berhasil mendaftarkan buku HYBRID dengan eksemplar fisik dan e-book PDF', async () => {

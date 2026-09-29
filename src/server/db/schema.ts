@@ -2,6 +2,12 @@
  * @file src/server/db/schema.ts
  * @description Definisi tabel database SQLite menggunakan Drizzle ORM.
  * @layer Database Schema Layer
+ * 
+ * Tujuan: Menyediakan skema relasional tabel SQLite (users, categories, books, book_copies, loans) dengan Drizzle ORM.
+ * Caller: src/server/db/index.ts, repositories (user, book, loan), test suites.
+ * Dependensi: drizzle-orm/sqlite-core, drizzle-orm.
+ * Main Functions: users, categories, books, bookCopies, loans.
+ * Side Effects: Mendefinisikan struktur DDL tabel dan tipe inferensi untuk basis data SQLite.
  */
 
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
@@ -67,6 +73,7 @@ export const loans = sqliteTable('loans', {
   status: text('status', { enum: ['BORROWED', 'RETURNED', 'OVERDUE', 'RESERVED', 'CANCELLED'] }).notNull().default('BORROWED'),
   fineAmount: integer('fine_amount').notNull().default(0), // dalam Rupiah
   isFinePaid: integer('is_fine_paid', { mode: 'boolean' }).notNull().default(false),
+  isRenewed: integer('is_renewed', { mode: 'boolean' }).notNull().default(false),
   reservationCode: text('reservation_code'),
   reservedUntil: text('reserved_until'),
   createdAt: text('created_at').default(sql`CURRENT_TIMESTAMP`).notNull()

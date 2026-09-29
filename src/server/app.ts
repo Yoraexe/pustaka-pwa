@@ -29,8 +29,9 @@ export const createApp = () => {
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
 
-  // Static uploads directory (untuk covers)
-  app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+  // Static uploads directory terbatas HANYA untuk sampul buku (/uploads/covers)
+  // Berkas e-book PDF (/uploads/ebooks) TIDAK BOLEH disajikan statis dan wajib melalui proteksi /stream-pdf
+  app.use('/uploads/covers', express.static(path.resolve(process.cwd(), 'uploads/covers')));
 
   // Health check endpoint
   app.get('/api/health', (_req, res) => {

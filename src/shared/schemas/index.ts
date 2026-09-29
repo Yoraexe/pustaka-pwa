@@ -2,6 +2,12 @@
  * @file src/shared/schemas/index.ts
  * @description Skema validasi Zod untuk seluruh input API (Auth, Buku, Sirkulasi).
  * @layer Shared Validation Schema
+ * 
+ * Tujuan: Menyediakan skema validasi runtime dengan Zod untuk input otentikasi, pembuatan buku, dan transaksi sirkulasi.
+ * Caller: Controller layer (auth, book, circulation), UI forms, test suites.
+ * Dependensi: zod.
+ * Main Functions: LoginSchema, CreateUserSchema, BookFilterSchema, CreateBookSchema, DigitalLoanSchema, PhysicalLoanSchema, ReturnPhysicalLoanSchema, ReservePhysicalLoanSchema, ClaimReservationSchema, CancelReservationSchema, RenewLoanSchema.
+ * Side Effects: Melakukan parsing dan validasi data masukan klien (melempar ZodError jika schema dilanggar).
  */
 
 import { z } from 'zod';
@@ -107,3 +113,10 @@ export const CancelReservationSchema = z.object({
 });
 
 export type CancelReservationInput = z.infer<typeof CancelReservationSchema>;
+
+export const RenewLoanSchema = z.object({
+  loanId: z.coerce.number().int().positive('ID Peminjaman tidak valid')
+});
+
+export type RenewLoanInput = z.infer<typeof RenewLoanSchema>;
+

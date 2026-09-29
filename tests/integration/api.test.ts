@@ -106,24 +106,50 @@ describe('Pustaka Sekolah API Integration Tests', () => {
     }
   });
 
-  it('GET /api/books/:id/stream-pdf harus mengembalikan binary PDF dengan header ramah offline cache', async () => {
+  it('GET /api/books/:id/stream-pdf harus menerapkan proteksi otorisasi pinjaman digital', async () => {
     const booksRes = await request(app).get('/api/books');
     const bookWithPdf = booksRes.body.data.find(
       (b: { ebookFilePath: string | null }) => !!b.ebookFilePath
     );
     expect(bookWithPdf).toBeDefined();
 
-    const pdfRes = await request(app)
+    // 1. Siswa belum meminjam: Harus ditolak dengan 403 Forbidden
+    const forbiddenRes = await request(app)
+      .get(`/api/books/${bookWithPdf.id}/stream-pdf`)
+      .set('Authorization', `Bearer ${studentToken}`);
+    expect(forbiddenRes.status).toBe(403);
+    expect(forbiddenRes.body.error.message).toContain('belum meminjam e-book ini');
+
+    // 2. Admin dapat melakukan preview/stream langsung tanpa meminjam
+    const adminRes = await request(app)
+      .get(`/api/books/${bookWithPdf.id}/stream-pdf`)
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(adminRes.status).toBe(200);
+    expect(adminRes.headers['content-type']).toBe('application/pdf');
+
+    // 3. Siswa meminjam buku digital secara resmi
+    const borrowRes = await request(app)
+      .post('/api/circulation/digital/borrow')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ bookId: bookWithPdf.id });
+    expect(borrowRes.status).toBe(201);
+
+    // 4. Setelah meminjam, siswa berhak streaming PDF dengan header ramah offline cache
+    const authorizedRes = await request(app)
       .get(`/api/books/${bookWithPdf.id}/stream-pdf`)
       .set('Authorization', `Bearer ${studentToken}`);
 
-    expect(pdfRes.status).toBe(200);
-    expect(pdfRes.headers['content-type']).toBe('application/pdf');
-    // Memastikan tidak ada 'no-store' agar W3C Cache API browser tidak melempar TypeError saat cache.put()
-    expect(pdfRes.headers['cache-control']).not.toContain('no-store');
-    expect(pdfRes.headers['cache-control']).toContain('must-revalidate');
-    expect(pdfRes.headers['content-length']).toBeDefined();
-    expect(Number(pdfRes.headers['content-length'])).toBeGreaterThan(0);
+    expect(authorizedRes.status).toBe(200);
+    expect(authorizedRes.headers['content-type']).toBe('application/pdf');
+    expect(authorizedRes.headers['cache-control']).not.toContain('no-store');
+    expect(authorizedRes.headers['cache-control']).toContain('must-revalidate');
+    expect(Number(authorizedRes.headers['content-length'])).toBeGreaterThan(0);
+
+    // 5. Kembalikan buku digital untuk merapikan state
+    await request(app)
+      .post('/api/circulation/digital/return')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ bookId: bookWithPdf.id });
   });
 
   it('GET /api/books/copies/available harus mengembalikan daftar eksemplar fisik di rak', async () => {

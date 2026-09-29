@@ -2,6 +2,12 @@
  * @file src/server/repositories/loan.repository.ts
  * @description Data access layer untuk sirkulasi peminjaman digital dan fisik.
  * @layer Repository Layer
+ * 
+ * Tujuan: Menyediakan abstraksi akses basis data untuk transaksi peminjaman (digital/fisik), reservasi, kalkulasi denda, dan auto-expiration.
+ * Caller: src/server/services/circulation.service.ts, test suites.
+ * Dependensi: src/server/db/index.ts, src/server/db/schema.ts, drizzle-orm, src/shared/types.
+ * Main Functions: autoExpireDigitalLoans, autoExpireReservations, findActiveLoan, findActivePhysicalLoanByCopyId, countActiveUserLoans, findUserLoans, create, updateReturn, createReservation, claimReservation, updateRenewLoan, checkUserCirculationSuspension.
+ * Side Effects: Membaca dan menulis catatan sirkulasi pada tabel loans dan book_copies di basis data SQLite.
  */
 
 import { db } from '../db/index.js';
@@ -416,6 +422,81 @@ export class LoanRepository {
       .where(eq(loans.id, loanId));
   }
 
+  /**
+   * Perpanjangan masa pinjam fisik 1x (BRD 3.3 Rule 3)
+   */
+  async updateRenewLoan(loanId: number, newDueDate: string): Promise<void> {
+    await db.update(loans)
+      .set({
+        dueDate: newDueDate,
+        isRenewed: true
+      })
+      .where(eq(loans.id, loanId));
+  }
+
+  /**
+   * Memeriksa penangguhan sirkulasi pemustaka karena denda tertunggak atau keterlambatan buku fisik (BRD 3.3 Negative Flow)
+   */
+  async checkUserCirculationSuspension(userId: number): Promise<{
+    isSuspended: boolean;
+    reason?: string;
+    overdueCount: number;
+    unpaidFineAmount: number;
+  }> {
+    const nowIso = new Date().toISOString();
+
+    // 1. Cek apakah ada pinjaman fisik yang aktif dan melewati batas tanggal jatuh tempo
+    const overdueRows = await db.select({ id: loans.id, bookTitle: books.title, dueDate: loans.dueDate })
+      .from(loans)
+      .innerJoin(books, eq(loans.bookId, books.id))
+      .where(
+        and(
+          eq(loans.userId, userId),
+          eq(loans.loanType, 'PHYSICAL'),
+          eq(loans.status, 'BORROWED'),
+          sql`${loans.dueDate} < ${nowIso}`
+        )
+      );
+
+    // 2. Cek apakah ada denda yang belum dilunasi
+    const unpaidFineRows = await db.select({ id: loans.id, fineAmount: loans.fineAmount })
+      .from(loans)
+      .where(
+        and(
+          eq(loans.userId, userId),
+          eq(loans.isFinePaid, false),
+          sql`${loans.fineAmount} > 0`
+        )
+      );
+
+    const overdueCount = overdueRows.length;
+    const unpaidFineAmount = unpaidFineRows.reduce((sum, r) => sum + (r.fineAmount || 0), 0);
+
+    if (overdueCount > 0) {
+      return {
+        isSuspended: true,
+        reason: `Anggota memiliki ${overdueCount} buku yang belum dikembalikan dan telah melewati jatuh tempo. Harap kembalikan buku terlebih dahulu.`,
+        overdueCount,
+        unpaidFineAmount
+      };
+    }
+
+    if (unpaidFineAmount > 0) {
+      return {
+        isSuspended: true,
+        reason: `Anggota memiliki penangguhan sirkulasi (Denda tertunggak: Rp ${unpaidFineAmount.toLocaleString('id-ID')}). Harap lunasi denda di meja sirkulasi.`,
+        overdueCount,
+        unpaidFineAmount
+      };
+    }
+
+    return {
+      isSuspended: false,
+      overdueCount: 0,
+      unpaidFineAmount: 0
+    };
+  }
+
   private mapToDomain(
     raw: LoanTable,
     bookTitle?: string,
@@ -443,6 +524,7 @@ export class LoanRepository {
       status: raw.status as LoanStatus,
       fineAmount: raw.fineAmount,
       isFinePaid: raw.isFinePaid,
+      isRenewed: Boolean(raw.isRenewed),
       reservationCode: raw.reservationCode,
       reservedUntil: raw.reservedUntil
     };

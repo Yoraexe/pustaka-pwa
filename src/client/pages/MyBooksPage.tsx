@@ -47,6 +47,7 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
   const [bookToDeleteOffline, setBookToDeleteOffline] = useState<{ id: number; title: string } | null>(null);
   const [reservations, setReservations] = useState<Loan[]>([]);
   const [reservationToCancel, setReservationToCancel] = useState<{ id: number; title: string; code: string } | null>(null);
+  const [loanToRenew, setLoanToRenew] = useState<{ id: number; title: string } | null>(null);
 
   const maxQuota = user.role === 'TEACHER' ? 5 : 2;
 
@@ -125,14 +126,37 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
     if (!bookToReturn) return;
     try {
       await api.returnDigitalBook(bookToReturn.id);
+      // Evict salinan luring dari IndexedDB & Cache Storage (BRD Seksi 3.2 AC-2.2)
+      await offlineStorage.removeEbook(bookToReturn.id);
+      setSavedOfflineIds((prev) => {
+        const next = new Set(prev);
+        next.delete(bookToReturn.id);
+        return next;
+      });
       toast.success('Pengembalian Berhasil', {
-        description: `"${bookToReturn.title}" telah dikembalikan.`,
+        description: `"${bookToReturn.title}" telah dikembalikan dan salinan luring dibersihkan.`,
       });
       setBookToReturn(null);
       fetchMyLoans();
     } catch (err: unknown) {
       toast.error('Gagal Mengembalikan', {
         description: err instanceof Error ? err.message : 'Terjadi kendala saat mengembalikan e-book.',
+      });
+    }
+  };
+
+  const confirmRenewPhysical = async () => {
+    if (!loanToRenew) return;
+    try {
+      await api.renewPhysicalLoan(loanToRenew.id);
+      toast.success('Perpanjangan Berhasil!', {
+        description: `Masa pinjam "${loanToRenew.title}" berhasil diperpanjang 1 kali.`,
+      });
+      setLoanToRenew(null);
+      fetchMyLoans();
+    } catch (err: unknown) {
+      toast.error('Gagal Memperpanjang Pinjaman', {
+        description: err instanceof Error ? err.message : 'Terjadi kendala saat memperpanjang masa pinjam.',
       });
     }
   };
@@ -338,8 +362,29 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                           </Button>
                         </>
                       ) : (
-                        <div className="w-full text-center py-2 text-xs text-muted-foreground bg-muted/50 rounded-xl font-medium">
-                          Kembalikan di meja sirkulasi
+                        <div className="w-full flex items-center justify-between gap-2">
+                          {!loan.isRenewed && !isOverdue ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() =>
+                                setLoanToRenew({
+                                  id: loan.id,
+                                  title: loan.bookTitle || 'Buku Fisik',
+                                })
+                              }
+                              className="flex-1 text-xs font-semibold hover:border-primary hover:text-primary"
+                            >
+                              Perpanjang (1x)
+                            </Button>
+                          ) : loan.isRenewed ? (
+                            <Badge variant="outline" className="text-[10px] font-normal text-muted-foreground py-1">
+                              Sudah Diperpanjang
+                            </Badge>
+                          ) : null}
+                          <span className="text-[11px] text-muted-foreground bg-muted/50 px-2.5 py-1.5 rounded-xl font-medium shrink-0">
+                            Kembalikan di Meja
+                          </span>
                         </div>
                       )}
                     </div>
@@ -494,14 +539,9 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                     </span>
 
                     {loan.loanType === 'DIGITAL' && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleOpenReader(loan.bookId, loan.bookTitle)}
-                        className="text-xs font-semibold text-primary hover:text-primary"
-                      >
-                        Buka Kembali
-                      </Button>
+                      <span className="text-[11px] font-medium text-muted-foreground bg-muted/60 px-2.5 py-1 rounded-full border border-border">
+                        Akses Selesai
+                      </span>
                     )}
                   </div>
                 </div>
@@ -652,6 +692,31 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
               className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
               Batalkan Tiket
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Alert Dialog: Renew Physical Loan Confirmation */}
+      <AlertDialog
+        open={!!loanToRenew}
+        onOpenChange={(open: boolean) => !open && setLoanToRenew(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Perpanjang Masa Pinjam?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Perpanjang masa pinjam <strong>"{loanToRenew?.title}"</strong> selama 7 hari ke depan?
+              <br />
+              <span className="text-xs text-muted-foreground mt-2 block">
+                Catatan: Perpanjangan mandiri hanya dapat dilakukan 1 kali dan tidak berlaku jika buku terlambat atau memiliki denda.
+              </span>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRenewPhysical}>
+              Perpanjang (7 Hari)
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

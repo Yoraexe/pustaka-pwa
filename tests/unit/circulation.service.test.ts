@@ -4,7 +4,7 @@
  * @layer Quality Assurance (Shift-Left TDD)
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { circulationService } from '../../src/server/services/circulation.service.js';
 import { bookRepository } from '../../src/server/repositories/book.repository.js';
 import { userRepository } from '../../src/server/repositories/user.repository.js';
@@ -157,6 +157,61 @@ describe('CirculationService Unit Tests', () => {
       // Kembalikan buku untuk merapikan state test
       if (claimedLoan.copyBarcode) {
         await circulationService.returnPhysicalBook(librarianUser, claimedLoan.copyBarcode);
+      }
+    });
+  });
+
+  describe('Physical Loan Renewal & Circulation Suspension Policy', () => {
+    let renewalLoanId: number;
+    let renewalBarcode: string;
+
+    beforeAll(async () => {
+      const available = await bookRepository.findAvailableCopies();
+      if (available.length === 0) throw new Error('No available copy for renewal test');
+      renewalBarcode = available[0].barcode;
+    });
+
+    it('harus berhasil memperpanjang pinjaman fisik 1 kali dan menambah durasi jatuh tempo', async () => {
+      // 1. Check out buku fisik oleh pustakawan
+      const initialLoan = await circulationService.checkOutPhysicalBook(
+        librarianUser,
+        studentUser.identityNumber,
+        renewalBarcode
+      );
+      renewalLoanId = initialLoan.id;
+      const initialDueDate = new Date(initialLoan.dueDate).getTime();
+
+      // 2. Pemustaka memperpanjang pinjamannya secara mandiri
+      const renewedLoan = await circulationService.renewPhysicalLoan(studentUser, renewalLoanId);
+      expect(renewedLoan.isRenewed).toBe(true);
+      expect(new Date(renewedLoan.dueDate).getTime()).toBeGreaterThan(initialDueDate);
+    });
+
+    it('harus menolak perpanjangan kedua untuk pinjaman yang sama (kebijakan maksimal 1 kali)', async () => {
+      await expect(
+        circulationService.renewPhysicalLoan(studentUser, renewalLoanId)
+      ).rejects.toThrow('sudah pernah diperpanjang 1 kali');
+    });
+
+    it('harus menolak perpanjangan jika dilakukan oleh pengguna lain yang bukan peminjam', async () => {
+      const fakeUser: User = { ...studentUser, id: 9999, identityNumber: 'FAKE999' };
+      await expect(
+        circulationService.renewPhysicalLoan(fakeUser, renewalLoanId)
+      ).rejects.toThrow('tidak memiliki wewenang');
+    });
+
+    it('harus memvalidasi status suspensi sirkulasi pemustaka', async () => {
+      const suspension = await circulationService.checkUserCirculationSuspension(studentUser.id);
+      expect(suspension).toBeDefined();
+      expect(typeof suspension.isSuspended).toBe('boolean');
+      expect(typeof suspension.overdueCount).toBe('number');
+      expect(typeof suspension.unpaidFineAmount).toBe('number');
+    });
+
+    afterAll(async () => {
+      // Bersihkan buku yang dipinjam dengan mengembalikannya
+      if (renewalBarcode) {
+        await circulationService.returnPhysicalBook(librarianUser, renewalBarcode);
       }
     });
   });

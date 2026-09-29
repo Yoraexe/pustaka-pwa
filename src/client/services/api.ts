@@ -2,6 +2,12 @@
  * @file src/client/services/api.ts
  * @description API Client wrapper untuk komunikasi frontend PWA dengan backend Express.
  * @layer Client Service Layer
+ * 
+ * Tujuan: Menyediakan abstraksi HTTP Client berbasis Fetch dengan penyisipan token JWT, caching offline localStorage, dan error handling terpusat.
+ * Caller: Seluruh komponen UI klien (CatalogPage, MyBooksPage, CirculationDesk, PDFReader, AddBookModal, UserImportModal).
+ * Dependensi: shared/types.
+ * Main Functions: ApiClient (login, getCurrentUser, getBooks, getBookDetail, borrowDigitalBook, returnDigitalBook, reservePhysicalBook, claimReservation, cancelReservation, renewPhysicalLoan, importUsersCsv, dll).
+ * Side Effects: Melakukan request jaringan HTTP ke backend Express, menulis/membaca token dan cache ke localStorage.
  */
 
 import type {
@@ -231,6 +237,13 @@ class ApiClient {
 
   async getReservations(activeOnly = true): Promise<Loan[]> {
     return this.request<Loan[]>(`/circulation/reservations?active=${activeOnly}`);
+  }
+
+  async renewPhysicalLoan(loanId: number): Promise<Loan> {
+    return this.request<Loan>('/circulation/physical/renew', {
+      method: 'POST',
+      body: JSON.stringify({ loanId })
+    });
   }
 }
 

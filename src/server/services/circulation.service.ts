@@ -2,6 +2,12 @@
  * @file src/server/services/circulation.service.ts
  * @description Layanan bisnis sirkulasi peminjaman hybrid (Digital E-book & Buku Fisik Meja Pustakawan).
  * @layer Service Layer (Business Logic)
+ * 
+ * Tujuan: Menyediakan logika bisnis untuk sirkulasi buku digital, check-out/in buku fisik, reservasi 24 jam, perpanjangan, dan validasi hak akses streaming.
+ * Caller: src/server/controllers/circulation.controller.ts, src/server/controllers/book.controller.ts, test suites.
+ * Dependensi: loanRepository, bookRepository, userRepository, sqlite, config, shared/types.
+ * Main Functions: borrowDigitalBook, returnDigitalBook, checkOutPhysicalBook, returnPhysicalBook, reservePhysicalBook, claimPhysicalReservation, cancelPhysicalReservation, renewPhysicalLoan, hasActiveDigitalAccess.
+ * Side Effects: Mutasi transaksi database SQLite secara atomik (BEGIN IMMEDIATE/COMMIT/ROLLBACK).
  */
 
 import { loanRepository, type LoanRepository } from '../repositories/loan.repository.js';
@@ -17,6 +23,17 @@ export class CirculationService {
     private bookRepo: BookRepository = bookRepository,
     private userRepo: UserRepository = userRepository
   ) {}
+
+  /**
+   * Validasi Hak Akses Streaming Dokumen E-Book Digital (BRD Seksi 3.2 & AC-2.2)
+   */
+  async hasActiveDigitalAccess(user: User, bookId: number): Promise<boolean> {
+    if (user.role === 'LIBRARIAN' || user.role === 'ADMIN') {
+      return true;
+    }
+    const activeLoan = await this.loanRepo.findActiveLoan(user.id, bookId, 'DIGITAL');
+    return Boolean(activeLoan);
+  }
 
   /**
    * Peminjaman Mandiri E-Book Digital oleh Pengguna (Siswa/Guru)
@@ -92,6 +109,12 @@ export class CirculationService {
 
     if (!borrower.isActive) {
       throw new Error('Akun anggota ini sedang dinonaktifkan.');
+    }
+
+    // 1b. Validasi Penangguhan Sirkulasi (Denda tertunggak / Keterlambatan buku fisik, BRD 3.3 Negative Flow)
+    const suspension = await this.loanRepo.checkUserCirculationSuspension(borrower.id);
+    if (suspension.isSuspended) {
+      throw new Error(suspension.reason);
     }
 
     // 2. Validasi Eksemplar Buku Fisik
@@ -245,6 +268,12 @@ export class CirculationService {
       throw new Error(`Batas maksimal sirkulasi fisik (${limit} buku) tercapai. Anda tidak dapat membuat reservasi baru.`);
     }
 
+    // 3b. Validasi Penangguhan Sirkulasi (Denda tertunggak / Keterlambatan buku fisik, BRD 3.3 Negative Flow)
+    const suspension = await this.loanRepo.checkUserCirculationSuspension(user.id);
+    if (suspension.isSuspended) {
+      throw new Error(suspension.reason);
+    }
+
     // 4. Cari eksemplar fisik yang tersedia
     const availableCopy = await this.bookRepo.findFirstAvailableCopy(bookId);
     if (!availableCopy || book.availablePhysicalCopies <= 0) {
@@ -358,6 +387,77 @@ export class CirculationService {
    */
   async getAllReservations(activeOnly = true): Promise<Loan[]> {
     return this.loanRepo.findAllReservations(activeOnly);
+  }
+
+  /**
+   * 11. Perpanjangan Masa Pinjam Buku Fisik 1 Kali (BRD Seksi 3.3 Aturan 3)
+   */
+  async renewPhysicalLoan(user: User, loanId: number): Promise<Loan> {
+    const loan = await this.loanRepo.findById(loanId);
+    if (!loan) {
+      throw new Error('Data peminjaman tidak ditemukan.');
+    }
+
+    if (loan.loanType !== 'PHYSICAL') {
+      throw new Error('Hanya peminjaman buku fisik yang dapat diperpanjang.');
+    }
+
+    if (loan.status !== 'BORROWED') {
+      throw new Error(`Peminjaman ini sudah berstatus ${loan.status} dan tidak dapat diperpanjang.`);
+    }
+
+    // Otorisasi: Siswa/guru peminjam atau pustakawan/admin
+    if (user.role !== 'LIBRARIAN' && user.role !== 'ADMIN' && loan.userId !== user.id) {
+      throw new Error('Anda tidak memiliki wewenang untuk memperpanjang peminjaman ini.');
+    }
+
+    // Perpanjangan hanya diizinkan maksimal 1 kali
+    if (loan.isRenewed) {
+      throw new Error('Buku ini sudah pernah diperpanjang 1 kali. Perpanjangan kedua tidak diizinkan sesuai aturan perpustakaan.');
+    }
+
+    // Tidak boleh diperpanjang jika sudah melewati batas jatuh tempo (overdue)
+    const now = new Date();
+    const currentDueDate = new Date(loan.dueDate);
+    if (now > currentDueDate) {
+      throw new Error('Buku ini telah melewati batas jatuh tempo. Harap kembalikan buku ke meja sirkulasi untuk melunasi denda keterlambatan.');
+    }
+
+    // Cek antrean reservasi dari siswa lain untuk buku ini
+    const allBookReservations = await this.loanRepo.findAllReservations(true);
+    const hasQueue = allBookReservations.some(r => r.bookId === loan.bookId && r.userId !== loan.userId);
+    if (hasQueue) {
+      throw new Error('Buku ini tidak dapat diperpanjang karena ada antrean reservasi dari pemustaka lain.');
+    }
+
+    // Hitung perpanjangan tanggal jatuh tempo baru
+    const borrower = await this.userRepo.findById(loan.userId);
+    const loanDays = borrower?.role === 'TEACHER' ? config.TEACHER_LOAN_DAYS : config.STUDENT_LOAN_DAYS;
+    const newDueDate = new Date(currentDueDate);
+    newDueDate.setDate(newDueDate.getDate() + loanDays);
+    newDueDate.setHours(23, 59, 59, 999);
+
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      await this.loanRepo.updateRenewLoan(loan.id, newDueDate.toISOString());
+      sqlite.exec('COMMIT');
+
+      return {
+        ...loan,
+        dueDate: newDueDate.toISOString(),
+        isRenewed: true
+      };
+    } catch (err) {
+      sqlite.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  /**
+   * Memeriksa status penangguhan sirkulasi anggota (tunggakan denda / keterlambatan buku fisik).
+   */
+  async checkUserCirculationSuspension(userId: number) {
+    return this.loanRepo.checkUserCirculationSuspension(userId);
   }
 }
 

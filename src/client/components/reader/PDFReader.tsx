@@ -198,7 +198,8 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
     ctx.restore();
   }, [user]);
 
-  const targetPdfUrl = pdfBlobUrl ? `${pdfBlobUrl}#page=${activePage}&zoom=${zoomLevel}&toolbar=1&navpanes=0` : null;
+  // Sembunyikan toolbar native browser (#toolbar=0) untuk mencegah unduhan dokumen asli tanpa watermark (BRD Seksi 3.2 Aturan 4)
+  const targetPdfUrl = pdfBlobUrl ? `${pdfBlobUrl}#page=${activePage}&zoom=${zoomLevel}&toolbar=0&navpanes=0` : null;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-slate-900 text-slate-100 select-none">

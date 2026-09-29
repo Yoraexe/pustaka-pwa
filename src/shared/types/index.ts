@@ -2,6 +2,12 @@
  * @file src/shared/types/index.ts
  * @description Definisi tipe domain perpustakaan digital & sirkulasi fisik hybrid.
  * @layer Shared Domain Types
+ * 
+ * Tujuan: Menyediakan kontrak tipe TypeScript terpadu yang digunakan bersama antara server Express dan client PWA.
+ * Caller: Seluruh file di src/server dan src/client.
+ * Dependensi: src/shared/schemas/index.ts.
+ * Main Functions: Definisi interfaces (User, Book, Loan, Category, AuthSession, dll).
+ * Side Effects: Murni kontrak tipe (tidak ada side effect runtime).
  */
 
 export type UserRole = 'STUDENT' | 'TEACHER' | 'LIBRARIAN' | 'ADMIN';
@@ -74,6 +80,7 @@ export interface Loan {
   status: LoanStatus;
   fineAmount: number;
   isFinePaid: boolean;
+  isRenewed?: boolean;
   reservationCode?: string | null;
   reservedUntil?: string | null;
 }
@@ -117,6 +124,7 @@ export type {
   ReturnPhysicalLoanInput,
   ReservePhysicalLoanInput,
   ClaimReservationInput,
-  CancelReservationInput
+  CancelReservationInput,
+  RenewLoanInput
 } from '../schemas/index.js';
 

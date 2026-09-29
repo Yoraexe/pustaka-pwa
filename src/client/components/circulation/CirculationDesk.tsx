@@ -5,7 +5,7 @@
  * 
  * Tujuan: Memfasilitasi sirkulasi buku fisik, check-out, pengembalian, kalkulasi denda, dan ekspor data bagi staf perpustakaan.
  * Caller: src/client/App.tsx (Tab Sirkulasi)
- * Dependensi: react, src/client/services/api.ts, shared/types, AddBookModal, Shadcn UI (Tabs, Card, Table, Input, Label, Button, Badge)
+ * Dependensi: react, src/client/services/api.ts, shared/types, AddBookModal, UserImportModal, BarcodeScannerModal, lucide-react, Shadcn UI (Tabs, Card, Table, Input, Label, Button, Badge)
  * Main Functions: CirculationDesk
  * Side Effects: Melakukan request peminjaman, pengembalian, dan generate file download CSV.
  */
@@ -16,6 +16,7 @@ import { useAuth } from '../../hooks/useAuth.js';
 import type { Loan, AvailableCopy } from '../../../shared/types/index.js';
 import { AddBookModal } from '../catalog/AddBookModal.js';
 import { UserImportModal } from '../admin/UserImportModal.js';
+import { BarcodeScannerModal } from './BarcodeScannerModal.js';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs.js';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card.js';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../ui/table.js';
@@ -23,6 +24,7 @@ import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
 import { Label } from '../ui/label.js';
 import { Badge } from '../ui/badge.js';
+import { Camera } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const CirculationDesk: React.FC = () => {
@@ -33,6 +35,10 @@ export const CirculationDesk: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isAddBookModalOpen, setIsAddBookModalOpen] = useState<boolean>(false);
   const [isUserImportModalOpen, setIsUserImportModalOpen] = useState<boolean>(false);
+
+  // Camera Barcode Scanner State
+  const [isScannerOpen, setIsScannerOpen] = useState<boolean>(false);
+  const [scannerTarget, setScannerTarget] = useState<'checkout' | 'return'>('checkout');
 
   // Form Check-out
   const [borrowerIdentity, setBorrowerIdentity] = useState<string>('');
@@ -113,6 +119,35 @@ export const CirculationDesk: React.FC = () => {
       const errText = err instanceof Error ? err.message : 'Gagal memproses klaim reservasi.';
       setClaimMsg({ type: 'error', text: errText });
       toast.error('Gagal Klaim Reservasi', { description: errText });
+    }
+  };
+
+  const handleOpenScanner = (target: 'checkout' | 'return') => {
+    setScannerTarget(target);
+    setIsScannerOpen(true);
+  };
+
+  const handleScanResult = (scannedBarcode: string) => {
+    if (scannerTarget === 'checkout') {
+      setCheckoutBarcode(scannedBarcode);
+      toast.info(`Barcode Terpindai: ${scannedBarcode}`);
+    } else {
+      setReturnBarcode(scannedBarcode);
+      toast.info(`Barcode Terpindai: ${scannedBarcode}`);
+    }
+  };
+
+  const handleRenewPhysical = async (loanId: number, bookTitle: string) => {
+    try {
+      await api.renewPhysicalLoan(loanId);
+      toast.success('Pinjaman Diperpanjang!', {
+        description: `Masa pinjam "${bookTitle}" berhasil diperpanjang 7 hari.`,
+      });
+      fetchCirculationHistory();
+    } catch (err: unknown) {
+      toast.error('Gagal Memperpanjang', {
+        description: err instanceof Error ? err.message : 'Terjadi kendala saat memperpanjang masa pinjam.',
+      });
     }
   };
 
@@ -347,14 +382,26 @@ export const CirculationDesk: React.FC = () => {
                       </span>
                     )}
                   </div>
-                  <Input
-                    id="checkoutBarcode"
-                    value={checkoutBarcode}
-                    onChange={(e) => setCheckoutBarcode(e.target.value)}
-                    placeholder="Contoh: BK-0001-01"
-                    className="font-mono text-xs"
-                    required
-                  />
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="checkoutBarcode"
+                      value={checkoutBarcode}
+                      onChange={(e) => setCheckoutBarcode(e.target.value)}
+                      placeholder="Contoh: BK-0001-01"
+                      className="font-mono text-xs flex-1"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenScanner('checkout')}
+                      className="h-9 px-3 gap-1.5 text-xs font-semibold shrink-0"
+                    >
+                      <Camera className="w-4 h-4 text-primary" />
+                      <span>Pindai</span>
+                    </Button>
+                  </div>
 
                   {/* Quick Copy Selector */}
                   {availableCopies.length > 0 && (
@@ -551,14 +598,26 @@ export const CirculationDesk: React.FC = () => {
               <form onSubmit={handleProcessReturn} className="space-y-4 max-w-lg">
                 <div>
                   <Label htmlFor="returnBarcode">Barcode Eksemplar</Label>
-                  <Input
-                    id="returnBarcode"
-                    value={returnBarcode}
-                    onChange={(e) => setReturnBarcode(e.target.value)}
-                    placeholder="Contoh: BK-0001-01"
-                    className="font-mono text-xs"
-                    required
-                  />
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="returnBarcode"
+                      value={returnBarcode}
+                      onChange={(e) => setReturnBarcode(e.target.value)}
+                      placeholder="Contoh: BK-0001-01"
+                      className="font-mono text-xs flex-1"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenScanner('return')}
+                      className="h-9 px-3 gap-1.5 text-xs font-semibold shrink-0"
+                    >
+                      <Camera className="w-4 h-4 text-primary" />
+                      <span>Pindai</span>
+                    </Button>
+                  </div>
 
                   {/* Quick Return Selector */}
                   {activePhysicalLoans.length > 0 && (
@@ -713,20 +772,33 @@ export const CirculationDesk: React.FC = () => {
                         Klaim Tiket
                       </Button>
                     ) : l.status === 'BORROWED' && l.loanType === 'PHYSICAL' && l.copyBarcode ? (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-7 px-2.5 text-[11px] font-semibold text-primary hover:text-primary-foreground hover:bg-primary"
-                        onClick={() => {
-                          setReturnBarcode(l.copyBarcode!);
-                          setActiveTab('return');
-                          toast.info(`Barcode ${l.copyBarcode} dipilih`, {
-                            description: 'Silakan klik "Proses Pengembalian" pada form di atas.',
-                          });
-                        }}
-                      >
-                        Kembalikan
-                      </Button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        {!l.isRenewed && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2 text-[11px] font-semibold text-emerald-600 border-emerald-500/30 hover:bg-emerald-500 hover:text-white"
+                            onClick={() => handleRenewPhysical(l.id, l.bookTitle || 'Buku Fisik')}
+                            title="Perpanjang 7 hari (maks 1x)"
+                          >
+                            Perpanjang
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2.5 text-[11px] font-semibold text-primary hover:text-primary-foreground hover:bg-primary"
+                          onClick={() => {
+                            setReturnBarcode(l.copyBarcode!);
+                            setActiveTab('return');
+                            toast.info(`Barcode ${l.copyBarcode} dipilih`, {
+                              description: 'Silakan klik "Proses Pengembalian" pada form di atas.',
+                            });
+                          }}
+                        >
+                          Kembalikan
+                        </Button>
+                      </div>
                     ) : (
                       <span className="text-[11px] text-muted-foreground">-</span>
                     )}
@@ -763,6 +835,14 @@ export const CirculationDesk: React.FC = () => {
           setIsUserImportModalOpen(false);
           fetchCirculationHistory();
         }}
+      />
+
+      {/* Modal Pindai Barcode Kamera */}
+      <BarcodeScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScan={handleScanResult}
+        title={scannerTarget === 'checkout' ? 'Pindai Barcode Peminjaman' : 'Pindai Barcode Pengembalian'}
       />
     </div>
   );

@@ -2,6 +2,12 @@
  * @file src/server/controllers/circulation.controller.ts
  * @description Thin controller untuk penanganan rute sirkulasi digital & fisik.
  * @layer Controller Layer (HTTP Interface)
+ * 
+ * Tujuan: Menyediakan antarmuka REST API tipis untuk peminjaman/pengembalian buku digital & fisik, reservasi 24 jam, dan perpanjangan masa pinjam.
+ * Caller: src/server/app.ts (mounted at /api/circulation).
+ * Dependensi: express, circulationService, shared/schemas, auth.middleware.
+ * Main Functions: circulationRouter (POST /digital/borrow, POST /digital/return, GET /my-loans, POST /physical/checkout, POST /physical/return, GET /all, POST /physical/reserve, POST /physical/claim, POST /physical/cancel-reserve, GET /reservations, POST /physical/renew).
+ * Side Effects: Meneruskan input ke service layer dan mengembalikan respons HTTP terstruktur.
  */
 
 import { Router, type Request, type Response, type NextFunction } from 'express';
@@ -12,7 +18,8 @@ import {
   ReturnPhysicalLoanSchema,
   ReservePhysicalLoanSchema,
   ClaimReservationSchema,
-  CancelReservationSchema
+  CancelReservationSchema,
+  RenewLoanSchema
 } from '../../shared/schemas/index.js';
 import { authenticateToken, requireRole } from '../middleware/auth.middleware.js';
 
@@ -161,3 +168,19 @@ circulationRouter.get('/reservations', authenticateToken, requireRole(['LIBRARIA
     next(err);
   }
 });
+
+// 11. Physical Loan - Renew 1-time (Siswa/Guru atau Pustakawan, BRD 3.3 Rule 3)
+circulationRouter.post('/physical/renew', authenticateToken, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const input = RenewLoanSchema.parse(req.body);
+    const renewedLoan = await circulationService.renewPhysicalLoan(req.user!, input.loanId);
+    res.json({
+      success: true,
+      message: 'Masa pinjam buku fisik berhasil diperpanjang 1 kali.',
+      data: renewedLoan
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
