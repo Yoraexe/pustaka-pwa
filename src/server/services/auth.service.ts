@@ -227,76 +227,102 @@ export class AuthService {
     const salt = await bcrypt.genSalt(10);
     const defaultPasswordHash = await bcrypt.hash('123456', salt);
 
+    interface PreparedImportUser {
+      rowNum: number;
+      identityNumber: string;
+      name: string;
+      role: UserRole;
+      className: string | null;
+      password: string;
+      passwordHash: string;
+    }
+
+    const preparedUsers: PreparedImportUser[] = [];
+
+    // Tahap 1: Validasi dan komputasi hash kata sandi di luar transaksi basis data (CPU-bound, tanpa menahan write lock SQLite)
+    for (let i = startIndex; i < lines.length; i++) {
+      const rowNum = i + 1;
+      const cols = parseCsvLine(lines[i]);
+      if (cols.length < 2) {
+        errors.push({
+          row: rowNum,
+          identity: cols[0] || '-',
+          reason: 'Format baris tidak lengkap (minimal Nama dan NISN/NIP)'
+        });
+        continue;
+      }
+
+      const name = cols[nameIdx] || '';
+      const identityNumber = cols[identityIdx] || '';
+      const rawRole = (cols[roleIdx] || 'STUDENT').toUpperCase();
+      const className = cols[classIdx] || null;
+      const customPassword = cols[passwordIdx] || null;
+
+      if (!name || !identityNumber) {
+        errors.push({
+          row: rowNum,
+          identity: identityNumber || '-',
+          reason: 'Nama dan NISN/NIP wajib diisi'
+        });
+        continue;
+      }
+
+      let role: UserRole = 'STUDENT';
+      if (rawRole.includes('GURU') || rawRole.includes('TEACHER')) {
+        role = 'TEACHER';
+      } else if (rawRole.includes('PUSTAKA') || rawRole.includes('LIBRARIAN')) {
+        role = 'LIBRARIAN';
+      } else if (rawRole.includes('ADMIN')) {
+        role = 'ADMIN';
+      }
+
+      if (customPassword && customPassword.length < 4) {
+        errors.push({
+          row: rowNum,
+          identity: identityNumber,
+          reason: 'Password minimal 4 karakter'
+        });
+        continue;
+      }
+
+      const passwordHash = customPassword ? await bcrypt.hash(customPassword, 10) : defaultPasswordHash;
+
+      preparedUsers.push({
+        rowNum,
+        identityNumber,
+        name,
+        role,
+        className,
+        password: customPassword || '123456',
+        passwordHash
+      });
+    }
+
+    // Tahap 2: Operasi penulisan I/O SQLite secara atomik dan secepat kilat (hanya milidetik, mencegah lock contention)
     sqlite.exec('BEGIN IMMEDIATE');
     try {
-      for (let i = startIndex; i < lines.length; i++) {
-        const rowNum = i + 1;
-        const cols = parseCsvLine(lines[i]);
-        if (cols.length < 2) {
-          errors.push({
-            row: rowNum,
-            identity: cols[0] || '-',
-            reason: 'Format baris tidak lengkap (minimal Nama dan NISN/NIP)'
-          });
-          continue;
-        }
-
-        const name = cols[nameIdx] || '';
-        const identityNumber = cols[identityIdx] || '';
-        const rawRole = (cols[roleIdx] || 'STUDENT').toUpperCase();
-        const className = cols[classIdx] || null;
-        const customPassword = cols[passwordIdx] || null;
-
-        if (!name || !identityNumber) {
-          errors.push({
-            row: rowNum,
-            identity: identityNumber || '-',
-            reason: 'Nama dan NISN/NIP wajib diisi'
-          });
-          continue;
-        }
-
-        let role: UserRole = 'STUDENT';
-        if (rawRole.includes('GURU') || rawRole.includes('TEACHER')) {
-          role = 'TEACHER';
-        } else if (rawRole.includes('PUSTAKA') || rawRole.includes('LIBRARIAN')) {
-          role = 'LIBRARIAN';
-        } else if (rawRole.includes('ADMIN')) {
-          role = 'ADMIN';
-        }
-
-        if (customPassword && customPassword.length < 4) {
-          errors.push({
-            row: rowNum,
-            identity: identityNumber,
-            reason: 'Password minimal 4 karakter'
-          });
-          continue;
-        }
-
+      for (const u of preparedUsers) {
         try {
-          const existing = await this.userRepo.findByIdentityNumber(identityNumber);
+          const existing = await this.userRepo.findByIdentityNumber(u.identityNumber);
           if (existing) {
             skippedCount++;
             continue;
           }
 
-          const passwordHash = customPassword ? await bcrypt.hash(customPassword, 10) : defaultPasswordHash;
-
           await this.userRepo.create({
-            identityNumber,
-            name,
-            role,
-            className,
-            password: customPassword || '123456',
-            passwordHash
+            identityNumber: u.identityNumber,
+            name: u.name,
+            role: u.role,
+            className: u.className,
+            password: u.password,
+            passwordHash: u.passwordHash
           });
 
           importedCount++;
         } catch (err: unknown) {
           errors.push({
-            row: rowNum,
-            identity: identityNumber,
+            row: u.rowNum,
+            identity: u.identityNumber,
             reason: err instanceof Error ? err.message : 'Gagal menyimpan ke basis data'
           });
         }

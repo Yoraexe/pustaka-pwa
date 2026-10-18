@@ -346,6 +346,46 @@ describe('CirculationService Unit Tests', () => {
       ).rejects.toThrow('penangguhan sirkulasi');
     });
 
+    it('harus menolak perpanjangan pinjaman fisik jika pemustaka memiliki penangguhan sirkulasi (BUG-702)', async () => {
+      // Buat pinjaman aktif yang belum overdue untuk studentUser
+      const activeLoan = await loanRepository.create({
+        userId: studentUser.id,
+        bookId: hybridBookId,
+        loanType: 'PHYSICAL',
+        dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString()
+      });
+
+      try {
+        await expect(
+          circulationService.renewPhysicalLoan(studentUser, activeLoan.id)
+        ).rejects.toThrow('penangguhan sirkulasi');
+      } finally {
+        await db.delete(loans).where(eq(loans.id, activeLoan.id));
+      }
+    });
+
+    it('harus menolak klaim reservasi jika peminjam memiliki penangguhan sirkulasi atau akun nonaktif (BUG-701)', async () => {
+      const resCode = 'RES-TEST-SUSP-01';
+      const copies = await bookRepository.findCopiesByBookId(physicalOnlyBookId);
+      const copyId = copies[0]?.id || 1;
+      const createdRes = await loanRepository.createReservation({
+        userId: studentUser.id,
+        bookId: physicalOnlyBookId,
+        copyId,
+        reservationCode: resCode,
+        reservedUntil: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      });
+
+      try {
+        // 1. Tolak saat tersuspensi denda
+        await expect(
+          circulationService.claimPhysicalReservation(librarianUser, resCode)
+        ).rejects.toThrow('penangguhan sirkulasi');
+      } finally {
+        await db.delete(loans).where(eq(loans.id, createdRes.id));
+      }
+    });
+
     it('harus menolak pelunasan denda jika dilakukan oleh non-staf', async () => {
       await expect(
         circulationService.settleLoanFine(studentUser, penaltyLoanId)

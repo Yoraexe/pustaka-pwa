@@ -538,7 +538,21 @@ export class CirculationService {
     }
 
     const borrower = await this.userRepo.findById(reservation.userId);
-    const loanDays = borrower?.role === 'TEACHER' ? config.TEACHER_LOAN_DAYS : config.STUDENT_LOAN_DAYS;
+    if (!borrower) {
+      throw new Error('Data peminjam untuk tiket reservasi ini tidak ditemukan.');
+    }
+
+    if (!borrower.isActive) {
+      throw new Error('Akun peminjam tiket reservasi ini sedang dinonaktifkan.');
+    }
+
+    // Validasi Penangguhan Sirkulasi (Denda tertunggak / Keterlambatan buku fisik lain, BRD 3.3 Negative Flow)
+    const suspension = await this.loanRepo.checkUserCirculationSuspension(borrower.id);
+    if (suspension.isSuspended) {
+      throw new Error(suspension.reason);
+    }
+
+    const loanDays = borrower.role === 'TEACHER' ? config.TEACHER_LOAN_DAYS : config.STUDENT_LOAN_DAYS;
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + loanDays);
     dueDate.setHours(23, 59, 59, 999);
@@ -619,6 +633,12 @@ export class CirculationService {
     // Otorisasi: Siswa/guru peminjam atau pustakawan/admin
     if (user.role !== 'LIBRARIAN' && user.role !== 'ADMIN' && loan.userId !== user.id) {
       throw new Error('Anda tidak memiliki wewenang untuk memperpanjang peminjaman ini.');
+    }
+
+    // Validasi Penangguhan Sirkulasi (Denda tertunggak / Keterlambatan buku fisik lain, BRD 3.3 Negative Flow)
+    const suspension = await this.loanRepo.checkUserCirculationSuspension(loan.userId);
+    if (suspension.isSuspended) {
+      throw new Error(suspension.reason);
     }
 
     // Perpanjangan hanya diizinkan maksimal 1 kali

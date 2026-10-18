@@ -119,14 +119,18 @@ export const offlineStorage = {
   },
 
   /**
-   * Memeriksa apakah buku sudah pernah diunduh untuk dibaca offline
+   * Memeriksa apakah berkas e-book benar-benar tersimpan di IndexedDB atau Cache API
+   * Memverifikasi blob riil untuk mencegah false positive jika browser melakukan storage eviction.
    */
   async isEbookSaved(bookId: number): Promise<boolean> {
-    if (localStorage.getItem(`offline_ebook_${bookId}`) === 'true') {
-      return true;
-    }
     const blob = await this.getEbook(bookId);
-    return blob !== null;
+    if (blob !== null) {
+      localStorage.setItem(`offline_ebook_${bookId}`, 'true');
+      return true;
+    } else {
+      localStorage.removeItem(`offline_ebook_${bookId}`);
+      return false;
+    }
   },
 
   /**
