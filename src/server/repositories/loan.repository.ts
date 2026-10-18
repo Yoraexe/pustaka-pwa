@@ -24,7 +24,9 @@ export class LoanRepository {
     const result = await db.update(loans)
       .set({
         status: 'RETURNED',
-        returnDate: nowIso
+        returnDate: nowIso,
+        fineAmount: 0,
+        isFinePaid: true
       })
       .where(
         and(
@@ -167,7 +169,14 @@ export class LoanRepository {
         if (updateRes.changes > 0) {
           expiredCount++;
           if (r.copyId) {
-            await db.update(bookCopies).set({ status: 'AVAILABLE' }).where(eq(bookCopies.id, r.copyId));
+            await db.update(bookCopies)
+              .set({ status: 'AVAILABLE' })
+              .where(
+                and(
+                  eq(bookCopies.id, r.copyId),
+                  eq(bookCopies.status, 'RESERVED')
+                )
+              );
           }
           await db.update(books)
             .set({

@@ -479,6 +479,28 @@ describe('CirculationService Unit Tests', () => {
       const changes = await loanRepository.updateSettleFine(penaltyLoanId);
       expect(changes).toBe(0);
     });
+
+    it('harus menandai e-book kadaluwarsa sebagai RETURNED dengan fineAmount 0 dan isFinePaid true', async () => {
+      const pastDueDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const expiredDigitalLoan = await loanRepository.create({
+        userId: studentUser.id,
+        bookId: hybridBookId,
+        copyId: null,
+        loanType: 'DIGITAL',
+        dueDate: pastDueDate
+      });
+
+      const expiredCount = await loanRepository.autoExpireDigitalLoans();
+      expect(expiredCount).toBeGreaterThanOrEqual(1);
+
+      const found = await loanRepository.findById(expiredDigitalLoan.id);
+      expect(found).toBeDefined();
+      expect(found?.status).toBe('RETURNED');
+      expect(found?.fineAmount).toBe(0);
+      expect(found?.isFinePaid).toBe(true);
+
+      await db.delete(loans).where(eq(loans.id, expiredDigitalLoan.id));
+    });
   });
 });
 

@@ -176,7 +176,7 @@ export class CirculationService {
           throw new Error('Tiket reservasi sudah diklaim atau sudah tidak aktif.');
         }
         if (existingRes.copyId) {
-          await this.bookRepo.updateCopyStatus(existingRes.copyId, 'BORROWED');
+          await this.bookRepo.updateCopyStatus(existingRes.copyId, 'BORROWED', 'RESERVED');
         }
         sqlite.exec('COMMIT');
         return {
@@ -287,7 +287,7 @@ export class CirculationService {
         throw new Error('Buku fisik ini sudah dikembalikan atau tidak dalam status pinjaman aktif.');
       }
       if (activeLoan.copyId) {
-        await this.bookRepo.updateCopyStatus(activeLoan.copyId, 'AVAILABLE');
+        await this.bookRepo.updateCopyStatus(activeLoan.copyId, 'AVAILABLE', 'BORROWED');
       }
       await this.bookRepo.updateAvailableCopies(activeLoan.bookId, 1);
       sqlite.exec('COMMIT');
@@ -428,7 +428,7 @@ export class CirculationService {
       if (returnChanges === 0) {
         throw new Error('Buku fisik ini sudah dikembalikan atau tidak dalam status pinjaman aktif.');
       }
-      await this.bookRepo.updateCopyStatus(copyData.id, 'AVAILABLE');
+      await this.bookRepo.updateCopyStatus(copyData.id, 'AVAILABLE', 'BORROWED');
       await this.bookRepo.updateAvailableCopies(copyData.bookId, 1);
       sqlite.exec('COMMIT');
     } catch (err) {
@@ -588,7 +588,7 @@ export class CirculationService {
         throw new Error('Tiket reservasi sudah diklaim atau sudah tidak aktif.');
       }
       if (reservation.copyId) {
-        await this.bookRepo.updateCopyStatus(reservation.copyId, 'BORROWED');
+        await this.bookRepo.updateCopyStatus(reservation.copyId, 'BORROWED', 'RESERVED');
       }
       sqlite.exec('COMMIT');
 
@@ -624,7 +624,7 @@ export class CirculationService {
         throw new Error('Tiket reservasi sudah tidak aktif atau telah dibatalkan.');
       }
       if (loan.copyId) {
-        await this.bookRepo.updateCopyStatus(loan.copyId, 'AVAILABLE');
+        await this.bookRepo.updateCopyStatus(loan.copyId, 'AVAILABLE', 'RESERVED');
       }
       await this.bookRepo.updateAvailableCopies(loan.bookId, 1);
       sqlite.exec('COMMIT');

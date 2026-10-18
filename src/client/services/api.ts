@@ -211,7 +211,12 @@ class ApiClient {
     const cacheKey = 'pustaka_cached_books';
     try {
       const books = await this.request<Book[]>(`/books?${params.toString()}`);
-      if (!filters.search && (!filters.categoryId || filters.categoryId === 0)) {
+      const isDefaultCatalog = !filters.search &&
+        (!filters.categoryId || filters.categoryId === 0) &&
+        (!filters.bookType || filters.bookType === 'ALL') &&
+        !filters.availableOnly;
+
+      if (isDefaultCatalog) {
         localStorage.setItem(cacheKey, JSON.stringify(books));
       }
       return books;
