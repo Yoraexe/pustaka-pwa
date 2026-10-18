@@ -18,6 +18,7 @@ import { authRouter } from './controllers/auth.controller.js';
 import { bookRouter } from './controllers/book.controller.js';
 import { circulationRouter } from './controllers/circulation.controller.js';
 import { errorHandler } from './middleware/error.middleware.js';
+import { config } from './config/index.js';
 
 export const createApp = () => {
   const app = express();
@@ -50,10 +51,8 @@ export const createApp = () => {
       status: 'healthy',
       app: 'Pustaka Sekolah PWA',
       timestamp: new Date().toISOString(),
-      isTursoEnabled: config.isTursoEnabled,
-      hasTursoUrl: Boolean(config.TURSO_DATABASE_URL),
-      hasTursoToken: Boolean(config.TURSO_AUTH_TOKEN),
-      tursoHost: config.TURSO_DATABASE_URL ? new URL(config.TURSO_DATABASE_URL.replace('libsql://', 'https://')).hostname : null
+      isTursoEnabled: Boolean(config.isTursoEnabled),
+      hasTursoUrl: Boolean(config.TURSO_DATABASE_URL)
     });
   });
 
