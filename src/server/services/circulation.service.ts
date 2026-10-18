@@ -690,7 +690,10 @@ export class CirculationService {
 
     // Hitung perpanjangan tanggal jatuh tempo baru
     const borrower = await this.userRepo.findById(loan.userId);
-    const loanDays = borrower?.role === 'TEACHER' ? config.TEACHER_LOAN_DAYS : config.STUDENT_LOAN_DAYS;
+    if (!borrower || !borrower.isActive) {
+      throw new Error('Akun peminjam buku ini sedang dinonaktifkan.');
+    }
+    const loanDays = borrower.role === 'TEACHER' ? config.TEACHER_LOAN_DAYS : config.STUDENT_LOAN_DAYS;
     const newDueDate = new Date(currentDueDate);
     newDueDate.setDate(newDueDate.getDate() + loanDays);
     newDueDate.setHours(23, 59, 59, 999);
@@ -742,12 +745,22 @@ export class CirculationService {
       throw new Error('Denda untuk transaksi ini sudah berstatus lunas.');
     }
 
-    await this.loanRepo.updateSettleFine(loan.id);
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const changes = await this.loanRepo.updateSettleFine(loan.id);
+      if (changes === 0) {
+        throw new Error('Denda untuk transaksi ini sudah berstatus lunas atau tidak valid.');
+      }
+      sqlite.exec('COMMIT');
 
-    return {
-      ...loan,
-      isFinePaid: true
-    };
+      return {
+        ...loan,
+        isFinePaid: true
+      };
+    } catch (err) {
+      sqlite.exec('ROLLBACK');
+      throw err;
+    }
   }
 }
 

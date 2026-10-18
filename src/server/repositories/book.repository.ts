@@ -133,7 +133,7 @@ export class BookRepository {
       bookType: data.bookType,
       coverUrl: data.coverUrl || null,
       ebookFilePath: data.ebookFilePath || null,
-      digitalLicenseCount: data.digitalLicenseCount,
+      digitalLicenseCount: data.bookType === 'PHYSICAL_ONLY' ? 0 : data.digitalLicenseCount,
       totalPhysicalCopies: totalCopies,
       availablePhysicalCopies: availableCopies,
       shelfLocation: isDigitalOnly ? null : (data.shelfLocation || null)

@@ -464,10 +464,16 @@ export class LoanRepository {
     return res.changes;
   }
 
-  async updateSettleFine(loanId: number): Promise<void> {
-    await db.update(loans)
+  async updateSettleFine(loanId: number): Promise<number> {
+    const res = await db.update(loans)
       .set({ isFinePaid: true })
-      .where(eq(loans.id, loanId));
+      .where(
+        and(
+          eq(loans.id, loanId),
+          eq(loans.isFinePaid, false)
+        )
+      );
+    return res.changes;
   }
 
   /**

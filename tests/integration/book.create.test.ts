@@ -130,6 +130,7 @@ describe('Book Creation & Ingestion API Integration Tests', () => {
     expect(createdBook.totalPhysicalCopies).toBe(3);
     expect(createdBook.availablePhysicalCopies).toBe(3);
     expect(createdBook.shelfLocation).toBe('RAK-FIS-05');
+    expect(createdBook.digitalLicenseCount).toBe(0);
     expect(createdBook.copies).toBeDefined();
     expect(createdBook.copies.length).toBe(3);
     expect(createdBook.copies[0].barcode).toMatch(/^BK-\d+-01$/);

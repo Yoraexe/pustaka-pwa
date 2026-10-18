@@ -10,7 +10,7 @@ import { bookRepository } from '../../src/server/repositories/book.repository.js
 import { userRepository } from '../../src/server/repositories/user.repository.js';
 import { loanRepository } from '../../src/server/repositories/loan.repository.js';
 import { db } from '../../src/server/db/index.js';
-import { loans } from '../../src/server/db/schema.js';
+import { loans, users } from '../../src/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 import type { User } from '../../src/shared/types/index.js';
 import { ensureTestDatabaseSeeded, cleanupTestPdf } from '../helpers/test-fixture.js';
@@ -236,6 +236,38 @@ describe('CirculationService Unit Tests', () => {
       expect(typeof suspension.unpaidFineAmount).toBe('number');
     });
 
+    it('harus menolak perpanjangan pinjaman fisik jika akun peminjam sedang dinonaktifkan', async () => {
+      const inactiveUser = await userRepository.create({
+        identityNumber: 'TEST_INACTIVE_RENEW',
+        name: 'Siswa Nonaktif Renew',
+        role: 'STUDENT',
+        password: 'dummyPassword123',
+        passwordHash: 'dummyhash'
+      });
+      await userRepository.updateStatus(inactiveUser.id, false);
+
+      const copy = await bookRepository.findFirstAvailableCopy(physicalOnlyBookId);
+      expect(copy).toBeDefined();
+      if (copy) {
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 7);
+        const tempLoan = await loanRepository.create({
+          userId: inactiveUser.id,
+          bookId: physicalOnlyBookId,
+          copyId: copy.id,
+          loanType: 'PHYSICAL',
+          dueDate: dueDate.toISOString()
+        });
+
+        await expect(
+          circulationService.renewPhysicalLoan(librarianUser, tempLoan.id)
+        ).rejects.toThrow('Akun peminjam buku ini sedang dinonaktifkan.');
+
+        await db.delete(loans).where(eq(loans.id, tempLoan.id));
+      }
+      await db.delete(users).where(eq(users.id, inactiveUser.id));
+    });
+
     afterAll(async () => {
       // Bersihkan buku yang dipinjam dengan mengembalikannya
       if (renewalBarcode) {
@@ -438,10 +470,14 @@ describe('CirculationService Unit Tests', () => {
       expect(suspension.unpaidFineAmount).toBe(0);
     });
 
-    it('harus menolak pelunasan denda jika denda sudah lunas', async () => {
+    it('harus menolak pelunasan denda jika denda sudah lunas dan menjamin atomisitas', async () => {
       await expect(
         circulationService.settleLoanFine(librarianUser, penaltyLoanId)
       ).rejects.toThrow('sudah berstatus lunas');
+
+      // Verifikasi atomisitas: updateSettleFine mengembalikan 0 changes pada pemanggilan kedua
+      const changes = await loanRepository.updateSettleFine(penaltyLoanId);
+      expect(changes).toBe(0);
     });
   });
 });
