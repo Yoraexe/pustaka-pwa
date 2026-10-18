@@ -8,6 +8,10 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { circulationService } from '../../src/server/services/circulation.service.js';
 import { bookRepository } from '../../src/server/repositories/book.repository.js';
 import { userRepository } from '../../src/server/repositories/user.repository.js';
+import { loanRepository } from '../../src/server/repositories/loan.repository.js';
+import { db } from '../../src/server/db/index.js';
+import { loans } from '../../src/server/db/schema.js';
+import { eq } from 'drizzle-orm';
 import type { User } from '../../src/shared/types/index.js';
 import { ensureTestDatabaseSeeded, cleanupTestPdf } from '../helpers/test-fixture.js';
 
@@ -308,6 +312,61 @@ describe('CirculationService Unit Tests', () => {
 
       // 4. Bersihkan: Kembalikan buku
       await circulationService.returnPhysicalBookSelf(studentUser, loan.id);
+    });
+  });
+
+  describe('Fine Settlement & Suspension Enforcement', () => {
+    let penaltyLoanId: number;
+
+    beforeAll(async () => {
+      // Buat pinjaman buatan dengan denda tertunggak untuk studentUser
+      const created = await loanRepository.create({
+        userId: studentUser.id,
+        bookId: physicalOnlyBookId,
+        loanType: 'PHYSICAL',
+        dueDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
+      });
+      await loanRepository.updateReturn(
+        created.id,
+        new Date().toISOString(),
+        3000,
+        false
+      );
+      penaltyLoanId = created.id;
+    });
+
+    afterAll(async () => {
+      // Bersihkan transaksi penalti
+      await db.delete(loans).where(eq(loans.id, penaltyLoanId));
+    });
+
+    it('harus menolak peminjaman digital jika pemustaka memiliki penangguhan sirkulasi (denda tertunggak)', async () => {
+      await expect(
+        circulationService.borrowDigitalBook(studentUser, hybridBookId)
+      ).rejects.toThrow('penangguhan sirkulasi');
+    });
+
+    it('harus menolak pelunasan denda jika dilakukan oleh non-staf', async () => {
+      await expect(
+        circulationService.settleLoanFine(studentUser, penaltyLoanId)
+      ).rejects.toThrow('Hanya pustakawan atau admin');
+    });
+
+    it('harus berhasil melunasi denda ketika diproses oleh pustakawan dan mengangkat penangguhan sirkulasi', async () => {
+      const settled = await circulationService.settleLoanFine(librarianUser, penaltyLoanId);
+      expect(settled.isFinePaid).toBe(true);
+      expect(settled.fineAmount).toBe(3000);
+
+      // Setelah denda dilunasi, suspensi harus terangkat
+      const suspension = await circulationService.checkUserCirculationSuspension(studentUser.id);
+      expect(suspension.isSuspended).toBe(false);
+      expect(suspension.unpaidFineAmount).toBe(0);
+    });
+
+    it('harus menolak pelunasan denda jika denda sudah lunas', async () => {
+      await expect(
+        circulationService.settleLoanFine(librarianUser, penaltyLoanId)
+      ).rejects.toThrow('sudah berstatus lunas');
     });
   });
 });

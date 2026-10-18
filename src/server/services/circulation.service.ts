@@ -54,6 +54,12 @@ export class CirculationService {
       throw new Error('Anda sudah meminjam e-book ini. Silakan buka di menu "Rak Buku Saya".');
     }
 
+    // 1b. Validasi Penangguhan Sirkulasi (Denda tertunggak / Keterlambatan buku fisik, BRD 3.3 Negative Flow)
+    const suspension = await this.loanRepo.checkUserCirculationSuspension(user.id);
+    if (suspension.isSuspended) {
+      throw new Error(suspension.reason);
+    }
+
     // 2. Cek kuota peminjaman aktif berdasarkan role pengguna
     const limit = user.role === 'TEACHER' ? config.TEACHER_LOAN_LIMIT : config.STUDENT_LOAN_LIMIT;
     const currentActiveCount = await this.loanRepo.countActiveUserLoans(user.id, 'DIGITAL');
@@ -665,6 +671,35 @@ export class CirculationService {
    */
   async checkUserCirculationSuspension(userId: number) {
     return this.loanRepo.checkUserCirculationSuspension(userId);
+  }
+
+  /**
+   * 12. Pelunasan Denda Tertunggak oleh Pustakawan / Admin (BRD 3.3 Fine Settlement)
+   */
+  async settleLoanFine(librarianUser: User, loanId: number): Promise<Loan> {
+    if (librarianUser.role !== 'LIBRARIAN' && librarianUser.role !== 'ADMIN') {
+      throw new Error('Hanya pustakawan atau admin yang berwenang memvalidasi pelunasan denda.');
+    }
+
+    const loan = await this.loanRepo.findById(loanId);
+    if (!loan) {
+      throw new Error(`Data transaksi peminjaman dengan ID ${loanId} tidak ditemukan.`);
+    }
+
+    if (loan.fineAmount <= 0) {
+      throw new Error('Transaksi ini tidak memiliki tagihan denda.');
+    }
+
+    if (loan.isFinePaid) {
+      throw new Error('Denda untuk transaksi ini sudah berstatus lunas.');
+    }
+
+    await this.loanRepo.updateSettleFine(loan.id);
+
+    return {
+      ...loan,
+      isFinePaid: true
+    };
   }
 }
 

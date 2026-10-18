@@ -621,8 +621,20 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                   </div>
 
                   <div className="mt-4 pt-3 border-t border-border flex items-center justify-between">
-                    <span className="text-[11px] text-muted-foreground">
-                      Denda: {loan.fineAmount > 0 ? `Rp ${loan.fineAmount.toLocaleString('id-ID')} (Lunas)` : 'Nihil'}
+                    <span className="text-[11px] font-mono">
+                      {loan.fineAmount > 0 ? (
+                        loan.isFinePaid ? (
+                          <span className="text-muted-foreground">
+                            Denda: Rp {loan.fineAmount.toLocaleString('id-ID')} (Lunas)
+                          </span>
+                        ) : (
+                          <span className="text-destructive font-semibold">
+                            Denda: Rp {loan.fineAmount.toLocaleString('id-ID')} (Belum Lunas - Lunasi di Meja Sirkulasi)
+                          </span>
+                        )
+                      ) : (
+                        <span className="text-muted-foreground">Denda: Nihil</span>
+                      )}
                     </span>
 
                     {loan.loanType === 'DIGITAL' && (

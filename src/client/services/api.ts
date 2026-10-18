@@ -303,6 +303,13 @@ class ApiClient {
     return this.request<Loan[]>('/circulation/all');
   }
 
+  async settleFine(loanId: number): Promise<Loan> {
+    return this.request<Loan>('/circulation/fines/settle', {
+      method: 'POST',
+      body: JSON.stringify({ loanId })
+    });
+  }
+
   // --- Physical Book Reservation ---
   async reservePhysicalBook(bookId: number): Promise<Loan> {
     return this.request<Loan>('/circulation/physical/reserve', {

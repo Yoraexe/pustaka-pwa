@@ -194,6 +194,20 @@ export const CirculationDesk: React.FC = () => {
     }
   };
 
+  const handleSettleFine = async (loanId: number, borrowerName: string) => {
+    try {
+      const res = await api.settleFine(loanId);
+      toast.success('Denda Berhasil Dilunasi!', {
+        description: `Denda Rp ${res.fineAmount.toLocaleString('id-ID')} untuk "${borrowerName}" telah lunas dan penangguhan sirkulasi dibuka.`,
+      });
+      fetchCirculationHistory();
+    } catch (err: unknown) {
+      toast.error('Gagal Melunasi Denda', {
+        description: err instanceof Error ? err.message : 'Terjadi kendala saat memproses pelunasan denda.',
+      });
+    }
+  };
+
   // Filter active physical loans with barcodes for quick return picker
   const activePhysicalLoans = loans.filter((l) => l.status === 'BORROWED' && l.loanType === 'PHYSICAL' && !!l.copyBarcode);
 
@@ -273,7 +287,11 @@ export const CirculationDesk: React.FC = () => {
 
     const escapeCSV = (val: string | number | undefined | null) => {
       if (val === undefined || val === null) return '""';
-      const s = String(val).replace(/"/g, '""');
+      let s = String(val).replace(/"/g, '""');
+      // CWE-1236: Netralisasi formula spreadsheet jika diawali =, +, -, @, atau tab/newline
+      if (/^[=+\-@\t\r]/.test(s)) {
+        s = `'${s}`;
+      }
       return `"${s}"`;
     };
 
@@ -849,9 +867,14 @@ export const CirculationDesk: React.FC = () => {
                   </TableCell>
                   <TableCell className="text-right font-mono font-medium">
                     {l.fineAmount > 0 ? (
-                      <span className="text-destructive font-bold">
-                        Rp {l.fineAmount.toLocaleString('id-ID')}
-                      </span>
+                      <div className="flex flex-col items-end">
+                        <span className="text-destructive font-bold text-xs">
+                          Rp {l.fineAmount.toLocaleString('id-ID')}
+                        </span>
+                        <span className={`text-[10px] font-semibold ${l.isFinePaid ? 'text-emerald-600 dark:text-emerald-400' : 'text-destructive'}`}>
+                          {l.isFinePaid ? 'Lunas' : 'Belum Lunas'}
+                        </span>
+                      </div>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
@@ -888,6 +911,16 @@ export const CirculationDesk: React.FC = () => {
                           Kembalikan
                         </Button>
                       </div>
+                    ) : l.status === 'RETURNED' && l.fineAmount > 0 && !l.isFinePaid ? (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2.5 text-[11px] font-semibold text-destructive border-destructive/30 hover:bg-destructive hover:text-white"
+                        onClick={() => handleSettleFine(l.id, l.userName || l.userIdentity || 'Pemustaka')}
+                        title="Tandai denda lunas dan buka penangguhan sirkulasi anggota"
+                      >
+                        Lunasi Denda
+                      </Button>
                     ) : (
                       <span className="text-[11px] text-muted-foreground">-</span>
                     )}

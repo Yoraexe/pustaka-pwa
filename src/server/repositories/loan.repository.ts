@@ -446,6 +446,12 @@ export class LoanRepository {
       .where(eq(loans.id, loanId));
   }
 
+  async updateSettleFine(loanId: number): Promise<void> {
+    await db.update(loans)
+      .set({ isFinePaid: true })
+      .where(eq(loans.id, loanId));
+  }
+
   /**
    * Perpanjangan masa pinjam fisik 1x (BRD 3.3 Rule 3)
    */

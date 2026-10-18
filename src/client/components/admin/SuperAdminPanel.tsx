@@ -29,6 +29,7 @@ import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
 import { Label } from '../ui/label.js';
 import { Badge } from '../ui/badge.js';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 const ROLE_LABELS: Record<UserRole, string> = {
@@ -41,6 +42,8 @@ const ROLE_LABELS: Record<UserRole, string> = {
 export const SuperAdminPanel: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 15;
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [roleFilter, setRoleFilter] = useState<UserRole | 'ALL'>('ALL');
@@ -93,6 +96,13 @@ export const SuperAdminPanel: React.FC = () => {
       return true;
     });
   }, [users, roleFilter, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+  const paginatedUsers = filteredUsers.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, roleFilter]);
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -294,7 +304,7 @@ export const SuperAdminPanel: React.FC = () => {
           </TableHeader>
           <TableBody>
             {filteredUsers.length > 0 ? (
-              filteredUsers.map((u) => {
+              paginatedUsers.map((u) => {
                 const isSelf = currentUser?.id === u.id;
                 return (
                   <TableRow key={u.id}>
@@ -327,15 +337,16 @@ export const SuperAdminPanel: React.FC = () => {
                       {u.className || '-'}
                     </TableCell>
                     <TableCell>
-                      {u.isActive ? (
-                        <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                          Aktif
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-semibold text-destructive bg-destructive/10 px-2.5 py-0.5 rounded-full border border-destructive/20">
-                          Nonaktif
-                        </span>
-                      )}
+                      <Badge
+                        variant={u.isActive ? 'outline' : 'secondary'}
+                        className={`text-[10px] ${
+                          u.isActive
+                            ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20 font-semibold'
+                            : 'text-destructive bg-destructive/10 border-destructive/20 font-semibold'
+                        }`}
+                      >
+                        {u.isActive ? 'Aktif' : 'Nonaktif'}
+                      </Badge>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1.5">
@@ -377,6 +388,41 @@ export const SuperAdminPanel: React.FC = () => {
             )}
           </TableBody>
         </Table>
+
+        {/* Pagination Controls */}
+        {filteredUsers.length > pageSize && (
+          <div className="p-4 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+            <div>
+              Menampilkan {Math.min((currentPage - 1) * pageSize + 1, filteredUsers.length)} -{' '}
+              {Math.min(currentPage * pageSize, filteredUsers.length)} dari {filteredUsers.length} pengguna
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="w-3.5 h-3.5 mr-1" />
+                Sebelumnya
+              </Button>
+              <span className="text-xs font-semibold px-2 text-foreground">
+                Halaman {currentPage} dari {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Selanjutnya
+                <ChevronRight className="w-3.5 h-3.5 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Dialog: Buat Akun Baru oleh Superadmin */}

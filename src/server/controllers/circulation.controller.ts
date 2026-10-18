@@ -21,7 +21,8 @@ import {
   ReservePhysicalLoanSchema,
   ClaimReservationSchema,
   CancelReservationSchema,
-  RenewLoanSchema
+  RenewLoanSchema,
+  SettleFineSchema
 } from '../../shared/schemas/index.js';
 import { authenticateToken, requireRole } from '../middleware/auth.middleware.js';
 
@@ -217,5 +218,21 @@ circulationRouter.post('/physical/renew', authenticateToken, async (req: Request
     next(err);
   }
 });
+
+// 12. Settle Unpaid Fine (Meja Pustakawan & Admin, BRD 3.3 Fine Settlement)
+circulationRouter.post('/fines/settle', authenticateToken, requireRole(['LIBRARIAN', 'ADMIN']), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const input = SettleFineSchema.parse(req.body);
+    const settledLoan = await circulationService.settleLoanFine(req.user!, input.loanId);
+    res.json({
+      success: true,
+      message: `Denda sebesar Rp ${settledLoan.fineAmount.toLocaleString('id-ID')} untuk peminjam "${settledLoan.userName || settledLoan.userIdentity}" telah berhasil dilunasi.`,
+      data: settledLoan
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 
 

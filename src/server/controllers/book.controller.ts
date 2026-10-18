@@ -156,6 +156,22 @@ bookRouter.get('/:id/stream-pdf', authenticateToken, async (req: Request, res: R
     res.setHeader('Content-Length', fs.statSync(fullPath).size);
 
     const stream = fs.createReadStream(fullPath);
+
+    stream.on('error', () => {
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          error: { code: 'STREAM_ERROR', message: 'Gagal membaca berkas e-book dari server.' }
+        });
+      } else {
+        res.destroy();
+      }
+    });
+
+    res.on('close', () => {
+      stream.destroy();
+    });
+
     stream.pipe(res);
   } catch (err) {
     next(err);

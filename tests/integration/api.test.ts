@@ -398,5 +398,22 @@ describe('Pustaka Sekolah API Integration Tests', () => {
     expect(Array.isArray(res.body.data)).toBe(true);
     expect(res.body.data.length).toBeLessThanOrEqual(1);
   });
+
+  it('POST /api/circulation/fines/settle harus menolak akses siswa (403) dan mengizinkan admin/pustakawan melunasi denda', async () => {
+    // 1. Siswa mencoba melunasi denda secara sepihak -> 403 Forbidden
+    const forbiddenRes = await request(app)
+      .post('/api/circulation/fines/settle')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ loanId: 1 });
+
+    expect(forbiddenRes.status).toBe(403);
+
+    // 2. Akses tanpa token -> 401 Unauthorized
+    const unauthRes = await request(app)
+      .post('/api/circulation/fines/settle')
+      .send({ loanId: 1 });
+
+    expect(unauthRes.status).toBe(401);
+  });
 });
 

@@ -164,4 +164,10 @@ export const RenewLoanSchema = z.object({
 
 export type RenewLoanInput = z.infer<typeof RenewLoanSchema>;
 
+export const SettleFineSchema = z.object({
+  loanId: z.coerce.number().int().positive('ID Peminjaman tidak valid')
+});
+
+export type SettleFineInput = z.infer<typeof SettleFineSchema>;
+
 
