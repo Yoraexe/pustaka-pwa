@@ -44,7 +44,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => url.pathname.startsWith('/api/books'),
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/books') && !url.pathname.includes('/stream-pdf'),
             handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'api-books-cache',

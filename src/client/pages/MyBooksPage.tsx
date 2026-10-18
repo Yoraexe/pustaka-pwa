@@ -55,7 +55,9 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
   const [reservationToCancel, setReservationToCancel] = useState<{ id: number; title: string; code: string } | null>(null);
   const [loanToRenew, setLoanToRenew] = useState<{ id: number; title: string } | null>(null);
 
-  const maxQuota = user.role === 'TEACHER' ? 5 : 2;
+  const maxQuotaPerType = user.role === 'TEACHER' ? 5 : 2;
+  const activeDigitalLoans = activeLoans.filter((l) => l.loanType === 'DIGITAL');
+  const activePhysicalLoans = activeLoans.filter((l) => l.loanType === 'PHYSICAL');
 
   const fetchMyLoans = useCallback(async () => {
     setIsLoading(true);
@@ -258,9 +260,15 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4 shrink-0">
           <div className="bg-muted/40 border border-border p-3 rounded-2xl text-center">
             <span className="text-[10px] text-muted-foreground block font-medium">Pinjaman Aktif</span>
-            <span className="text-base sm:text-lg font-bold text-foreground font-mono">
-              {activeLoans.length}/{maxQuota}
-            </span>
+            <div className="flex items-center justify-center gap-1.5 text-xs sm:text-sm font-bold font-mono">
+              <span title="E-Book Digital Aktif" className="text-blue-600 dark:text-blue-400">
+                E: {activeDigitalLoans.length}/{maxQuotaPerType}
+              </span>
+              <span className="text-muted-foreground/60">•</span>
+              <span title="Buku Fisik Aktif" className="text-amber-600 dark:text-amber-400">
+                F: {activePhysicalLoans.length}/{maxQuotaPerType}
+              </span>
+            </div>
           </div>
 
           <div className="bg-muted/40 border border-border p-3 rounded-2xl text-center">

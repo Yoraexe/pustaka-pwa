@@ -34,8 +34,9 @@ import {
   CommandItem,
 } from './components/ui/command.js';
 import { api } from './services/api.js';
-import type { Book } from '../shared/types/index.js';
+import type { Book, Loan } from '../shared/types/index.js';
 import { BookDetailModal } from './components/catalog/BookDetailModal.js';
+import { PDFReader } from './components/reader/PDFReader.js';
 import { toast } from 'sonner';
 
 export const App: React.FC = () => {
@@ -47,6 +48,25 @@ export const App: React.FC = () => {
   const [isCommandOpen, setIsCommandOpen] = useState<boolean>(false);
   const [commandBooks, setCommandBooks] = useState<Book[]>([]);
   const [activeDetailBook, setActiveDetailBook] = useState<Book | null>(null);
+  const [userLoans, setUserLoans] = useState<Loan[]>([]);
+  const [readingBook, setReadingBook] = useState<Book | null>(null);
+
+  const fetchUserLoans = React.useCallback(async () => {
+    if (!isAuthenticated) {
+      setUserLoans([]);
+      return;
+    }
+    try {
+      const myLoans = await api.getMyLoans(true);
+      setUserLoans(myLoans);
+    } catch {
+      // ignore
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    fetchUserLoans();
+  }, [fetchUserLoans, currentTab, isCommandOpen]);
 
   // Keyboard shortcut listener for Command Palette (Ctrl+K / Cmd+K)
   useEffect(() => {
@@ -293,6 +313,24 @@ export const App: React.FC = () => {
         <BookDetailModal
           book={activeDetailBook}
           onClose={() => setActiveDetailBook(null)}
+          isDigitalBorrowed={userLoans.some(
+            (l) => l.bookId === activeDetailBook.id && l.loanType === 'DIGITAL' && l.status === 'BORROWED'
+          )}
+          isPhysicalBorrowed={userLoans.some(
+            (l) => l.bookId === activeDetailBook.id && l.loanType === 'PHYSICAL' && l.status === 'BORROWED'
+          )}
+          isPhysicalReserved={userLoans.some(
+            (l) => l.bookId === activeDetailBook.id && l.status === 'RESERVED'
+          )}
+          reservationCode={
+            userLoans.find(
+              (l) => l.bookId === activeDetailBook.id && l.status === 'RESERVED'
+            )?.reservationCode || null
+          }
+          onOpenReader={(b) => {
+            setActiveDetailBook(null);
+            setReadingBook(b);
+          }}
           onBorrowDigital={async (book) => {
             if (!isAuthenticated) {
               toast.warning('Perlu Masuk', {
@@ -309,6 +347,7 @@ export const App: React.FC = () => {
               toast.success('Peminjaman Berhasil', {
                 description: `"${book.title}" berhasil dipinjam.`,
               });
+              await fetchUserLoans();
               setCurrentTab('my-books');
             } catch (err: unknown) {
               toast.error(err instanceof Error ? err.message : 'Gagal meminjam e-book.');
@@ -330,6 +369,7 @@ export const App: React.FC = () => {
               toast.success('Peminjaman Fisik Berhasil!', {
                 description: `"${book.title}" (Barcode: ${res.copyBarcode || '-'}) resmi dipinjam.`,
               });
+              await fetchUserLoans();
               setCurrentTab('my-books');
             } catch (err: unknown) {
               toast.error(err instanceof Error ? err.message : 'Gagal meminjam buku fisik.');
@@ -351,11 +391,21 @@ export const App: React.FC = () => {
               toast.success('Reservasi Berhasil!', {
                 description: `Tiket ${res.reservationCode} dibuat. Silakan ambil di perpustakaan dalam 24 jam.`,
               });
+              await fetchUserLoans();
               setCurrentTab('my-books');
             } catch (err: unknown) {
               toast.error(err instanceof Error ? err.message : 'Gagal mereservasi buku fisik.');
             }
           }}
+        />
+      )}
+
+      {/* In-App PDF Reader Modal */}
+      {readingBook && user && (
+        <PDFReader
+          book={readingBook}
+          user={user}
+          onClose={() => setReadingBook(null)}
         />
       )}
     </div>

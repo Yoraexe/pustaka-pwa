@@ -41,7 +41,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
   // Signup Form State
   const [regIdentity, setRegIdentity] = useState<string>('');
   const [regName, setRegName] = useState<string>('');
-  const [regRole, setRegRole] = useState<'STUDENT' | 'TEACHER' | 'LIBRARIAN' | 'ADMIN'>('STUDENT');
+  const [regRole, setRegRole] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
   const [regClassName, setRegClassName] = useState<string>('');
   const [regPassword, setRegPassword] = useState<string>('');
 
@@ -109,7 +109,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
           <DialogDescription className="text-xs text-muted-foreground mt-1 leading-relaxed">
             {mode === 'login'
               ? 'Masuk menggunakan NISN, NIP, atau ID pengguna terdaftar Anda.'
-              : 'Daftarkan akun pengguna baru (Siswa, Guru, Pustakawan, atau Superadmin).'}
+              : 'Daftarkan akun pengguna baru (Siswa atau Guru).'}
           </DialogDescription>
         </DialogHeader>
 
@@ -183,14 +183,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
                   id="regRole"
                   value={regRole}
                   onChange={(e) =>
-                    setRegRole(e.target.value as 'STUDENT' | 'TEACHER' | 'LIBRARIAN' | 'ADMIN')
+                    setRegRole(e.target.value as 'STUDENT' | 'TEACHER')
                   }
                   className="w-full h-10 px-3 rounded-xl border border-border bg-background text-xs font-semibold text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="STUDENT">Siswa (STUDENT)</option>
                   <option value="TEACHER">Guru (TEACHER)</option>
-                  <option value="LIBRARIAN">Pustakawan (LIBRARIAN)</option>
-                  <option value="ADMIN">Superadmin / Administrator (ADMIN)</option>
                 </select>
               </div>
 

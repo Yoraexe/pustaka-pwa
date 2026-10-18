@@ -16,7 +16,7 @@ describe('Pustaka Sekolah API Integration Tests', () => {
   const app = createApp();
   let studentToken = '';
   let adminToken = '';
-  const testIdentities = ['NISN_API_001', 'NIP_API_002', 'NISN_SIGNUP_99', 'ADMIN_SIGNUP_99', 'NIP_SUPER_99'];
+  const testIdentities = ['NISN_API_001', 'NIP_API_002', 'NISN_SIGNUP_99', 'NIP_SIGNUP_99', 'ADMIN_SIGNUP_99', 'NIP_SUPER_99'];
 
   beforeAll(async () => {
     await ensureTestDatabaseSeeded();
@@ -200,7 +200,7 @@ describe('Pustaka Sekolah API Integration Tests', () => {
     expect(res.body.data.importedCount).toBe(2);
   });
 
-  it('POST /api/auth/signup harus mengizinkan pendaftaran akun baru (termasuk ADMIN & STUDENT) dan menolak role tidak valid', async () => {
+  it('POST /api/auth/signup harus mengizinkan pendaftaran mandiri Siswa & Guru, serta menolak peran terlarang (ADMIN/LIBRARIAN/UNKNOWN) demi mencegah eskalasi hak akses (BRD AC-4.3)', async () => {
     // 1. Role tidak dikenal harus ditolak (400 Bad Request dari Zod)
     const invalidRoleRes = await request(app)
       .post('/api/auth/signup')
@@ -212,22 +212,31 @@ describe('Pustaka Sekolah API Integration Tests', () => {
       });
     expect(invalidRoleRes.status).toBe(400);
 
-    // 2. Pendaftaran mandiri valid sebagai ADMIN (Superadmin)
+    // 2. Upaya eskalasi hak akses sebagai ADMIN dari endpoint publik harus ditolak (400)
     const adminSignupRes = await request(app)
       .post('/api/auth/signup')
       .send({
         identityNumber: 'ADMIN_SIGNUP_99',
-        name: 'Superadmin Baru',
+        name: 'Superadmin Palsu',
         role: 'ADMIN',
-        className: 'Administrator Utama',
+        className: 'Hacker',
         password: 'password123'
       });
-    expect(adminSignupRes.status).toBe(201);
-    expect(adminSignupRes.body.success).toBe(true);
-    expect(adminSignupRes.body.data.user.role).toBe('ADMIN');
+    expect(adminSignupRes.status).toBe(400);
 
-    // 3. Pendaftaran mandiri valid sebagai STUDENT
-    const signupRes = await request(app)
+    // 3. Upaya eskalasi hak akses sebagai LIBRARIAN dari endpoint publik harus ditolak (400)
+    const librarianSignupRes = await request(app)
+      .post('/api/auth/signup')
+      .send({
+        identityNumber: 'LIB_SIGNUP_99',
+        name: 'Pustakawan Palsu',
+        role: 'LIBRARIAN',
+        password: 'password123'
+      });
+    expect(librarianSignupRes.status).toBe(400);
+
+    // 4. Pendaftaran mandiri sah sebagai STUDENT
+    const studentRes = await request(app)
       .post('/api/auth/signup')
       .send({
         identityNumber: 'NISN_SIGNUP_99',
@@ -236,10 +245,24 @@ describe('Pustaka Sekolah API Integration Tests', () => {
         className: 'X DKV 1',
         password: 'password123'
       });
-    expect(signupRes.status).toBe(201);
-    expect(signupRes.body.success).toBe(true);
-    expect(signupRes.body.data.token).toBeDefined();
-    expect(signupRes.body.data.user.role).toBe('STUDENT');
+    expect(studentRes.status).toBe(201);
+    expect(studentRes.body.success).toBe(true);
+    expect(studentRes.body.data.token).toBeDefined();
+    expect(studentRes.body.data.user.role).toBe('STUDENT');
+
+    // 5. Pendaftaran mandiri sah sebagai TEACHER
+    const teacherRes = await request(app)
+      .post('/api/auth/signup')
+      .send({
+        identityNumber: 'NIP_SIGNUP_99',
+        name: 'Guru Pendaftar Mandiri',
+        role: 'TEACHER',
+        className: 'Guru Fisika',
+        password: 'password123'
+      });
+    expect(teacherRes.status).toBe(201);
+    expect(teacherRes.body.success).toBe(true);
+    expect(teacherRes.body.data.user.role).toBe('TEACHER');
   });
 
   it('Superadmin endpoints (/api/auth/register, /api/auth/users, PATCH status & password) harus berfungsi penuh', async () => {

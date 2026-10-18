@@ -321,9 +321,9 @@ export class CirculationService {
       throw new Error(`Eksemplar buku ini berstatus ${copyData.status} (tidak tersedia untuk dipinjam).`);
     }
 
-    // 3. Cek kuota peminjaman fisik
+    // 3. Cek kuota peminjaman fisik (termasuk tiket reservasi aktif yang mengunci kuota)
     const limit = borrower.role === 'TEACHER' ? config.TEACHER_LOAN_LIMIT : config.STUDENT_LOAN_LIMIT;
-    const activeLoans = await this.loanRepo.countActiveUserLoans(borrower.id, 'PHYSICAL');
+    const activeLoans = await this.loanRepo.countActiveUserPhysicalLoansAndReservations(borrower.id);
     if (activeLoans >= limit) {
       throw new Error(`Anggota telah mencapai batas peminjaman fisik (${limit} buku).`);
     }

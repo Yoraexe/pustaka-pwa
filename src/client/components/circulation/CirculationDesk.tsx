@@ -280,7 +280,13 @@ export const CirculationDesk: React.FC = () => {
         new Date(l.borrowDate).toISOString().slice(0, 10),
         new Date(l.dueDate).toISOString().slice(0, 10),
         l.returnDate ? new Date(l.returnDate).toISOString().slice(0, 10) : '-',
-        l.status === 'BORROWED' ? 'Dipinjam' : 'Dikembalikan',
+        l.status === 'BORROWED'
+          ? 'Dipinjam'
+          : l.status === 'RESERVED'
+          ? 'Reservasi'
+          : l.status === 'CANCELLED'
+          ? 'Dibatalkan'
+          : 'Dikembalikan',
         l.fineAmount || 0,
       ].join(',')
     );

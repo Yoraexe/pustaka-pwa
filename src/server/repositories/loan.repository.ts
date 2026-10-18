@@ -10,7 +10,7 @@
  * Side Effects: Membaca dan menulis catatan sirkulasi pada tabel loans dan book_copies di basis data SQLite.
  */
 
-import { db } from '../db/index.js';
+import { db, sqlite } from '../db/index.js';
 import { loans, books, users, bookCopies, type LoanTable } from '../db/schema.js';
 import { eq, and, or, sql } from 'drizzle-orm';
 import type { Loan, LoanType, LoanStatus } from '../../shared/types/index.js';
@@ -128,7 +128,7 @@ export class LoanRepository {
   }
 
   /**
-   * Secara otomatis membatalkan reservasi yang telah melewati batas reservedUntil dan memulihkan stok eksemplar
+   * Secara otomatis membatalkan reservasi yang telah melewati batas reservedUntil dan memulihkan stok eksemplar secara atomik
    */
   async autoExpireReservations(): Promise<number> {
     const nowIso = new Date().toISOString();
@@ -145,19 +145,27 @@ export class LoanRepository {
       )
     );
 
-    for (const r of expiredRows) {
-      await db.update(loans).set({ status: 'CANCELLED' }).where(eq(loans.id, r.id));
-      if (r.copyId) {
-        await db.update(bookCopies).set({ status: 'AVAILABLE' }).where(eq(bookCopies.id, r.copyId));
+    if (expiredRows.length === 0) return 0;
+
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      for (const r of expiredRows) {
+        await db.update(loans).set({ status: 'CANCELLED' }).where(eq(loans.id, r.id));
+        if (r.copyId) {
+          await db.update(bookCopies).set({ status: 'AVAILABLE' }).where(eq(bookCopies.id, r.copyId));
+        }
+        await db.update(books)
+          .set({
+            availablePhysicalCopies: sql`min(${books.totalPhysicalCopies}, ${books.availablePhysicalCopies} + 1)`
+          })
+          .where(eq(books.id, r.bookId));
       }
-      const b = await db.select({ total: books.totalPhysicalCopies, avail: books.availablePhysicalCopies })
-        .from(books).where(eq(books.id, r.bookId)).limit(1);
-      if (b.length > 0) {
-        const newAvail = Math.min(b[0].total, b[0].avail + 1);
-        await db.update(books).set({ availablePhysicalCopies: newAvail }).where(eq(books.id, r.bookId));
-      }
+      sqlite.exec('COMMIT');
+      return expiredRows.length;
+    } catch (err) {
+      sqlite.exec('ROLLBACK');
+      throw err;
     }
-    return expiredRows.length;
   }
 
   async findActiveReservation(userId: number, bookId: number): Promise<Loan | null> {

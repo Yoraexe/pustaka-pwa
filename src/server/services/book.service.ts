@@ -5,6 +5,7 @@
  */
 
 import { bookRepository, type BookRepository } from '../repositories/book.repository.js';
+import { sqlite } from '../db/index.js';
 import type { Book, BookCopy, Category, CreateBookInput, BookFilterInput } from '../../shared/types/index.js';
 
 export class BookService {
@@ -35,23 +36,30 @@ export class BookService {
   }
 
   async addNewBook(input: CreateBookInput): Promise<Book & { copies: BookCopy[] }> {
-    const createdBook = await this.bookRepo.create(input);
-    const copies: BookCopy[] = [];
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      const createdBook = await this.bookRepo.create(input);
+      const copies: BookCopy[] = [];
 
-    // Jika memiliki eksemplar fisik, generate barcode eksemplar otomatis (BK-ID-INDEX)
-    if (input.bookType === 'HYBRID' || input.bookType === 'PHYSICAL_ONLY') {
-      const copyCount = input.totalPhysicalCopies || 1;
-      for (let i = 1; i <= copyCount; i++) {
-        const barcode = `BK-${String(createdBook.id).padStart(4, '0')}-${String(i).padStart(2, '0')}`;
-        const copy = await this.bookRepo.createCopy(createdBook.id, barcode);
-        copies.push(copy);
+      // Jika memiliki eksemplar fisik, generate barcode eksemplar otomatis (BK-ID-INDEX)
+      if (input.bookType === 'HYBRID' || input.bookType === 'PHYSICAL_ONLY') {
+        const copyCount = input.totalPhysicalCopies || 1;
+        for (let i = 1; i <= copyCount; i++) {
+          const barcode = `BK-${String(createdBook.id).padStart(4, '0')}-${String(i).padStart(2, '0')}`;
+          const copy = await this.bookRepo.createCopy(createdBook.id, barcode);
+          copies.push(copy);
+        }
       }
-    }
 
-    return {
-      ...createdBook,
-      copies
-    };
+      sqlite.exec('COMMIT');
+      return {
+        ...createdBook,
+        copies
+      };
+    } catch (err) {
+      sqlite.exec('ROLLBACK');
+      throw err;
+    }
   }
 }
 

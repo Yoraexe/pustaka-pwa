@@ -170,7 +170,9 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
                               key={c.id}
                               type="button"
                               onClick={() => {
-                                setSelectedBarcode(c.barcode);
+                                if (c.status === 'AVAILABLE') {
+                                  setSelectedBarcode(c.barcode);
+                                }
                                 handleCopy(c.barcode, 'Barcode Eksemplar');
                               }}
                               className={`px-2 py-1 rounded-lg text-[10px] font-mono border transition-colors flex items-center gap-1.5 cursor-pointer ${
@@ -178,9 +180,13 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
                                   ? 'bg-primary text-primary-foreground border-primary font-bold shadow-xs'
                                   : c.status === 'AVAILABLE'
                                   ? 'bg-background hover:bg-emerald-500/10 border-emerald-500/30 text-foreground font-semibold shadow-2xs'
-                                  : 'bg-muted/70 border-border text-muted-foreground line-through opacity-70'
+                                  : 'bg-muted/70 border-border text-muted-foreground line-through opacity-70 cursor-not-allowed'
                               }`}
-                              title={`Barcode: ${c.barcode} (${c.status === 'AVAILABLE' ? 'Tersedia - Klik untuk pilih & salin' : 'Sedang dipinjam'})`}
+                              title={
+                                c.status === 'AVAILABLE'
+                                  ? `Barcode: ${c.barcode} (Tersedia - Klik untuk pilih & salin)`
+                                  : `Barcode: ${c.barcode} (Sedang dipinjam/tidak tersedia - Hanya salin)`
+                              }
                             >
                               <span>{c.barcode}</span>
                               <span

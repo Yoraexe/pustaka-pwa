@@ -174,6 +174,18 @@
       "timestamp": "2026-10-11T21:48:00+08:00",
       "action": "Superadmin Account Management, Self-Service Physical Checkout, & Instant Physical Return (v1.1)",
       "agent_note": "Implemented 3 major revisions: (1) Superadmin Panel (SuperAdminPanel.tsx) for multi-role account creation, status toggling, password reset, and self-registration tab in LoginPage.tsx for STUDENT/TEACHER; (2) 100% working self-service physical book borrowing (POST /api/circulation/physical/borrow-self) directly from BookCard, BookDetailModal, and MyBooksPage with decoupled digital/physical borrow states; (3) Instant physical book return at any time without waiting for due date expiry (POST /api/circulation/physical/return-self) from MyBooksPage and 1-click return in CirculationDesk. Verified 42/42 Vitest tests passing and clean Vite production build."
+    },
+    {
+      "layer": "quality",
+      "timestamp": "2026-10-18T17:30:00+08:00",
+      "action": "Full Codebase Audit & Security Vulnerability Assessment",
+      "agent_note": "Identified 10 defects across RBAC privilege escalation (public self-registration role injection), PWA Workbox cache leak of DRM PDF streams, desk circulation quota bypass, unhandled SQLite transaction concurrency in auto-expiration and book creation, UI quota ambiguity (digital vs physical), Command Palette reader integration, barcode availability validation, CSV export status completeness, and PDF watermark responsive rendering."
+    },
+    {
+      "layer": "engineering",
+      "timestamp": "2026-10-18T17:55:00+08:00",
+      "action": "10 Defect Remediation & Verification Suite",
+      "agent_note": "Remediated all 10 audit findings: (1) Restricted SelfRegisterSchema and selfRegister service to STUDENT and TEACHER only with 400 Bad Request rejection for ADMIN/LIBRARIAN; (2) Excluded /stream-pdf from Workbox PWA runtime cache in vite.config.ts; (3) Unified active physical loans + reservations quota check in desk checkout; (4) Wrapped autoExpireReservations in BEGIN IMMEDIATE transaction with atomic stock recalculation; (5) Wrapped addNewBook in atomic transaction; (6) Decoupled digital and physical quota badges in MyBooksPage; (7) Connected loan states, reservation code, and PDF reader modal to Command Palette in App.tsx; (8) Disabled selection of non-AVAILABLE copies in BookDetailModal; (9) Completed CSV circulation report status mapping; (10) Added ResizeObserver and window resize listener to PDFReader watermark canvas. Verified 44/44 tests passing and clean Vite production build."
     }
   ],
   "decisions": [
@@ -242,7 +254,7 @@
       "frontend": "TailwindCSS + PDF.js Canvas Reader"
     },
     "created_at": "2026-09-22T20:13:30+08:00",
-    "last_updated": "2026-10-11T21:48:00+08:00"
+    "last_updated": "2026-10-18T17:55:00+08:00"
   },
   "context_paths": {
     "brd": "./.astesia/brd.md",

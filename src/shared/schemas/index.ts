@@ -32,7 +32,7 @@ export type CreateUserInput = z.infer<typeof CreateUserSchema>;
 export const SelfRegisterSchema = z.object({
   identityNumber: z.string().min(3, 'NISN / NIP minimal 3 karakter').trim(),
   name: z.string().min(2, 'Nama lengkap minimal 2 karakter').trim(),
-  role: z.enum(['STUDENT', 'TEACHER', 'LIBRARIAN', 'ADMIN']).default('STUDENT'),
+  role: z.enum(['STUDENT', 'TEACHER']).default('STUDENT'),
   className: z.string().optional().nullable(),
   password: z.string().min(4, 'Kata sandi minimal 4 karakter')
 });

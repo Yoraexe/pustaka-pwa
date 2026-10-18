@@ -170,32 +170,54 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
     }
   };
 
-  // 5. Watermark Proteksi Anti-Bocor (Canvas Overlay)
+  // 5. Watermark Proteksi Anti-Bocor (Canvas Overlay dengan Adaptasi Resize Responsif)
   useEffect(() => {
     const wmCanvas = watermarkOverlayRef.current;
     if (!wmCanvas) return;
 
-    const ctx = wmCanvas.getContext('2d');
-    if (!ctx) return;
+    const parent = wmCanvas.parentElement;
 
-    const width = wmCanvas.parentElement?.clientWidth || 800;
-    const height = wmCanvas.parentElement?.clientHeight || 900;
-    wmCanvas.width = width;
-    wmCanvas.height = height;
+    const renderWatermark = () => {
+      const ctx = wmCanvas.getContext('2d');
+      if (!ctx) return;
 
-    ctx.clearRect(0, 0, width, height);
-    ctx.save();
-    ctx.translate(width / 2, height / 2);
-    ctx.rotate(-Math.PI / 4);
-    ctx.font = `bold 14px 'Plus Jakarta Sans', sans-serif`;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
-    ctx.textAlign = 'center';
+      const width = parent?.clientWidth || 800;
+      const height = parent?.clientHeight || 900;
+      wmCanvas.width = width;
+      wmCanvas.height = height;
 
-    const wmText = `PERPUSTAKAAN SEKOLAH • ${user.name.toUpperCase()} (${user.identityNumber})`;
-    for (let y = -450; y <= 450; y += 110) {
-      ctx.fillText(wmText, 0, y);
+      ctx.clearRect(0, 0, width, height);
+      ctx.save();
+      ctx.translate(width / 2, height / 2);
+      ctx.rotate(-Math.PI / 4);
+      ctx.font = `bold 14px 'Plus Jakarta Sans', sans-serif`;
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.06)';
+      ctx.textAlign = 'center';
+
+      const wmText = `PERPUSTAKAAN SEKOLAH • ${user.name.toUpperCase()} (${user.identityNumber})`;
+      const spread = Math.max(width, height);
+      for (let y = -spread; y <= spread; y += 110) {
+        ctx.fillText(wmText, 0, y);
+      }
+      ctx.restore();
+    };
+
+    renderWatermark();
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && parent) {
+      resizeObserver = new ResizeObserver(() => {
+        renderWatermark();
+      });
+      resizeObserver.observe(parent);
     }
-    ctx.restore();
+
+    window.addEventListener('resize', renderWatermark);
+
+    return () => {
+      if (resizeObserver) resizeObserver.disconnect();
+      window.removeEventListener('resize', renderWatermark);
+    };
   }, [user]);
 
   // Sembunyikan toolbar native browser (#toolbar=0) untuk mencegah unduhan dokumen asli tanpa watermark (BRD Seksi 3.2 Aturan 4)

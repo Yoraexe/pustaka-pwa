@@ -66,12 +66,12 @@ export class AuthService {
   }
 
   /**
-   * Pendaftaran Mandiri (Self-Registration) untuk pembuatan akun awal (Siswa, Guru, Pustakawan, atau Superadmin)
+   * Pendaftaran Mandiri (Self-Registration) khusus Siswa dan Guru (BRD Seksi 3.4 & AC-4.3)
    */
   async selfRegister(input: SelfRegisterInput): Promise<AuthSession> {
-    const allowedRoles: UserRole[] = ['STUDENT', 'TEACHER', 'LIBRARIAN', 'ADMIN'];
+    const allowedRoles: UserRole[] = ['STUDENT', 'TEACHER'];
     if (!allowedRoles.includes(input.role)) {
-      throw new Error('Peran akun tidak valid.');
+      throw new Error('Pendaftaran mandiri hanya diizinkan untuk peran Siswa dan Guru.');
     }
 
     const newUser = await this.registerUser({
