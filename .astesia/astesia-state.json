@@ -94,7 +94,8 @@
     "tests/unit/auth.service.test.ts",
     "tests/unit/circulation.service.test.ts",
     "tests/integration/api.test.ts",
-    "tests/integration/book.create.test.ts"
+    "tests/integration/book.create.test.ts",
+    "start-production-public.bat"
   ],
   "history": [
     {
@@ -198,6 +199,12 @@
       "timestamp": "2026-10-18T18:16:00+08:00",
       "action": "Second-Pass 10 Defect Remediation & Verification Suite",
       "agent_note": "Executed complete 3-wave remediation: (1) Enforced strict path sandboxing on /stream-pdf and body path traversal checks in book.controller.ts; (2) Hardened Multer upload.middleware.ts with strict AND checks and extension whitelist eliminating Stored XSS; (3) Added positive integer parameter validation in auth.controller.ts and book.controller.ts; (4) Wrapped borrowDigitalBook in atomic BEGIN IMMEDIATE transaction; (5) Added composite & foreign key performance indexes in SQLite bootstrap DDL; (6) Converted updateAvailableCopies to atomic SQL expression; (7) Wrapped CSV user import batch loop in single SQLite transaction; (8) Enhanced PDFReader with specific 401/403/404 error states; (9) Added safe non-JSON response parsing in api.ts; (10) Synchronized Header Doc in book.service.ts. Verified 47/47 Vitest tests passing and 0-error production build."
+    },
+    {
+      "layer": "devops",
+      "timestamp": "2026-10-18T22:15:00+08:00",
+      "action": "Production Deployment Architectural Hardening & Multi-Platform Enablement",
+      "agent_note": "Resolved critical production deployment gaps: (1) Mounted Express static file serving for Vite 'dist' and SPA wildcard fallback (* -> index.html) enabling unified single-unit deployment on port 3001; (2) Replaced deprecated Node v20 '--loader tsx' with '--import tsx' in package.json start script and Dockerfile CMD; (3) Added 'start:public' and 'start-production-public.bat' for 1-click zero-cost production deployment with Cloudflare Tunnel HTTPS; (4) Hardened Dockerfile directory creation for /app/uploads/covers; (5) Comprehensive deployment.md documentation across 4 target platforms (Windows Local + Cloudflare Tunnel, On-premise Docker Compose, Cloud VPS Ubuntu Nginx+PM2, and Cloud PaaS). 67 Vitest tests passing 100% and clean Vite production build."
     }
   ],
   "decisions": [

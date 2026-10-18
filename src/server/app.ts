@@ -13,6 +13,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { authRouter } from './controllers/auth.controller.js';
 import { bookRouter } from './controllers/book.controller.js';
 import { circulationRouter } from './controllers/circulation.controller.js';
@@ -56,6 +57,29 @@ export const createApp = () => {
   app.use('/api/auth', authRouter);
   app.use('/api/books', bookRouter);
   app.use('/api/circulation', circulationRouter);
+
+  // Serve PWA Frontend Static Build & SPA Routing Fallback (Production)
+  const distPath = path.resolve(process.cwd(), 'dist');
+  if (fs.existsSync(distPath)) {
+    app.use(express.static(distPath));
+    app.get('*', (req, res, next) => {
+      if (req.path.startsWith('/api') || req.path.startsWith('/uploads')) {
+        return next();
+      }
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  // 404 Not Found for unhandled /api routes
+  app.use('/api', (_req, res) => {
+    res.status(404).json({
+      success: false,
+      error: {
+        code: 'NOT_FOUND',
+        message: 'Endpoint API tidak ditemukan.'
+      }
+    });
+  });
 
   // Global Centralized Error Handler (Astesia Directive #4)
   app.use(errorHandler);

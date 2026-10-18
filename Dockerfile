@@ -41,7 +41,7 @@ COPY --from=builder /app/src ./src
 COPY --from=builder /app/tsconfig.json ./tsconfig.json
 
 # Create directory for persistent SQLite and uploads
-RUN mkdir -p /app/data /app/uploads/ebooks && \
+RUN mkdir -p /app/data /app/uploads/ebooks /app/uploads/covers && \
     chown -R appuser:appgroup /app
 
 USER appuser
@@ -51,4 +51,4 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3001/api/health || exit 1
 
-CMD ["node", "--loader", "tsx", "src/server/index.ts"]
+CMD ["node", "--import", "tsx", "src/server/index.ts"]
