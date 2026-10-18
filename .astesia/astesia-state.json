@@ -95,7 +95,10 @@
     "tests/unit/circulation.service.test.ts",
     "tests/integration/api.test.ts",
     "tests/integration/book.create.test.ts",
-    "start-production-public.bat"
+    "start-production-public.bat",
+    "api/index.ts",
+    "src/server/services/storage.service.ts",
+    "vercel.json"
   ],
   "history": [
     {
@@ -205,6 +208,12 @@
       "timestamp": "2026-10-18T22:15:00+08:00",
       "action": "Production Deployment Architectural Hardening & Multi-Platform Enablement",
       "agent_note": "Resolved critical production deployment gaps: (1) Mounted Express static file serving for Vite 'dist' and SPA wildcard fallback (* -> index.html) enabling unified single-unit deployment on port 3001; (2) Replaced deprecated Node v20 '--loader tsx' with '--import tsx' in package.json start script and Dockerfile CMD; (3) Added 'start:public' and 'start-production-public.bat' for 1-click zero-cost production deployment with Cloudflare Tunnel HTTPS; (4) Hardened Dockerfile directory creation for /app/uploads/covers; (5) Comprehensive deployment.md documentation across 4 target platforms (Windows Local + Cloudflare Tunnel, On-premise Docker Compose, Cloud VPS Ubuntu Nginx+PM2, and Cloud PaaS). 67 Vitest tests passing 100% and clean Vite production build."
+    },
+    {
+      "layer": "engineering",
+      "timestamp": "2026-10-18T22:45:00+08:00",
+      "action": "Vercel Serverless + Turso SQLite + Supabase Storage Hybrid Architecture",
+      "agent_note": "Architected zero-compromise Hybrid Cloud engine: (1) Created api/index.ts and vercel.json for Vercel Serverless routing with static dist edge CDN; (2) Integrated @libsql/client in src/server/db/index.ts enabling Turso SQLite cloud connection when TURSO_DATABASE_URL is set, while retaining local better-sqlite3; (3) Created StorageService hybrid in src/server/services/storage.service.ts with Supabase Storage bucket integration and multer.memoryStorage fallback; (4) Verified 67/67 Vitest tests passing 100% and clean Vite production build."
     }
   ],
   "decisions": [

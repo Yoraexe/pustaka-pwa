@@ -6,7 +6,59 @@
 
 ---
 
-## 1. Opsi A: Local Server / Windows PC Sekolah + Cloudflare Tunnel (Paling Cepat & Gratis)
+## 1. Opsi Utama: Vercel + Turso + Supabase (100% Online Gratis, Tanpa Beli Domain, Laptop Bebas Mati)
+
+Pilihan terbaik jika Anda ingin aplikasi online 24 jam di internet, memiliki domain HTTPS permanen gratis (`*.vercel.app`), dan tidak perlu menyalakan laptop terus-menerus.
+
+### Arsitektur:
+- **Hosting & Serverless API:** Vercel (Edge CDN + `@vercel/node` handler via `api/index.ts`).
+- **Database:** Turso (SQLite Cloud via `@libsql/client` dan Drizzle ORM).
+- **File Storage (Cover & PDF):** Supabase Storage (Bucket `covers` & `ebooks`).
+
+### Langkah Praktis Deployment (10-15 Menit):
+
+#### Langkah A: Push Kode ke GitHub
+1. Buat repository baru di [GitHub](https://github.com/new), beri nama misalnya `pustaka-sekolah-pwa`.
+2. Dari terminal laptop Anda:
+   ```bash
+   git remote add origin https://github.com/USERNAME_ANDA/pustaka-sekolah-pwa.git
+   git branch -M main
+   git push -u origin main
+   ```
+
+#### Langkah B: Buat Database Gratis di Turso
+1. Buka [turso.tech](https://turso.tech) dan login dengan akun GitHub Anda.
+2. Buat database baru (misal: `pustaka-sekolah`).
+3. Dapatkan 2 informasi kredensial:
+   - **Database URL:** `libsql://pustaka-sekolah-username.turso.io`
+   - **Auth Token:** Buat token baru via tombol "Create Token".
+
+#### Langkah C: Buat Storage Gratis di Supabase
+1. Buka [supabase.com](https://supabase.com) dan buat project baru (bebas biaya).
+2. Masuk ke menu **Storage** -> Buat 2 bucket:
+   - `covers` (Centang **Public Bucket** agar gambar sampul bisa ditampilkan di browser).
+   - `ebooks` (Biarkan **Private**, karena file PDF dilindungi hak cipta via route `/stream-pdf`).
+3. Masuk ke menu **Project Settings** -> **API**:
+   - Salin **Project URL**.
+   - Salin **service_role secret** (kunci admin untuk upload berkas).
+
+#### Langkah D: Deploy di Vercel
+1. Buka [vercel.com](https://vercel.com) dan login dengan akun GitHub Anda.
+2. Klik tombol **"Add New..."** -> **"Project"** -> Pilih repository `pustaka-sekolah-pwa`.
+3. Di bagian **Environment Variables**, tambahkan:
+   - `JWT_SECRET` = `rahasia-pustaka-sekolah-production-key-2026-astesia` (atau teks acak >32 karakter)
+   - `TURSO_DATABASE_URL` = `libsql://pustaka-sekolah-...`
+   - `TURSO_AUTH_TOKEN` = `eyJhbGciOi...`
+   - `SUPABASE_URL` = `https://your-project.supabase.co`
+   - `SUPABASE_SERVICE_ROLE_KEY` = `eyJhbGciOi...`
+   - `SUPABASE_BUCKET_COVERS` = `covers`
+   - `SUPABASE_BUCKET_EBOOKS` = `ebooks`
+4. Klik **Deploy**!
+5. Dalam ~1 menit, aplikasi PWA perpustakaan Anda aktif permanen di: `https://pustaka-sekolah-xxxx.vercel.app`.
+
+---
+
+## 2. Opsi Alternatif: Local Server / Windows PC Sekolah + Cloudflare Tunnel
 
 Cocok untuk pengujian langsung, operasional perpustakaan berbasis PC sekolah, atau demo ke pimpinan sekolah tanpa perlu menyewa VPS.
 
