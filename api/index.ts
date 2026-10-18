@@ -13,6 +13,14 @@ async function getApp() {
   if (appInstance) return appInstance;
   if (!initPromise) {
     initPromise = (async () => {
+      try {
+        const { initDatabase } = await import('../src/server/db/index.js');
+        if (typeof initDatabase === 'function') {
+          await initDatabase();
+        }
+      } catch (dbErr) {
+        console.warn('[Serverless DB Init Notice]:', dbErr);
+      }
       const { createApp } = await import('../src/server/app.js');
       appInstance = createApp();
       return appInstance;

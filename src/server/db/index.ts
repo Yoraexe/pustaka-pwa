@@ -119,26 +119,8 @@ if (config.isTursoEnabled && config.TURSO_DATABASE_URL) {
     },
     pragma: (_cmd: string) => {}
   };
-  client.executeMultiple(DDL_BOOTSTRAP)
-    .then(async () => {
-      try {
-        const check = await client.execute("SELECT COUNT(*) as count FROM users WHERE role = 'ADMIN'");
-        if (Number(check.rows[0]?.count ?? 0) === 0) {
-          const { default: bcrypt } = await import('bcryptjs');
-          const hash = bcrypt.hashSync('admin123', 10);
-          await client.execute({
-            sql: 'INSERT OR IGNORE INTO users (identity_number, name, role, password_hash, is_active) VALUES (?, ?, ?, ?, 1)',
-            args: ['ADMIN01', 'Super Admin Perpustakaan', 'ADMIN', hash]
-          });
-          console.log('[Turso Bootstrap]: Superadmin ADMIN01 berhasil diinisialisasi.');
-        }
-      } catch (err: any) {
-        console.warn('[Turso Superadmin Bootstrap Notice]:', err?.message || err);
-      }
-    })
-    .catch((err) => {
-      console.warn('[Turso DDL Bootstrap Notice]:', err?.message || err);
-    });
+  // Fire-and-forget bootstrap for background warming
+  client.executeMultiple(DDL_BOOTSTRAP).catch(() => {});
 } else if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
   throw new Error(
     'Konfigurasi Turso Database belum ditemukan di Vercel Environment Variables. ' +
@@ -166,4 +148,29 @@ if (config.isTursoEnabled && config.TURSO_DATABASE_URL) {
   sqlite = localSqlite;
   db = drizzleBetterSqlite(localSqlite, { schema }) as unknown as AppDatabase;
 }
+
+export async function initDatabase(): Promise<void> {
+  if (config.isTursoEnabled && config.TURSO_DATABASE_URL) {
+    const client = createClient({
+      url: config.TURSO_DATABASE_URL,
+      authToken: config.TURSO_AUTH_TOKEN
+    });
+    try {
+      await client.executeMultiple(DDL_BOOTSTRAP);
+      const check = await client.execute("SELECT COUNT(*) as count FROM users WHERE role = 'ADMIN'");
+      if (Number(check.rows[0]?.count ?? 0) === 0) {
+        const { default: bcrypt } = await import('bcryptjs');
+        const hash = bcrypt.hashSync('admin123', 10);
+        await client.execute({
+          sql: 'INSERT OR IGNORE INTO users (identity_number, name, role, password_hash, is_active) VALUES (?, ?, ?, ?, 1)',
+          args: ['ADMIN01', 'Super Admin Perpustakaan', 'ADMIN', hash]
+        });
+        console.log('[Turso Init]: Superadmin ADMIN01 berhasil diinisialisasi.');
+      }
+    } catch (err: any) {
+      console.warn('[Turso Init Notice]:', err?.message || err);
+    }
+  }
+}
+
 
