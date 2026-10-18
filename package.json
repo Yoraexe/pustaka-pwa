@@ -16,6 +16,7 @@
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
     "db:seed": "tsx src/server/db/seed.ts",
+    "db:seed:turso": "node scripts/init-turso.mjs",
     "tunnel": "cloudflared tunnel --url http://localhost:5173"
   },
   "dependencies": {
