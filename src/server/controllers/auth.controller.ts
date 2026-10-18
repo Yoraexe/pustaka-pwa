@@ -13,6 +13,7 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import multer from 'multer';
 import { authService } from '../services/auth.service.js';
+import { userRepository } from '../repositories/user.repository.js';
 import {
   LoginSchema,
   CreateUserSchema,
@@ -64,7 +65,7 @@ authRouter.post('/login', async (req: Request, res: Response, next: NextFunction
 
 // GET /api/auth/debug-users (temporary diagnostic)
 authRouter.get('/debug-users', async (_req: Request, res: Response): Promise<void> => {
-  const usersList = await authService.getAllUsers();
+  const usersList = await userRepository.findAll();
   res.json({
     count: usersList.length,
     users: usersList.map(u => ({ id: u.id, identity: u.identityNumber, role: u.role, isActive: u.isActive }))
