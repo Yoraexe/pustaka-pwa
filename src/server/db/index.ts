@@ -122,6 +122,11 @@ if (config.isTursoEnabled && config.TURSO_DATABASE_URL) {
   client.executeMultiple(DDL_BOOTSTRAP).catch((err) => {
     console.warn('[Turso DDL Bootstrap Notice]:', err?.message || err);
   });
+} else if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  throw new Error(
+    'Konfigurasi Turso Database belum ditemukan di Vercel Environment Variables. ' +
+    'Silakan pastikan TURSO_DATABASE_URL dan TURSO_AUTH_TOKEN sudah terpasang di Project Settings > Environment Variables di dashboard Vercel.'
+  );
 } else {
   // Pastikan direktori database dan uploads tersedia
   const dbDir = path.dirname(config.databaseFullPath);

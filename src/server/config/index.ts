@@ -35,7 +35,7 @@ const envSchema = z.object({
   SUPABASE_BUCKET_EBOOKS: z.string().default('ebooks')
 }).refine(
   (data) => {
-    if (data.NODE_ENV === 'production') {
+    if (data.NODE_ENV === 'production' && !process.env.VERCEL) {
       return (
         data.JWT_SECRET &&
         data.JWT_SECRET !== 'pustaka-sekolah-super-secret-key-2026-astesia' &&
@@ -53,8 +53,9 @@ const envSchema = z.object({
 const parsedEnv = envSchema.safeParse(process.env);
 
 if (!parsedEnv.success) {
-  console.error('❌ Konfigurasi Environment tidak valid:', parsedEnv.error.format());
-  process.exit(1);
+  const errMsg = `Konfigurasi Environment tidak valid: ${JSON.stringify(parsedEnv.error.format())}`;
+  console.error('❌', errMsg);
+  throw new Error(errMsg);
 }
 
 const effectiveDbUrl =
