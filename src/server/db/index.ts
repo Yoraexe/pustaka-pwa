@@ -119,9 +119,26 @@ if (config.isTursoEnabled && config.TURSO_DATABASE_URL) {
     },
     pragma: (_cmd: string) => {}
   };
-  client.executeMultiple(DDL_BOOTSTRAP).catch((err) => {
-    console.warn('[Turso DDL Bootstrap Notice]:', err?.message || err);
-  });
+  client.executeMultiple(DDL_BOOTSTRAP)
+    .then(async () => {
+      try {
+        const check = await client.execute("SELECT COUNT(*) as count FROM users WHERE role = 'ADMIN'");
+        if (Number(check.rows[0]?.count ?? 0) === 0) {
+          const { default: bcrypt } = await import('bcryptjs');
+          const hash = bcrypt.hashSync('admin123', 10);
+          await client.execute({
+            sql: 'INSERT OR IGNORE INTO users (identity_number, name, role, password_hash, is_active) VALUES (?, ?, ?, ?, 1)',
+            args: ['ADMIN01', 'Super Admin Perpustakaan', 'ADMIN', hash]
+          });
+          console.log('[Turso Bootstrap]: Superadmin ADMIN01 berhasil diinisialisasi.');
+        }
+      } catch (err: any) {
+        console.warn('[Turso Superadmin Bootstrap Notice]:', err?.message || err);
+      }
+    })
+    .catch((err) => {
+      console.warn('[Turso DDL Bootstrap Notice]:', err?.message || err);
+    });
 } else if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
   throw new Error(
     'Konfigurasi Turso Database belum ditemukan di Vercel Environment Variables. ' +
