@@ -49,7 +49,11 @@ export const createApp = () => {
     res.json({
       status: 'healthy',
       app: 'Pustaka Sekolah PWA',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      isTursoEnabled: config.isTursoEnabled,
+      hasTursoUrl: Boolean(config.TURSO_DATABASE_URL),
+      hasTursoToken: Boolean(config.TURSO_AUTH_TOKEN),
+      tursoHost: config.TURSO_DATABASE_URL ? new URL(config.TURSO_DATABASE_URL.replace('libsql://', 'https://')).hostname : null
     });
   });
 
