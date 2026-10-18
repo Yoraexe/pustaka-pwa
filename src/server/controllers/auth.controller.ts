@@ -63,14 +63,6 @@ authRouter.post('/login', async (req: Request, res: Response, next: NextFunction
   }
 });
 
-// GET /api/auth/debug-users (temporary diagnostic)
-authRouter.get('/debug-users', async (_req: Request, res: Response): Promise<void> => {
-  const usersList = await userRepository.findAll();
-  res.json({
-    count: usersList.length,
-    users: usersList.map(u => ({ id: u.id, identity: u.identityNumber, role: u.role, isActive: u.isActive }))
-  });
-});
 
 // POST /api/auth/signup (Pendaftaran mandiri khusus Siswa & Guru)
 authRouter.post('/signup', async (req: Request, res: Response, next: NextFunction): Promise<void> => {

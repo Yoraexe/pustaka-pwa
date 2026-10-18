@@ -50,10 +50,7 @@ export const createApp = () => {
     res.json({
       status: 'healthy',
       app: 'Pustaka Sekolah PWA',
-      timestamp: new Date().toISOString(),
-      isTursoEnabled: Boolean(config.isTursoEnabled),
-      hasTursoUrl: Boolean(config.TURSO_DATABASE_URL),
-      tursoUrl: config.TURSO_DATABASE_URL || null
+      timestamp: new Date().toISOString()
     });
   });
 
