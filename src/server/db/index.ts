@@ -11,29 +11,19 @@
  */
 
 import Database from 'better-sqlite3';
-import { drizzle } from 'drizzle-orm/better-sqlite3';
+import { drizzle as drizzleBetterSqlite, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
+import { drizzle as drizzleLibsql } from 'drizzle-orm/libsql';
+import { createClient } from '@libsql/client';
 import * as schema from './schema.js';
 import { config } from '../config/index.js';
 import fs from 'fs';
 import path from 'path';
 
-// Pastikan direktori database dan uploads tersedia
-const dbDir = path.dirname(config.databaseFullPath);
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
-}
+export type AppDatabase = BetterSQLite3Database<typeof schema>;
+export let db: AppDatabase;
+export let sqlite: any;
 
-if (!fs.existsSync(config.uploadsFullPath)) {
-  fs.mkdirSync(config.uploadsFullPath, { recursive: true });
-}
-
-// Inisialisasi better-sqlite3 instance dengan WAL mode
-export const sqlite = new Database(config.databaseFullPath);
-sqlite.pragma('journal_mode = WAL');
-sqlite.pragma('foreign_keys = ON');
-
-// Bootstrap tables jika belum ada
-sqlite.exec(`
+const DDL_BOOTSTRAP = `
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     identity_number TEXT NOT NULL UNIQUE,
@@ -114,7 +104,43 @@ sqlite.exec(`
     ('Seni, Budaya & Prakarya', 'seni-budaya'),
     ('Fiksi, Novel & Literasi', 'fiksi-literasi'),
     ('Pengetahuan Umum & Referensi', 'umum');
-`);
+`;
 
-export const db = drizzle(sqlite, { schema });
+if (config.isTursoEnabled && config.TURSO_DATABASE_URL) {
+  const client = createClient({
+    url: config.TURSO_DATABASE_URL,
+    authToken: config.TURSO_AUTH_TOKEN
+  });
+  db = drizzleLibsql(client, { schema }) as unknown as AppDatabase;
+  sqlite = {
+    exec: (sqlQuery: string) => {
+      client.executeMultiple(sqlQuery).catch(() => {
+        // Silently catch or fallback to single statement
+        client.execute(sqlQuery).catch(() => {});
+      });
+    },
+    pragma: (_cmd: string) => {}
+  };
+  client.executeMultiple(DDL_BOOTSTRAP).catch((err) => {
+    console.warn('[Turso DDL Bootstrap Notice]:', err?.message || err);
+  });
+} else {
+  // Pastikan direktori database dan uploads tersedia
+  const dbDir = path.dirname(config.databaseFullPath);
+  if (!fs.existsSync(dbDir)) {
+    fs.mkdirSync(dbDir, { recursive: true });
+  }
+
+  if (!fs.existsSync(config.uploadsFullPath)) {
+    fs.mkdirSync(config.uploadsFullPath, { recursive: true });
+  }
+
+  const localSqlite = new Database(config.databaseFullPath);
+  localSqlite.pragma('journal_mode = WAL');
+  localSqlite.pragma('foreign_keys = ON');
+  localSqlite.exec(DDL_BOOTSTRAP);
+
+  sqlite = localSqlite;
+  db = drizzleBetterSqlite(localSqlite, { schema });
+}
 

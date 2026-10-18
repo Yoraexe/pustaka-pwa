@@ -26,7 +26,13 @@ const envSchema = z.object({
   STUDENT_LOAN_DAYS: z.coerce.number().default(7),
   TEACHER_LOAN_LIMIT: z.coerce.number().default(5),
   TEACHER_LOAN_DAYS: z.coerce.number().default(14),
-  DAILY_FINE_AMOUNT: z.coerce.number().default(1000) // Rp 1.000 / hari
+  DAILY_FINE_AMOUNT: z.coerce.number().default(1000), // Rp 1.000 / hari
+  TURSO_DATABASE_URL: z.string().optional(),
+  TURSO_AUTH_TOKEN: z.string().optional(),
+  SUPABASE_URL: z.string().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  SUPABASE_BUCKET_COVERS: z.string().default('covers'),
+  SUPABASE_BUCKET_EBOOKS: z.string().default('ebooks')
 }).refine(
   (data) => {
     if (data.NODE_ENV === 'production') {
@@ -56,8 +62,18 @@ const effectiveDbUrl =
     ? './pustaka.test.db'
     : parsedEnv.data.DATABASE_URL;
 
+const isTursoEnabled =
+  parsedEnv.data.NODE_ENV !== 'test' &&
+  !Boolean(process.env.VITEST) &&
+  Boolean(parsedEnv.data.TURSO_DATABASE_URL);
+
+const isSupabaseEnabled =
+  Boolean(parsedEnv.data.SUPABASE_URL && parsedEnv.data.SUPABASE_SERVICE_ROLE_KEY);
+
 export const config = {
   ...parsedEnv.data,
+  isTursoEnabled,
+  isSupabaseEnabled,
   uploadsFullPath: path.resolve(process.cwd(), parsedEnv.data.UPLOADS_DIR),
   databaseFullPath: path.resolve(process.cwd(), effectiveDbUrl)
 };

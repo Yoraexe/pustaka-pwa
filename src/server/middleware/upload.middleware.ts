@@ -18,39 +18,49 @@ const uploadsRoot = path.resolve(process.cwd(), 'uploads');
 const ebooksDir = path.resolve(uploadsRoot, 'ebooks');
 const coversDir = path.resolve(uploadsRoot, 'covers');
 
-// Pastikan folder uploads tersedia
-[uploadsRoot, ebooksDir, coversDir].forEach(dir => {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+import { config } from '../config/index.js';
+
+// Pastikan folder uploads tersedia jika berjalan di mode disk lokal
+if (!config.isSupabaseEnabled && !process.env.VERCEL) {
+  try {
+    [uploadsRoot, ebooksDir, coversDir].forEach(dir => {
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    });
+  } catch (err) {
+    console.warn('[Upload Directory Notice]:', err);
   }
-});
+}
 
 const ALLOWED_COVER_EXTS = ['.jpg', '.jpeg', '.png', '.webp'];
 const ALLOWED_COVER_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
 
-const storage = multer.diskStorage({
-  destination: (_req, file, cb) => {
-    if (file.fieldname === 'ebook') {
-      cb(null, ebooksDir);
-    } else if (file.fieldname === 'cover') {
-      cb(null, coversDir);
-    } else {
-      cb(null, uploadsRoot);
-    }
-  },
-  filename: (_req, file, cb) => {
-    const rawExt = path.extname(file.originalname).toLowerCase();
-    const sanitizedBase = path.basename(file.originalname, rawExt).replace(/[^a-zA-Z0-9_-]/g, '_');
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
+const storage = (config.isSupabaseEnabled || Boolean(process.env.VERCEL))
+  ? multer.memoryStorage()
+  : multer.diskStorage({
+      destination: (_req, file, cb) => {
+        if (file.fieldname === 'ebook') {
+          cb(null, ebooksDir);
+        } else if (file.fieldname === 'cover') {
+          cb(null, coversDir);
+        } else {
+          cb(null, uploadsRoot);
+        }
+      },
+      filename: (_req, file, cb) => {
+        const rawExt = path.extname(file.originalname).toLowerCase();
+        const sanitizedBase = path.basename(file.originalname, rawExt).replace(/[^a-zA-Z0-9_-]/g, '_');
+        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
 
-    // Paksa ekstensi yang aman dan terisolasi
-    const safeExt = file.fieldname === 'ebook'
-      ? '.pdf'
-      : ALLOWED_COVER_EXTS.includes(rawExt) ? rawExt : '.jpg';
+        // Paksa ekstensi yang aman dan terisolasi
+        const safeExt = file.fieldname === 'ebook'
+          ? '.pdf'
+          : ALLOWED_COVER_EXTS.includes(rawExt) ? rawExt : '.jpg';
 
-    cb(null, `${file.fieldname}-${sanitizedBase}-${uniqueSuffix}${safeExt}`);
-  }
-});
+        cb(null, `${file.fieldname}-${sanitizedBase}-${uniqueSuffix}${safeExt}`);
+      }
+    });
 
 const fileFilter: multer.Options['fileFilter'] = (_req, file, cb) => {
   if (file.fieldname === 'ebook') {
