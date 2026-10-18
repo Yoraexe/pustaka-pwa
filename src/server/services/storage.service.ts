@@ -9,6 +9,7 @@
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import WebSocket from 'ws';
 import { config } from '../config/index.js';
 import fs from 'fs';
 import path from 'path';
@@ -18,7 +19,10 @@ export class StorageService {
 
   constructor() {
     if (config.isSupabaseEnabled && config.SUPABASE_URL && config.SUPABASE_SERVICE_ROLE_KEY) {
-      this.supabase = createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY);
+      this.supabase = createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, {
+        auth: { persistSession: false },
+        realtime: { transport: WebSocket as any }
+      });
     }
   }
 
