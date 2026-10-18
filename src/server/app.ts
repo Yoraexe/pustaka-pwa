@@ -18,7 +18,6 @@ import { authRouter } from './controllers/auth.controller.js';
 import { bookRouter } from './controllers/book.controller.js';
 import { circulationRouter } from './controllers/circulation.controller.js';
 import { errorHandler } from './middleware/error.middleware.js';
-import { config } from './config/index.js';
 
 export const createApp = () => {
   const app = express();

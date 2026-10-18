@@ -13,7 +13,6 @@
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import multer from 'multer';
 import { authService } from '../services/auth.service.js';
-import { userRepository } from '../repositories/user.repository.js';
 import {
   LoginSchema,
   CreateUserSchema,
