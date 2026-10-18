@@ -132,36 +132,52 @@ export class LoanRepository {
    */
   async autoExpireReservations(): Promise<number> {
     const nowIso = new Date().toISOString();
-    const expiredRows = await db.select({
-      id: loans.id,
-      bookId: loans.bookId,
-      copyId: loans.copyId
-    })
-    .from(loans)
-    .where(
-      and(
-        eq(loans.status, 'RESERVED'),
-        sql`${loans.reservedUntil} < ${nowIso}`
-      )
-    );
-
-    if (expiredRows.length === 0) return 0;
 
     sqlite.exec('BEGIN IMMEDIATE');
     try {
+      const expiredRows = await db.select({
+        id: loans.id,
+        bookId: loans.bookId,
+        copyId: loans.copyId
+      })
+      .from(loans)
+      .where(
+        and(
+          eq(loans.status, 'RESERVED'),
+          sql`${loans.reservedUntil} < ${nowIso}`
+        )
+      );
+
+      if (expiredRows.length === 0) {
+        sqlite.exec('COMMIT');
+        return 0;
+      }
+
+      let expiredCount = 0;
       for (const r of expiredRows) {
-        await db.update(loans).set({ status: 'CANCELLED' }).where(eq(loans.id, r.id));
-        if (r.copyId) {
-          await db.update(bookCopies).set({ status: 'AVAILABLE' }).where(eq(bookCopies.id, r.copyId));
+        const updateRes = await db.update(loans)
+          .set({ status: 'CANCELLED' })
+          .where(
+            and(
+              eq(loans.id, r.id),
+              eq(loans.status, 'RESERVED')
+            )
+          );
+
+        if (updateRes.changes > 0) {
+          expiredCount++;
+          if (r.copyId) {
+            await db.update(bookCopies).set({ status: 'AVAILABLE' }).where(eq(bookCopies.id, r.copyId));
+          }
+          await db.update(books)
+            .set({
+              availablePhysicalCopies: sql`min(${books.totalPhysicalCopies}, ${books.availablePhysicalCopies} + 1)`
+            })
+            .where(eq(books.id, r.bookId));
         }
-        await db.update(books)
-          .set({
-            availablePhysicalCopies: sql`min(${books.totalPhysicalCopies}, ${books.availablePhysicalCopies} + 1)`
-          })
-          .where(eq(books.id, r.bookId));
       }
       sqlite.exec('COMMIT');
-      return expiredRows.length;
+      return expiredCount;
     } catch (err) {
       sqlite.exec('ROLLBACK');
       throw err;
@@ -433,13 +449,20 @@ export class LoanRepository {
   /**
    * Perpanjangan masa pinjam fisik 1x (BRD 3.3 Rule 3)
    */
-  async updateRenewLoan(loanId: number, newDueDate: string): Promise<void> {
-    await db.update(loans)
+  async updateRenewLoan(loanId: number, newDueDate: string): Promise<number> {
+    const res = await db.update(loans)
       .set({
         dueDate: newDueDate,
         isRenewed: true
       })
-      .where(eq(loans.id, loanId));
+      .where(
+        and(
+          eq(loans.id, loanId),
+          eq(loans.isRenewed, false),
+          eq(loans.status, 'BORROWED')
+        )
+      );
+    return res.changes;
   }
 
   /**

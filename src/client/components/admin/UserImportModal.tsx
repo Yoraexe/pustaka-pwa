@@ -10,7 +10,7 @@
  * Side Effects: Memanggil endpoint POST /api/auth/import-users, men-generate unduhan template CSV di browser.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { api } from '../../services/api.js';
 import type { CsvImportResult } from '../../../shared/types/index.js';
 import {
@@ -38,6 +38,7 @@ export const UserImportModal: React.FC<UserImportModalProps> = ({ isOpen, onClos
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [importResult, setImportResult] = useState<CsvImportResult | null>(null);
   const [mode, setMode] = useState<'file' | 'text'>('file');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const handleDownloadTemplate = () => {
     const templateContent = [
@@ -256,6 +257,7 @@ export const UserImportModal: React.FC<UserImportModalProps> = ({ isOpen, onClos
                   {selectedFile ? `${(selectedFile.size / 1024).toFixed(1)} KB` : 'Format .csv (maksimal 5 MB)'}
                 </span>
                 <input
+                  ref={fileInputRef}
                   id="csvFileInput"
                   type="file"
                   accept=".csv"
@@ -266,7 +268,7 @@ export const UserImportModal: React.FC<UserImportModalProps> = ({ isOpen, onClos
                   type="button"
                   variant="outline"
                   size="sm"
-                  onClick={() => document.getElementById('csvFileInput')?.click()}
+                  onClick={() => fileInputRef.current?.click()}
                   className="text-xs"
                 >
                   Pilih Berkas

@@ -74,7 +74,14 @@ export const CreateBookSchema = z.object({
   publicationYear: z.coerce.number().int().min(1900).max(2100),
   isbn: z.string().optional().nullable(),
   bookType: z.enum(['HYBRID', 'DIGITAL_ONLY', 'PHYSICAL_ONLY']),
-  coverUrl: z.string().optional().nullable(),
+  coverUrl: z.string()
+    .trim()
+    .refine(
+      (val) => !val || /^(https?:\/\/|\/uploads\/covers\/)/i.test(val),
+      { message: 'URL sampul harus diawali dengan http://, https://, atau /uploads/covers/' }
+    )
+    .optional()
+    .nullable(),
   ebookFilePath: z.string().optional().nullable(),
   digitalLicenseCount: z.coerce.number().int().min(0).default(5),
   totalPhysicalCopies: z.coerce.number().int().min(0).default(1),

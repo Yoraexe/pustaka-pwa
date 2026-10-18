@@ -27,7 +27,22 @@ const envSchema = z.object({
   TEACHER_LOAN_LIMIT: z.coerce.number().default(5),
   TEACHER_LOAN_DAYS: z.coerce.number().default(14),
   DAILY_FINE_AMOUNT: z.coerce.number().default(1000) // Rp 1.000 / hari
-});
+}).refine(
+  (data) => {
+    if (data.NODE_ENV === 'production') {
+      return (
+        data.JWT_SECRET &&
+        data.JWT_SECRET !== 'pustaka-sekolah-super-secret-key-2026-astesia' &&
+        data.JWT_SECRET.length >= 32
+      );
+    }
+    return true;
+  },
+  {
+    message: 'JWT_SECRET wajib diatur secara eksplisit dan aman (minimal 32 karakter) di lingkungan production.',
+    path: ['JWT_SECRET']
+  }
+);
 
 const parsedEnv = envSchema.safeParse(process.env);
 

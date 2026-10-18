@@ -111,6 +111,21 @@ class ApiClient {
 
   logout(): void {
     this.setToken(null);
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem('pustaka_cached_user');
+        localStorage.removeItem('pustaka_my_loans_false');
+        localStorage.removeItem('pustaka_my_loans_true');
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith('pustaka_my_loans_') || key.startsWith('pustaka_progress_'))) {
+            localStorage.removeItem(key);
+          }
+        }
+      }
+    } catch {
+      // Abaikan jika localStorage tidak tersedia
+    }
   }
 
   async getUsers(): Promise<User[]> {

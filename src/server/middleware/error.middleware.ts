@@ -8,10 +8,11 @@ import type { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
 
 export const errorHandler = (err: unknown, _req: Request, res: Response, _next: NextFunction): void => {
-  console.error('[Unhandled Error]:', err);
-
-  // 1. Zod Validation Errors
+  // 1. Zod Validation Errors (400 Bad Request)
   if (err instanceof ZodError) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[Validation Warning]:', err.flatten());
+    }
     res.status(400).json({
       success: false,
       error: {
@@ -26,8 +27,11 @@ export const errorHandler = (err: unknown, _req: Request, res: Response, _next: 
     return;
   }
 
-  // 2. Business Logic Domain Errors
+  // 2. Business Logic Domain Errors (400 Bad Request)
   if (err instanceof Error) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[Domain Warning]:', err.message);
+    }
     res.status(400).json({
       success: false,
       error: {
@@ -38,7 +42,8 @@ export const errorHandler = (err: unknown, _req: Request, res: Response, _next: 
     return;
   }
 
-  // 3. Fallback Internal Server Error
+  // 3. Fallback Internal Server Error (500 Unexpected)
+  console.error('[Unhandled Server Error]:', err);
   res.status(500).json({
     success: false,
     error: {

@@ -643,7 +643,10 @@ export class CirculationService {
 
     sqlite.exec('BEGIN IMMEDIATE');
     try {
-      await this.loanRepo.updateRenewLoan(loan.id, newDueDate.toISOString());
+      const changes = await this.loanRepo.updateRenewLoan(loan.id, newDueDate.toISOString());
+      if (changes === 0) {
+        throw new Error('Buku ini tidak dapat diperpanjang atau sudah pernah diperpanjang sebelumnya.');
+      }
       sqlite.exec('COMMIT');
 
       return {

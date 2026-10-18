@@ -291,6 +291,24 @@ describe('CirculationService Unit Tests', () => {
       const afterDigitalReturn = await circulationService.hasActiveDigitalAccess(studentUser, hybridBookId);
       expect(afterDigitalReturn).toBe(false);
     });
+
+    it('harus berhasil memperpanjang pinjaman fisik 1 kali dan menolak perpanjangan kedua secara atomik', async () => {
+      // 1. Pinjam buku fisik
+      const loan = await circulationService.borrowPhysicalBookSelf(studentUser, physicalOnlyBookId);
+      expect(loan.isRenewed).toBe(false);
+
+      // 2. Perpanjangan pertama: harus sukses
+      const renewedLoan = await circulationService.renewPhysicalLoan(studentUser, loan.id);
+      expect(renewedLoan.isRenewed).toBe(true);
+
+      // 3. Perpanjangan kedua: harus ditolak
+      await expect(
+        circulationService.renewPhysicalLoan(studentUser, loan.id)
+      ).rejects.toThrow('Buku ini sudah pernah diperpanjang 1 kali');
+
+      // 4. Bersihkan: Kembalikan buku
+      await circulationService.returnPhysicalBookSelf(studentUser, loan.id);
+    });
   });
 });
 

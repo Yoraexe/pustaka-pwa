@@ -256,4 +256,46 @@ describe('Book Creation & Ingestion API Integration Tests', () => {
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
   });
+
+  it('POST /api/books harus menolak coverUrl dengan protokol berbahaya (javascript: / data: / vbscript:) demi mencegah XSS', async () => {
+    const res = await request(app)
+      .post('/api/books')
+      .set('Authorization', `Bearer ${librarianToken}`)
+      .send({
+        title: 'Buku XSS Injection',
+        author: 'Attacker',
+        publisher: 'Darknet',
+        publicationYear: 2026,
+        categoryId: 1,
+        bookType: 'PHYSICAL_ONLY',
+        totalPhysicalCopies: 1,
+        shelfLocation: 'RAK-01',
+        coverUrl: 'javascript:alert(document.cookie)'
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('POST /api/books harus menerima coverUrl dengan protokol aman http/https atau /uploads/covers/', async () => {
+    const res = await request(app)
+      .post('/api/books')
+      .set('Authorization', `Bearer ${librarianToken}`)
+      .send({
+        title: 'Buku Referensi Valid Cover URL',
+        author: 'Penulis Aman',
+        publisher: 'Penerbit Resmi',
+        publicationYear: 2026,
+        categoryId: 1,
+        bookType: 'PHYSICAL_ONLY',
+        totalPhysicalCopies: 1,
+        shelfLocation: 'RAK-01',
+        coverUrl: 'https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c'
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    createdBookIds.push(res.body.data.id);
+  });
 });

@@ -162,8 +162,13 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
   useEffect(() => {
     if (!isOpen) {
       stopCamera();
+      if (coverPreviewUrl && coverPreviewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(coverPreviewUrl);
+        setCoverPreviewUrl(null);
+        setCoverFile(null);
+      }
     }
-  }, [isOpen, stopCamera]);
+  }, [isOpen, stopCamera, coverPreviewUrl]);
 
   useEffect(() => {
     return () => {
