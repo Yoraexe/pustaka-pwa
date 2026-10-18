@@ -417,14 +417,20 @@ export class LoanRepository {
     return this.mapToDomain(raw, b[0]?.title, b[0]?.coverUrl, u[0]?.name, u[0]?.identityNumber, c[0]?.barcode, b[0]?.shelfLocation);
   }
 
-  async updateClaimReservation(loanId: number, borrowDate: string, dueDate: string): Promise<void> {
-    await db.update(loans)
+  async updateClaimReservation(loanId: number, borrowDate: string, dueDate: string): Promise<number> {
+    const res = await db.update(loans)
       .set({
         status: 'BORROWED',
         borrowDate,
         dueDate
       })
-      .where(eq(loans.id, loanId));
+      .where(
+        and(
+          eq(loans.id, loanId),
+          eq(loans.status, 'RESERVED')
+        )
+      );
+    return res.changes;
   }
 
   async updateCancelReservation(loanId: number): Promise<number> {
@@ -441,15 +447,21 @@ export class LoanRepository {
     return res.changes;
   }
 
-  async updateReturn(loanId: number, returnDate: string, fineAmount: number, isFinePaid: boolean): Promise<void> {
-    await db.update(loans)
+  async updateReturn(loanId: number, returnDate: string, fineAmount: number, isFinePaid: boolean): Promise<number> {
+    const res = await db.update(loans)
       .set({
         returnDate,
         status: 'RETURNED',
         fineAmount,
         isFinePaid
       })
-      .where(eq(loans.id, loanId));
+      .where(
+        and(
+          eq(loans.id, loanId),
+          eq(loans.status, 'BORROWED')
+        )
+      );
+    return res.changes;
   }
 
   async updateSettleFine(loanId: number): Promise<void> {

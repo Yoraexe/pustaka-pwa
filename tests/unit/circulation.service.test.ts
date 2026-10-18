@@ -181,6 +181,12 @@ describe('CirculationService Unit Tests', () => {
         await circulationService.returnPhysicalBook(librarianUser, claimedLoan.copyBarcode);
       }
     });
+
+    it('harus menolak klaim reservasi ganda / tiket yang sudah diklaim (BUG-903)', async () => {
+      await expect(
+        circulationService.claimPhysicalReservation(librarianUser, reservationCode)
+      ).rejects.toThrow('sudah tidak aktif');
+    });
   });
 
   describe('Physical Loan Renewal & Circulation Suspension Policy', () => {
@@ -262,6 +268,23 @@ describe('CirculationService Unit Tests', () => {
 
       const bookAfter = await bookRepository.findById(physicalOnlyBookId);
       expect(bookAfter!.availablePhysicalCopies).toBe(initialAvail);
+
+      // 3. Penolakan pengembalian ganda pada pinjaman yang sama (BUG-901)
+      await expect(
+        circulationService.returnPhysicalBookSelf(studentUser, loan.id)
+      ).rejects.toThrow('sudah berstatus RETURNED');
+
+      // 4. Update atomik di repo harus menghasilkan 0 changes jika status bukan BORROWED (BUG-901)
+      const directChanges = await loanRepository.updateReturn(loan.id, new Date().toISOString(), 0, true);
+      expect(directChanges).toBe(0);
+    });
+
+    it('harus menolak pembaruan status eksemplar jika status saat ini tidak sesuai expectedStatus (BUG-902)', async () => {
+      const copies = await bookRepository.findCopiesByBookId(physicalOnlyBookId);
+      const testCopy = copies[0];
+      // Mencoba mengubah eksemplar dengan status yang salah (mengharapkan BORROWED pada eksemplar AVAILABLE)
+      const changes = await bookRepository.updateCopyStatus(testCopy.id, 'LOST', 'BORROWED');
+      expect(changes).toBe(0);
     });
 
     it('harus mengizinkan peminjaman fisik langsung hanya dengan hasil Scan QR / Barcode eksemplar tanpa bookId', async () => {

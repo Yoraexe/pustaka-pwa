@@ -197,10 +197,15 @@ export class BookRepository {
     };
   }
 
-  async updateCopyStatus(copyId: number, status: BookCopy['status']): Promise<void> {
-    await db.update(bookCopies)
+  async updateCopyStatus(copyId: number, status: BookCopy['status'], expectedStatus?: BookCopy['status']): Promise<number> {
+    const conditions = [eq(bookCopies.id, copyId)];
+    if (expectedStatus) {
+      conditions.push(eq(bookCopies.status, expectedStatus));
+    }
+    const res = await db.update(bookCopies)
       .set({ status })
-      .where(eq(bookCopies.id, copyId));
+      .where(and(...conditions));
+    return res.changes;
   }
 
   async updateAvailableCopies(bookId: number, delta: number): Promise<void> {

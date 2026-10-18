@@ -194,7 +194,7 @@ class ApiClient {
   }
 
   async getBookById(id: number): Promise<Book> {
-    return this.request<Book>(`/books/${id}`);
+    return this.getBookDetail(id);
   }
 
   async getAvailableCopies(): Promise<AvailableCopy[]> {

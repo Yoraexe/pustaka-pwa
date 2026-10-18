@@ -106,7 +106,10 @@ export class CirculationService {
       throw new Error('Tidak ditemukan peminjaman aktif untuk e-book ini.');
     }
 
-    await this.loanRepo.updateReturn(loan.id, new Date().toISOString(), 0, true);
+    const changes = await this.loanRepo.updateReturn(loan.id, new Date().toISOString(), 0, true);
+    if (changes === 0) {
+      throw new Error('E-book ini sudah dikembalikan atau tidak dalam status pinjaman aktif.');
+    }
   }
 
   /**
@@ -168,10 +171,13 @@ export class CirculationService {
     if (existingRes) {
       sqlite.exec('BEGIN IMMEDIATE');
       try {
+        const claimChanges = await this.loanRepo.updateClaimReservation(existingRes.id, nowIso, dueDate.toISOString());
+        if (claimChanges === 0) {
+          throw new Error('Tiket reservasi sudah diklaim atau sudah tidak aktif.');
+        }
         if (existingRes.copyId) {
           await this.bookRepo.updateCopyStatus(existingRes.copyId, 'BORROWED');
         }
-        await this.loanRepo.updateClaimReservation(existingRes.id, nowIso, dueDate.toISOString());
         sqlite.exec('COMMIT');
         return {
           ...existingRes,
@@ -214,7 +220,10 @@ export class CirculationService {
     // 6. Catat peminjaman fisik secara atomik
     sqlite.exec('BEGIN IMMEDIATE');
     try {
-      await this.bookRepo.updateCopyStatus(targetCopy.id, 'BORROWED');
+      const copyChanges = await this.bookRepo.updateCopyStatus(targetCopy.id, 'BORROWED', 'AVAILABLE');
+      if (copyChanges === 0) {
+        throw new Error('Eksemplar fisik ini baru saja dipinjam atau tidak lagi tersedia.');
+      }
       await this.bookRepo.updateAvailableCopies(book.id, -1);
 
       const createdLoan = await this.loanRepo.create({
@@ -273,7 +282,10 @@ export class CirculationService {
 
     sqlite.exec('BEGIN IMMEDIATE');
     try {
-      await this.loanRepo.updateReturn(activeLoan.id, now.toISOString(), fineAmount, isFinePaid);
+      const returnChanges = await this.loanRepo.updateReturn(activeLoan.id, now.toISOString(), fineAmount, isFinePaid);
+      if (returnChanges === 0) {
+        throw new Error('Buku fisik ini sudah dikembalikan atau tidak dalam status pinjaman aktif.');
+      }
       if (activeLoan.copyId) {
         await this.bookRepo.updateCopyStatus(activeLoan.copyId, 'AVAILABLE');
       }
@@ -353,7 +365,10 @@ export class CirculationService {
 
     sqlite.exec('BEGIN IMMEDIATE');
     try {
-      await this.bookRepo.updateCopyStatus(copyData.id, 'BORROWED');
+      const copyChanges = await this.bookRepo.updateCopyStatus(copyData.id, 'BORROWED', 'AVAILABLE');
+      if (copyChanges === 0) {
+        throw new Error('Eksemplar buku ini baru saja dipinjam atau tidak lagi tersedia.');
+      }
       await this.bookRepo.updateAvailableCopies(copyData.bookId, -1);
 
       const createdLoan = await this.loanRepo.create({
@@ -409,7 +424,10 @@ export class CirculationService {
     // Mutasi status pengembalian secara atomik
     sqlite.exec('BEGIN IMMEDIATE');
     try {
-      await this.loanRepo.updateReturn(activeLoan.id, now.toISOString(), fineAmount, finePaid || fineAmount === 0);
+      const returnChanges = await this.loanRepo.updateReturn(activeLoan.id, now.toISOString(), fineAmount, finePaid || fineAmount === 0);
+      if (returnChanges === 0) {
+        throw new Error('Buku fisik ini sudah dikembalikan atau tidak dalam status pinjaman aktif.');
+      }
       await this.bookRepo.updateCopyStatus(copyData.id, 'AVAILABLE');
       await this.bookRepo.updateAvailableCopies(copyData.bookId, 1);
       sqlite.exec('COMMIT');
@@ -498,7 +516,10 @@ export class CirculationService {
     // 6. Kunci eksemplar fisik dan kurangi stok tersedia secara atomik
     sqlite.exec('BEGIN IMMEDIATE');
     try {
-      await this.bookRepo.updateCopyStatus(availableCopy.id, 'RESERVED');
+      const copyChanges = await this.bookRepo.updateCopyStatus(availableCopy.id, 'RESERVED', 'AVAILABLE');
+      if (copyChanges === 0) {
+        throw new Error('Eksemplar fisik ini baru saja direservasi atau dipinjam oleh pemustaka lain.');
+      }
       await this.bookRepo.updateAvailableCopies(book.id, -1);
 
       const reservation = await this.loanRepo.createReservation({
@@ -562,10 +583,13 @@ export class CirculationService {
 
     sqlite.exec('BEGIN IMMEDIATE');
     try {
+      const claimChanges = await this.loanRepo.updateClaimReservation(reservation.id, nowIso, dueDate.toISOString());
+      if (claimChanges === 0) {
+        throw new Error('Tiket reservasi sudah diklaim atau sudah tidak aktif.');
+      }
       if (reservation.copyId) {
         await this.bookRepo.updateCopyStatus(reservation.copyId, 'BORROWED');
       }
-      await this.loanRepo.updateClaimReservation(reservation.id, nowIso, dueDate.toISOString());
       sqlite.exec('COMMIT');
 
       return {
