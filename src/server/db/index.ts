@@ -95,6 +95,15 @@ sqlite.exec(`
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 
+  -- Performance Indexes (DBA-Grade Standards - Astesia Quality Rule #6)
+  CREATE INDEX IF NOT EXISTS idx_loans_user_status ON loans(user_id, status);
+  CREATE INDEX IF NOT EXISTS idx_loans_book_status ON loans(book_id, status);
+  CREATE INDEX IF NOT EXISTS idx_loans_copy_id ON loans(copy_id);
+  CREATE INDEX IF NOT EXISTS idx_loans_res_code ON loans(reservation_code);
+  CREATE INDEX IF NOT EXISTS idx_loans_due_date ON loans(due_date);
+  CREATE INDEX IF NOT EXISTS idx_book_copies_book_id ON book_copies(book_id);
+  CREATE INDEX IF NOT EXISTS idx_books_category_id ON books(category_id);
+
   INSERT OR IGNORE INTO categories (name, slug) VALUES
     ('Informatika & Komputer', 'informatika'),
     ('Sains & Matematika', 'sains-matematika'),

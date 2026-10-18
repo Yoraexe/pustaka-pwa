@@ -35,6 +35,7 @@ interface ReadingProgress {
 export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => {
   const [isSavedOffline, setIsSavedOffline] = useState<boolean>(false);
   const [isLoadingPdf, setIsLoadingPdf] = useState<boolean>(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState<number>(100);
 
@@ -78,6 +79,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
 
     const loadPdfDocument = async () => {
       setIsLoadingPdf(true);
+      setErrorMessage(null);
       try {
         // Prioritaskan cache offline (IndexedDB & Cache API)
         let blob: Blob | null = await offlineStorage.getEbook(book.id);
@@ -93,6 +95,16 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
           });
           if (res.ok) {
             blob = await res.blob();
+          } else {
+            if (res.status === 403) {
+              setErrorMessage('Akses Ditolak: Anda belum meminjam e-book ini atau masa peminjaman telah berakhir.');
+            } else if (res.status === 401) {
+              setErrorMessage('Sesi Berakhir: Silakan masuk kembali ke akun Anda untuk membaca e-book.');
+            } else if (res.status === 404) {
+              setErrorMessage('Berkas PDF e-book belum diunggah atau tidak ditemukan di server perpustakaan.');
+            } else {
+              setErrorMessage(`Gagal memuat dokumen (Status: ${res.status}).`);
+            }
           }
         }
 
@@ -104,6 +116,7 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
         }
       } catch (err) {
         console.warn('Gagal memuat PDF stream riil:', err);
+        if (active) setErrorMessage('Gagal menghubungi server perpustakaan. Periksa koneksi internet Anda.');
       } finally {
         if (active) setIsLoadingPdf(false);
       }
@@ -379,13 +392,15 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
         ) : (
           <div className="text-center p-8 bg-slate-900 border border-slate-800 rounded-3xl max-w-md shadow-xl">
             <FileText size={44} className="mx-auto text-slate-500 mb-3" />
-            <h4 className="font-bold text-base text-white">Dokumen Belum Tersedia</h4>
+            <h4 className="font-bold text-base text-white">
+              {errorMessage ? 'Tidak Dapat Membuka Dokumen' : 'Dokumen Belum Tersedia'}
+            </h4>
             <p className="text-xs text-slate-400 mt-2 mb-5 leading-relaxed">
-              Berkas PDF buku ini belum diunggah oleh staf perpustakaan.
+              {errorMessage || 'Berkas PDF buku ini belum diunggah oleh staf perpustakaan.'}
             </p>
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors"
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
             >
               Tutup
             </button>

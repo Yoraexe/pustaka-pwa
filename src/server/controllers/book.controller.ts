@@ -56,6 +56,10 @@ bookRouter.get('/copies/available', async (_req: Request, res: Response, next: N
 bookRouter.get('/:id', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      res.status(400).json({ success: false, error: { code: 'INVALID_ID', message: 'ID buku harus berupa bilangan bulat positif.' } });
+      return;
+    }
     const book = await bookService.getBookDetail(id);
     res.json({ success: true, data: book });
   } catch (err) {
@@ -79,6 +83,18 @@ bookRouter.post('/', authenticateToken, requireRole(['LIBRARIAN', 'ADMIN']), upl
       }
     }
 
+    // Validasi pencegahan path traversal manual jika ebookFilePath dikirim via body
+    if (rawBody.ebookFilePath) {
+      const normalized = path.normalize(rawBody.ebookFilePath).replace(/\\/g, '/');
+      if (normalized.includes('..') || (!normalized.startsWith('uploads/ebooks/') && !normalized.startsWith('./uploads/ebooks/'))) {
+        res.status(400).json({
+          success: false,
+          error: { code: 'INVALID_FILE_PATH', message: 'Jalur file e-book tidak valid atau berada di luar direktori aman.' }
+        });
+        return;
+      }
+    }
+
     const input = CreateBookSchema.parse(rawBody);
     const newBook = await bookService.addNewBook(input);
     res.status(201).json({
@@ -95,6 +111,10 @@ bookRouter.post('/', authenticateToken, requireRole(['LIBRARIAN', 'ADMIN']), upl
 bookRouter.get('/:id/stream-pdf', authenticateToken, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      res.status(400).json({ success: false, error: { code: 'INVALID_ID', message: 'ID buku harus berupa bilangan bulat positif.' } });
+      return;
+    }
     const book = await bookService.getBookDetail(id);
 
     // Validasi Otorisasi: Wajib memiliki pinjaman aktif jika role adalah Siswa/Guru (BRD Seksi 3.2 & AC-2.2)
@@ -115,7 +135,15 @@ bookRouter.get('/:id/stream-pdf', authenticateToken, async (req: Request, res: R
       return;
     }
 
+    const ebooksBaseDir = path.resolve(process.cwd(), 'uploads/ebooks');
     const fullPath = path.resolve(process.cwd(), book.ebookFilePath);
+
+    // Sandbox check: Pastikan file berada di dalam uploads/ebooks untuk mencegah Path Traversal / Arbitrary File Read
+    if (!fullPath.startsWith(ebooksBaseDir) || !fullPath.toLowerCase().endsWith('.pdf')) {
+      res.status(403).json({ success: false, error: { code: 'FORBIDDEN_PATH', message: 'Akses ke jalur berkas ini ditolak demi keamanan sistem.' } });
+      return;
+    }
+
     if (!fs.existsSync(fullPath)) {
       res.status(404).json({ success: false, error: { code: 'FILE_NOT_FOUND', message: 'File dokumen e-book tidak ditemukan di server.' } });
       return;

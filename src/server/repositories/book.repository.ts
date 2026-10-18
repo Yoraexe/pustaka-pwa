@@ -204,17 +204,11 @@ export class BookRepository {
   }
 
   async updateAvailableCopies(bookId: number, delta: number): Promise<void> {
-    const book = await db.select({ total: books.totalPhysicalCopies, avail: books.availablePhysicalCopies })
-      .from(books)
-      .where(eq(books.id, bookId))
-      .limit(1);
-
-    if (book.length > 0) {
-      const newAvail = Math.max(0, Math.min(book[0].total, book[0].avail + delta));
-      await db.update(books)
-        .set({ availablePhysicalCopies: newAvail })
-        .where(eq(books.id, bookId));
-    }
+    await db.update(books)
+      .set({
+        availablePhysicalCopies: sql`min(${books.totalPhysicalCopies}, max(0, ${books.availablePhysicalCopies} + ${delta}))`
+      })
+      .where(eq(books.id, bookId));
   }
 
   private mapToDomain(raw: BookTable, categoryName: string): Book {

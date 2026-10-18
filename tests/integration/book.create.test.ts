@@ -238,4 +238,22 @@ describe('Book Creation & Ingestion API Integration Tests', () => {
     expect(hybridBook.coverUrl).toBeDefined();
     expect(hybridBook.ebookFilePath).toBeDefined();
   });
+
+  it('POST /api/books harus menolak berkas dengan format ilegal (MIME spoofing / HTML) via Multer filter', async () => {
+    const maliciousHtml = Buffer.from('<script>alert("xss")</script>');
+
+    const res = await request(app)
+      .post('/api/books')
+      .set('Authorization', `Bearer ${librarianToken}`)
+      .field('title', 'Buku Malware Exploit')
+      .field('author', 'Attacker')
+      .field('publisher', 'Darknet')
+      .field('publicationYear', '2026')
+      .field('categoryId', '1')
+      .field('bookType', 'DIGITAL_ONLY')
+      .attach('cover', maliciousHtml, { filename: 'exploit.html', contentType: 'image/jpeg' });
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
 });

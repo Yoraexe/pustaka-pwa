@@ -25,6 +25,9 @@ const coversDir = path.resolve(uploadsRoot, 'covers');
   }
 });
 
+const ALLOWED_COVER_EXTS = ['.jpg', '.jpeg', '.png', '.webp'];
+const ALLOWED_COVER_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+
 const storage = multer.diskStorage({
   destination: (_req, file, cb) => {
     if (file.fieldname === 'ebook') {
@@ -36,30 +39,37 @@ const storage = multer.diskStorage({
     }
   },
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const sanitizedBase = path.basename(file.originalname, ext).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const rawExt = path.extname(file.originalname).toLowerCase();
+    const sanitizedBase = path.basename(file.originalname, rawExt).replace(/[^a-zA-Z0-9_-]/g, '_');
     const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e6)}`;
-    cb(null, `${file.fieldname}-${sanitizedBase}-${uniqueSuffix}${ext}`);
+
+    // Paksa ekstensi yang aman dan terisolasi
+    const safeExt = file.fieldname === 'ebook'
+      ? '.pdf'
+      : ALLOWED_COVER_EXTS.includes(rawExt) ? rawExt : '.jpg';
+
+    cb(null, `${file.fieldname}-${sanitizedBase}-${uniqueSuffix}${safeExt}`);
   }
 });
 
 const fileFilter: multer.Options['fileFilter'] = (_req, file, cb) => {
   if (file.fieldname === 'ebook') {
-    const isPdf = file.mimetype === 'application/pdf' || file.originalname.toLowerCase().endsWith('.pdf');
+    const isPdf = file.mimetype === 'application/pdf' && file.originalname.toLowerCase().endsWith('.pdf');
     if (isPdf) {
       cb(null, true);
     } else {
-      cb(new Error('Format file e-book tidak valid. Hanya berkas PDF (.pdf) yang diperbolehkan.'));
+      cb(new Error('Format file e-book tidak valid. Hanya berkas PDF (.pdf) dengan MIME application/pdf yang diperbolehkan.'));
     }
   } else if (file.fieldname === 'cover') {
-    const isImage = file.mimetype.startsWith('image/') || /\.(jpg|jpeg|png|webp)$/i.test(file.originalname);
+    const ext = path.extname(file.originalname).toLowerCase();
+    const isImage = ALLOWED_COVER_EXTS.includes(ext) && ALLOWED_COVER_MIMES.includes(file.mimetype.toLowerCase());
     if (isImage) {
       cb(null, true);
     } else {
       cb(new Error('Format file sampul tidak valid. Hanya berkas gambar (JPG, PNG, WebP) yang diperbolehkan.'));
     }
   } else {
-    cb(null, true);
+    cb(new Error('Bidang berkas tidak dikenali.'));
   }
 };
 

@@ -13,6 +13,7 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { userRepository, type UserRepository } from '../repositories/user.repository.js';
+import { sqlite } from '../db/index.js';
 import { config } from '../config/index.js';
 import type { LoginInput, CreateUserInput, SelfRegisterInput, User, AuthSession, CsvImportResult, UserRole } from '../../shared/types/index.js';
 
@@ -226,68 +227,75 @@ export class AuthService {
     const salt = await bcrypt.genSalt(10);
     const defaultPasswordHash = await bcrypt.hash('123456', salt);
 
-    for (let i = startIndex; i < lines.length; i++) {
-      const rowNum = i + 1;
-      const cols = parseCsvLine(lines[i]);
-      if (cols.length < 2) {
-        errors.push({
-          row: rowNum,
-          identity: cols[0] || '-',
-          reason: 'Format baris tidak lengkap (minimal Nama dan NISN/NIP)'
-        });
-        continue;
-      }
-
-      const name = cols[nameIdx] || '';
-      const identityNumber = cols[identityIdx] || '';
-      const rawRole = (cols[roleIdx] || 'STUDENT').toUpperCase();
-      const className = cols[classIdx] || null;
-      const customPassword = cols[passwordIdx] || null;
-
-      if (!name || !identityNumber) {
-        errors.push({
-          row: rowNum,
-          identity: identityNumber || '-',
-          reason: 'Nama dan NISN/NIP wajib diisi'
-        });
-        continue;
-      }
-
-      let role: UserRole = 'STUDENT';
-      if (rawRole.includes('GURU') || rawRole.includes('TEACHER')) {
-        role = 'TEACHER';
-      } else if (rawRole.includes('PUSTAKA') || rawRole.includes('LIBRARIAN')) {
-        role = 'LIBRARIAN';
-      } else if (rawRole.includes('ADMIN')) {
-        role = 'ADMIN';
-      }
-
-      try {
-        const existing = await this.userRepo.findByIdentityNumber(identityNumber);
-        if (existing) {
-          skippedCount++;
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      for (let i = startIndex; i < lines.length; i++) {
+        const rowNum = i + 1;
+        const cols = parseCsvLine(lines[i]);
+        if (cols.length < 2) {
+          errors.push({
+            row: rowNum,
+            identity: cols[0] || '-',
+            reason: 'Format baris tidak lengkap (minimal Nama dan NISN/NIP)'
+          });
           continue;
         }
 
-        const passwordHash = customPassword ? await bcrypt.hash(customPassword, 10) : defaultPasswordHash;
+        const name = cols[nameIdx] || '';
+        const identityNumber = cols[identityIdx] || '';
+        const rawRole = (cols[roleIdx] || 'STUDENT').toUpperCase();
+        const className = cols[classIdx] || null;
+        const customPassword = cols[passwordIdx] || null;
 
-        await this.userRepo.create({
-          identityNumber,
-          name,
-          role,
-          className,
-          password: customPassword || '123456',
-          passwordHash
-        });
+        if (!name || !identityNumber) {
+          errors.push({
+            row: rowNum,
+            identity: identityNumber || '-',
+            reason: 'Nama dan NISN/NIP wajib diisi'
+          });
+          continue;
+        }
 
-        importedCount++;
-      } catch (err: unknown) {
-        errors.push({
-          row: rowNum,
-          identity: identityNumber,
-          reason: err instanceof Error ? err.message : 'Gagal menyimpan ke basis data'
-        });
+        let role: UserRole = 'STUDENT';
+        if (rawRole.includes('GURU') || rawRole.includes('TEACHER')) {
+          role = 'TEACHER';
+        } else if (rawRole.includes('PUSTAKA') || rawRole.includes('LIBRARIAN')) {
+          role = 'LIBRARIAN';
+        } else if (rawRole.includes('ADMIN')) {
+          role = 'ADMIN';
+        }
+
+        try {
+          const existing = await this.userRepo.findByIdentityNumber(identityNumber);
+          if (existing) {
+            skippedCount++;
+            continue;
+          }
+
+          const passwordHash = customPassword ? await bcrypt.hash(customPassword, 10) : defaultPasswordHash;
+
+          await this.userRepo.create({
+            identityNumber,
+            name,
+            role,
+            className,
+            password: customPassword || '123456',
+            passwordHash
+          });
+
+          importedCount++;
+        } catch (err: unknown) {
+          errors.push({
+            row: rowNum,
+            identity: identityNumber,
+            reason: err instanceof Error ? err.message : 'Gagal menyimpan ke basis data'
+          });
+        }
       }
+      sqlite.exec('COMMIT');
+    } catch (err) {
+      sqlite.exec('ROLLBACK');
+      throw err;
     }
 
     return {

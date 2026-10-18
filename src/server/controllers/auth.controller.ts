@@ -96,6 +96,10 @@ authRouter.post('/register', authenticateToken, requireRole(['ADMIN']), async (r
 authRouter.patch('/users/:id/status', authenticateToken, requireRole(['ADMIN']), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const targetId = Number(req.params.id);
+    if (!Number.isInteger(targetId) || targetId <= 0) {
+      res.status(400).json({ success: false, error: { code: 'INVALID_ID', message: 'ID pengguna harus berupa bilangan bulat positif.' } });
+      return;
+    }
     const input = UpdateUserStatusSchema.parse(req.body);
     const updatedUser = await authService.toggleUserStatus(req.user!, targetId, input.isActive);
     res.json({
@@ -112,6 +116,10 @@ authRouter.patch('/users/:id/status', authenticateToken, requireRole(['ADMIN']),
 authRouter.patch('/users/:id/password', authenticateToken, requireRole(['ADMIN']), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const targetId = Number(req.params.id);
+    if (!Number.isInteger(targetId) || targetId <= 0) {
+      res.status(400).json({ success: false, error: { code: 'INVALID_ID', message: 'ID pengguna harus berupa bilangan bulat positif.' } });
+      return;
+    }
     const input = ResetUserPasswordSchema.parse(req.body);
     await authService.resetUserPassword(req.user!, targetId, input.newPassword);
     res.json({

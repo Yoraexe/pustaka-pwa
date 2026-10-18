@@ -59,7 +59,20 @@ class ApiClient {
       headers
     });
 
-    const json: ApiResponse<T> = await res.json();
+    let json: ApiResponse<T>;
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      try {
+        json = await res.json();
+      } catch {
+        throw new Error(`Respons server tidak valid (Status HTTP: ${res.status}).`);
+      }
+    } else {
+      if (!res.ok) {
+        throw new Error(`Server perpustakaan mengalami kendala teknis (Status HTTP: ${res.status}). Silakan coba sesaat lagi.`);
+      }
+      throw new Error(`Format respons server tidak didukung (${contentType || 'Unknown'}).`);
+    }
 
     if (!res.ok || !json.success) {
       if (res.status === 401) {

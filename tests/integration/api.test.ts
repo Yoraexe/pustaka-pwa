@@ -331,5 +331,43 @@ describe('Pustaka Sekolah API Integration Tests', () => {
     expect(returnRes.body.data.loan.status).toBe('RETURNED');
     expect(returnRes.body.data.fineAmount).toBe(0);
   });
+
+  it('GET /api/books/:id dan PATCH /api/auth/users/:id harus menolak parameter ID non-integer (400 Bad Request)', async () => {
+    // 1. GET /api/books/abc
+    const badBookRes = await request(app).get('/api/books/abc');
+    expect(badBookRes.status).toBe(400);
+    expect(badBookRes.body.error.code).toBe('INVALID_ID');
+
+    // 2. GET /api/books/-5
+    const negativeBookRes = await request(app).get('/api/books/-5');
+    expect(negativeBookRes.status).toBe(400);
+    expect(negativeBookRes.body.error.code).toBe('INVALID_ID');
+
+    // 3. PATCH /api/auth/users/invalid/status
+    const badUserStatusRes = await request(app)
+      .patch('/api/auth/users/invalid/status')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ isActive: false });
+    expect(badUserStatusRes.status).toBe(400);
+    expect(badUserStatusRes.body.error.code).toBe('INVALID_ID');
+  });
+
+  it('POST /api/books harus menolak jalur berkas di luar folder aman atau path traversal (400 Bad Request)', async () => {
+    const res = await request(app)
+      .post('/api/books')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        title: 'Buku Path Traversal Exploiter',
+        author: 'Hacker',
+        publisher: 'Darknet',
+        publicationYear: 2026,
+        categoryId: 1,
+        bookType: 'DIGITAL_ONLY',
+        ebookFilePath: '../../pustaka.db'
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('INVALID_FILE_PATH');
+  });
 });
 

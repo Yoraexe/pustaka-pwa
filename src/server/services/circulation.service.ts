@@ -61,24 +61,33 @@ export class CirculationService {
       throw new Error(`Batas maksimal peminjaman e-book (${limit} buku) tercapai. Harap kembalikan buku terlebih dahulu.`);
     }
 
-    // 3. Cek ketersediaan lisensi simultan buku digital
-    const activeDigitalBorrows = await this.loanRepo.countActiveDigitalLoansForBook(bookId);
-    if (activeDigitalBorrows >= book.digitalLicenseCount) {
-      throw new Error('Seluruh lisensi digital buku ini sedang dipinjam siswa lain. Silakan coba kembali nanti.');
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      // 3. Cek ketersediaan lisensi simultan buku digital di dalam transaksi
+      const activeDigitalBorrows = await this.loanRepo.countActiveDigitalLoansForBook(bookId);
+      if (activeDigitalBorrows >= book.digitalLicenseCount) {
+        throw new Error('Seluruh lisensi digital buku ini sedang dipinjam siswa lain. Silakan coba kembali nanti.');
+      }
+
+      // 4. Kalkulasi tanggal jatuh tempo (Durasi pinjam)
+      const loanDays = user.role === 'TEACHER' ? config.TEACHER_LOAN_DAYS : config.STUDENT_LOAN_DAYS;
+      const dueDate = new Date();
+      dueDate.setDate(dueDate.getDate() + loanDays);
+
+      const createdLoan = await this.loanRepo.create({
+        userId: user.id,
+        bookId: book.id,
+        copyId: null,
+        loanType: 'DIGITAL',
+        dueDate: dueDate.toISOString()
+      });
+
+      sqlite.exec('COMMIT');
+      return createdLoan;
+    } catch (err) {
+      sqlite.exec('ROLLBACK');
+      throw err;
     }
-
-    // 4. Kalkulasi tanggal jatuh tempo (Durasi pinjam)
-    const loanDays = user.role === 'TEACHER' ? config.TEACHER_LOAN_DAYS : config.STUDENT_LOAN_DAYS;
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + loanDays);
-
-    return this.loanRepo.create({
-      userId: user.id,
-      bookId: book.id,
-      copyId: null,
-      loanType: 'DIGITAL',
-      dueDate: dueDate.toISOString()
-    });
   }
 
   /**

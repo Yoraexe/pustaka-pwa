@@ -1,7 +1,13 @@
 /**
  * @file src/server/services/book.service.ts
- * @description Layanan bisnis untuk katalog buku hybrid (Digital & Fisik).
+ * @description Layanan bisnis untuk katalog buku hybrid (Digital & Fisik) dan pembuatan eksemplar ber-barcode otomatis.
  * @layer Service Layer (Business Logic)
+ * 
+ * Tujuan: Menyediakan logika bisnis untuk penelusuran katalog, detail buku, ketersediaan eksemplar, dan registrasi buku baru secara atomik.
+ * Caller: src/server/controllers/book.controller.ts, test suites.
+ * Dependensi: bookRepository, sqlite, shared/types.
+ * Main Functions: listCategories, searchBooks, getBookDetail, getBookCopies, getAvailableCopies, addNewBook.
+ * Side Effects: Membaca dan menulis data katalog buku dan eksemplar fisik ke basis data SQLite via BookRepository dalam transaksi atomik.
  */
 
 import { bookRepository, type BookRepository } from '../repositories/book.repository.js';
