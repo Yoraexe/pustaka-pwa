@@ -18,8 +18,11 @@ import type {
 
 const API_BASE = '/api';
 
+type UnauthorizedCallback = () => void;
+
 class ApiClient {
   private token: string | null = null;
+  private unauthorizedListeners: Set<UnauthorizedCallback> = new Set();
 
   constructor() {
     this.token = localStorage.getItem('pustaka_token');
@@ -36,6 +39,27 @@ class ApiClient {
 
   getToken(): string | null {
     return this.token;
+  }
+
+  /**
+   * Mendaftarkan callback ketika token ditolak oleh server (HTTP 401 Unauthorized).
+   * Mengembalikan fungsi pembatalan langganan (unsubscribe).
+   */
+  onUnauthorized(callback: UnauthorizedCallback): () => void {
+    this.unauthorizedListeners.add(callback);
+    return () => {
+      this.unauthorizedListeners.delete(callback);
+    };
+  }
+
+  private notifyUnauthorized(): void {
+    this.unauthorizedListeners.forEach((callback) => {
+      try {
+        callback();
+      } catch (err) {
+        console.error('[Auth Listener Error]:', err);
+      }
+    });
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
@@ -77,6 +101,7 @@ class ApiClient {
     if (!res.ok || !json.success) {
       if (res.status === 401) {
         this.setToken(null);
+        this.notifyUnauthorized();
       }
       const errorMsg = json.error?.message || 'Terjadi kesalahan pada server.';
       throw new Error(errorMsg);

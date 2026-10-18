@@ -67,13 +67,31 @@ bookRouter.get('/:id', async (req: Request, res: Response, next: NextFunction): 
   }
 });
 
+// Helper pembersihan berkas biner Multer yang tertulis di disk jika validasi atau penyimpanan gagal (CWE-459)
+const cleanupUploadedFiles = (files?: { [fieldname: string]: Express.Multer.File[] } | Express.Multer.File[]): void => {
+  if (!files) return;
+  const fileList: Express.Multer.File[] = Array.isArray(files)
+    ? files
+    : Object.values(files).flat();
+
+  for (const file of fileList) {
+    try {
+      if (file.path && fs.existsSync(file.path)) {
+        fs.unlinkSync(file.path);
+      }
+    } catch (err) {
+      console.error(`[Cleanup Warning] Gagal menghapus berkas orphan ${file.path}:`, err);
+    }
+  }
+};
+
 // POST /api/books (Librarian / Admin - Multipart Upload & JSON)
 bookRouter.post('/', authenticateToken, requireRole(['LIBRARIAN', 'ADMIN']), uploadBookFiles, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
   try {
     const rawBody = { ...req.body };
 
     // Tangani file biner yang diunggah
-    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
     if (files) {
       if (files.ebook && files.ebook.length > 0) {
         rawBody.ebookFilePath = `./uploads/ebooks/${files.ebook[0].filename}`;
@@ -87,6 +105,7 @@ bookRouter.post('/', authenticateToken, requireRole(['LIBRARIAN', 'ADMIN']), upl
     if (rawBody.ebookFilePath) {
       const normalized = path.normalize(rawBody.ebookFilePath).replace(/\\/g, '/');
       if (normalized.includes('..') || (!normalized.startsWith('uploads/ebooks/') && !normalized.startsWith('./uploads/ebooks/'))) {
+        cleanupUploadedFiles(files);
         res.status(400).json({
           success: false,
           error: { code: 'INVALID_FILE_PATH', message: 'Jalur file e-book tidak valid atau berada di luar direktori aman.' }
@@ -103,6 +122,7 @@ bookRouter.post('/', authenticateToken, requireRole(['LIBRARIAN', 'ADMIN']), upl
       data: newBook
     });
   } catch (err) {
+    cleanupUploadedFiles(files);
     next(err);
   }
 });

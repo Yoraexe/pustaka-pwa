@@ -29,6 +29,18 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
+  // Dengarkan event token 401 Unauthorized secara reaktif dari API client
+  useEffect(() => {
+    const unsubscribe = api.onUnauthorized(() => {
+      localStorage.removeItem('pustaka_cached_user');
+      setUser(null);
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
+
   useEffect(() => {
     const initAuth = async () => {
       const token = api.getToken();

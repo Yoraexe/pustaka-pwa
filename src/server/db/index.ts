@@ -103,6 +103,7 @@ sqlite.exec(`
   CREATE INDEX IF NOT EXISTS idx_loans_due_date ON loans(due_date);
   CREATE INDEX IF NOT EXISTS idx_book_copies_book_id ON book_copies(book_id);
   CREATE INDEX IF NOT EXISTS idx_books_category_id ON books(category_id);
+  CREATE INDEX IF NOT EXISTS idx_books_isbn ON books(isbn);
 
   INSERT OR IGNORE INTO categories (name, slug) VALUES
     ('Informatika & Komputer', 'informatika'),

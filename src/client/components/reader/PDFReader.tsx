@@ -233,11 +233,38 @@ export const PDFReader: React.FC<PDFReaderProps> = ({ book, user, onClose }) => 
     };
   }, [user]);
 
+  // 6. Proteksi DRM Shortcut & Klik Kanan (Cegat Ctrl+P, Ctrl+S, dan Klik Kanan) - BRD 3.2 Aturan 4
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'p' || e.key === 'P' || e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        toast.warning('Proteksi Hak Cipta', {
+          description: 'Pencetakan atau penyimpanan dokumen ini dibatasi oleh kebijakan DRM perpustakaan.',
+        });
+      }
+    };
+
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('contextmenu', handleContextMenu);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('contextmenu', handleContextMenu);
+    };
+  }, []);
+
   // Sembunyikan toolbar native browser (#toolbar=0) untuk mencegah unduhan dokumen asli tanpa watermark (BRD Seksi 3.2 Aturan 4)
   const targetPdfUrl = pdfBlobUrl ? `${pdfBlobUrl}#page=${activePage}&zoom=${zoomLevel}&toolbar=0&navpanes=0` : null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-slate-900 text-slate-100 select-none">
+    <div
+      onContextMenu={(e) => e.preventDefault()}
+      className="fixed inset-0 z-50 flex flex-col bg-slate-900 text-slate-100 select-none"
+    >
       {/* Top Header Navigation */}
       <header className="h-14 px-3 sm:px-6 border-b border-slate-800 flex items-center justify-between bg-slate-950/90 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-3">

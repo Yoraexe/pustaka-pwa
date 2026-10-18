@@ -298,4 +298,40 @@ describe('Book Creation & Ingestion API Integration Tests', () => {
     expect(res.body.success).toBe(true);
     createdBookIds.push(res.body.data.id);
   });
+
+  it('POST /api/books harus menghapus berkas upload dari disk jika validasi Zod gagal (CWE-459 Orphan Cleanup)', async () => {
+    const mockPdfBuffer = Buffer.from('%PDF-1.4 Temp ebook for cleanup test');
+    const mockCoverBuffer = Buffer.from([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10, 0x4A, 0x46, 0x49, 0x46]);
+
+    const ebooksDir = path.resolve(process.cwd(), 'uploads/ebooks');
+    const coversDir = path.resolve(process.cwd(), 'uploads/covers');
+    const ebooksBefore = new Set(fs.existsSync(ebooksDir) ? fs.readdirSync(ebooksDir) : []);
+    const coversBefore = new Set(fs.existsSync(coversDir) ? fs.readdirSync(coversDir) : []);
+
+    const res = await request(app)
+      .post('/api/books')
+      .set('Authorization', `Bearer ${librarianToken}`)
+      .field('title', 'Buku Dengan Tahun Terbit Tidak Valid')
+      .field('author', 'Penulis Uji')
+      .field('publisher', 'Penerbit Uji')
+      .field('publicationYear', '1800') // Zod menolak tahun < 1900
+      .field('categoryId', '1')
+      .field('bookType', 'HYBRID')
+      .field('totalPhysicalCopies', '1')
+      .attach('ebook', mockPdfBuffer, 'test-cleanup.pdf')
+      .attach('cover', mockCoverBuffer, 'test-cleanup.jpg');
+
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe('VALIDATION_ERROR');
+
+    // Pastikan tidak ada berkas orphan baru yang tertinggal di direktori upload
+    const ebooksAfter = fs.existsSync(ebooksDir) ? fs.readdirSync(ebooksDir) : [];
+    const coversAfter = fs.existsSync(coversDir) ? fs.readdirSync(coversDir) : [];
+    const newEbooks = ebooksAfter.filter(f => !ebooksBefore.has(f));
+    const newCovers = coversAfter.filter(f => !coversBefore.has(f));
+
+    expect(newEbooks.length).toBe(0);
+    expect(newCovers.length).toBe(0);
+  });
 });
