@@ -2,6 +2,12 @@
  * @file src/server/config/index.ts
  * @description Konfigurasi server dan validasi variabel lingkungan dengan Zod.
  * @layer Server Configuration
+ *
+ * Tujuan: Memvalidasi environment variables dan menentukan lokasi database serta direktori penyimpanan berkas.
+ * Caller: Seluruh modul backend (db, services, controllers, app).
+ * Dependensi: zod, dotenv, path.
+ * Main Functions: config.
+ * Side Effects: Menghentikan proses jika variabel environment tidak valid.
  */
 
 import { z } from 'zod';
@@ -30,8 +36,14 @@ if (!parsedEnv.success) {
   process.exit(1);
 }
 
+const effectiveDbUrl =
+  parsedEnv.data.NODE_ENV === 'test' || Boolean(process.env.VITEST)
+    ? './pustaka.test.db'
+    : parsedEnv.data.DATABASE_URL;
+
 export const config = {
   ...parsedEnv.data,
   uploadsFullPath: path.resolve(process.cwd(), parsedEnv.data.UPLOADS_DIR),
-  databaseFullPath: path.resolve(process.cwd(), parsedEnv.data.DATABASE_URL)
+  databaseFullPath: path.resolve(process.cwd(), effectiveDbUrl)
 };
+

@@ -69,35 +69,41 @@ Membangun platform perpustakaan sekolah **Hybrid (Digital & Fisik)** berbasis **
 
 ---
 
-### 3.3 Sirkulasi Buku Fisik Meja Pustakawan
-* **Description:** Modul operasional pustakawan untuk mencatat peminjaman dan pengembalian buku fisik di perpustakaan secara cepat melalui pemindaian barcode/ID eksemplar.
+### 3.3 Sirkulasi Buku Fisik (Self-Service & Meja Pustakawan)
+* **Description:** Modul sirkulasi buku fisik terpadu yang mendukung peminjaman langsung mandiri (*Self-Service Checkout*), reservasi tiket 24 jam, serta operasional meja sirkulasi pustakawan dengan pemindaian barcode/ID eksemplar.
 * **Business Rules:**
-  1. Peminjaman fisik dilakukan oleh pustakawan dengan menginput/scan `Nomor Anggota (NISN/NIP)` dan `Barcode Eksemplar Buku`.
+  1. Peminjaman fisik dapat dilakukan melalui dua jalur:
+     - **Mandiri (Self-Service):** Siswa/Guru memilih buku fisik/hybrid di Katalog atau Detail Buku dan menekan **"Pinjam Fisik"** (sistem mengalokasikan eksemplar `AVAILABLE` secara otomatis atau sesuai pilihan barcode).
+     - **Meja Pustakawan:** Pustakawan memilih/memindai `Nomor Anggota (NISN/NIP)` dan `Barcode Eksemplar Buku`, atau mengklaim tiket reservasi 24 jam.
   2. Batas waktu peminjaman buku fisik: Siswa (7 hari, maks 3 buku), Guru (14 hari, maks 5 buku).
-  3. Perpanjangan masa pinjam diperbolehkan maksimal 1 kali jika tidak ada antrean reservasi dari siswa lain.
-  4. Keterlambatan pengembalian buku fisik dikenakan denda administratif (default: Rp 1.000 / hari keterlambatan per buku).
+  3. **Pengembalian Instan Tanpa Batas Waktu Minimum:** Buku fisik yang berstatus `BORROWED` dapat dikembalikan **kapan saja saat itu juga** tanpa harus menunggu masa pinjam habis, baik melalui tombol **"Kembalikan Buku"** di halaman *Rak Buku Saya* (oleh peminjam) maupun tombol *1-Klik Kembalikan* di *Meja Sirkulasi* (oleh pustakawan/superadmin).
+  4. Perpanjangan masa pinjam diperbolehkan maksimal 1 kali jika tidak ada antrean reservasi dari siswa lain.
+  5. Keterlambatan pengembalian buku fisik dikenakan denda administratif (default: Rp 1.000 / hari keterlambatan per buku). Jika dikembalikan sebelum atau tepat tanggal jatuh tempo, denda = Rp 0.
 * **Acceptance Criteria:**
-  - *AC-3.1:* Saat pustakawan memproses check-out buku fisik, stok eksemplar berkurang 1 dan status peminjaman tercatat dengan tanggal jatuh tempo tepat.
-  - *AC-3.2:* Saat proses pengembalian buku fisik yang terlambat, sistem otomatis mengkalkulasi nominal denda berdasarkan formula: `(Tanggal_Kembali - Tanggal_Jatuh_Tempo) * Tarif_Denda`.
-  - *AC-3.3:* Riwayat sirkulasi dan status pelunasan denda tersimpan dalam log transaksi yang tidak dapat dimanipulasi (*immutable history*).
+  - *AC-3.1:* Saat pemustaka atau pustakawan memproses peminjaman buku fisik, stok eksemplar berkurang 1, status eksemplar menjadi `BORROWED`, dan tanggal jatuh tempo tercatat otomatis.
+  - *AC-3.2:* Saat buku fisik dikembalikan (baik langsung di hari/menit yang sama maupun setelah beberapa hari), stok eksemplar langsung bertambah 1 dan status eksemplar kembali `AVAILABLE`.
+  - *AC-3.3:* Saat proses pengembalian buku fisik yang terlambat, sistem otomatis mengkalkulasi nominal denda berdasarkan formula: `(Tanggal_Kembali - Tanggal_Jatuh_Tempo) * Tarif_Denda`.
 * **Edge Cases & Negative Flow:**
   - Jika siswa memiliki tanggungan denda yang belum dibayar atau buku yang telat belum dikembalikan, sistem memblokir peminjaman buku fisik baru dengan peringatan: "Anggota memiliki penangguhan sirkulasi (Denda tertunggak: Rp X)".
 
 ---
 
-### 3.4 Manajemen Akun Lokal & Otentikasi
-* **Description:** Sistem otentikasi mandiri berbasis database sekolah dengan dukungan impor data massal untuk mempermudah pendaftaran anggota baru tiap tahun ajaran.
+### 3.4 Manajemen Akun Lokal, Registrasi Mandiri, & Panel Superadmin
+* **Description:** Sistem otentikasi mandiri berbasis database sekolah dengan Panel Superadmin (`ADMIN`) untuk pembuatan/manajemen akun semua peran, fitur impor CSV massal, serta registrasi mandiri bagi Siswa dan Guru.
 * **Business Rules:**
-  1. Siswa login menggunakan NISN dan password akun lokal (default: tanggal lahir atau password awal yang di-generate sistem, diwajibkan ganti saat login pertama).
-  2. Guru/Staff login menggunakan NIP atau username yang ditentukan sekolah.
-  3. Administrator dapat mengimpor data pengguna dari file CSV/Excel dengan format template: `Nama, NISN/NIP, Role, Kelas/Jurusan, Email/Kontak`.
-  4. Sesi login menggunakan token terenkripsi yang aman dan mendukung persistensi di PWA.
+  1. **Superadmin (`ADMIN`)** memiliki akses ke **Panel Manajemen Akun** untuk:
+     - Membuat akun baru secara manual untuk seluruh peran (`STUDENT`, `TEACHER`, `LIBRARIAN`, `ADMIN`).
+     - Melihat daftar seluruh pengguna, memfilter berdasarkan peran/kata kunci, mengubah status aktif/nonaktif akun (`isActive`), dan mereset kata sandi pengguna.
+     - Mengimpor data pengguna massal via CSV.
+  2. **Registrasi Mandiri (Sign Up):** Siswa (`STUDENT`) dan Guru (`TEACHER`) dapat mendaftarkan akun baru secara mandiri dari halaman Login dan langsung masuk ke aplikasi. Pendaftaran mandiri membatasi peran secara ketat hanya pada `STUDENT` dan `TEACHER` untuk mencegah eskalasi hak akses.
+  3. Sesi login menggunakan token JWT terenkripsi yang aman dan mendukung persistensi di PWA.
 * **Acceptance Criteria:**
-  - *AC-4.1:* Given kredensial yang valid, When pengguna login, Then pengguna diarahkan ke dashboard sesuai perannya.
-  - *AC-4.2:* Given file CSV berisi 500 data siswa, When admin mengunggah file impor, Then sistem memproses seluruh data tanpa kegagalan timeout dan menampilkan laporan sukses/gagal per baris.
-  - *AC-4.3:* Percobaan login gagal sebanyak 5 kali berturut-turut memicu penguncian sementara akun selama 15 menit.
+  - *AC-4.1:* Given kredensial yang valid atau setelah registrasi mandiri berhasil, When pengguna masuk/daftar, Then pengguna diarahkan ke antarmuka sesuai perannya.
+  - *AC-4.2:* Given Superadmin membuka Panel Manajemen Akun, When Superadmin membuat akun baru atau menonaktifkan/mereset sandi akun, Then perubahan langsung berlaku di basis data.
+  - *AC-4.3:* Given pengguna mendaftar mandiri, When mencoba mengirim role `ADMIN` atau `LIBRARIAN` pada endpoint publik, Then sistem menolak request dengan validasi skema Zod.
 * **Edge Cases & Negative Flow:**
-  - Jika terdapat duplikasi NISN pada file CSV impor, sistem melewati baris tersebut dan mencatatnya dalam rekap error tanpa membatalkan baris data yang valid lainnya.
+  - Superadmin tidak dapat menonaktifkan akunnya sendiri yang sedang aktif digunakan.
+  - Jika terdapat duplikasi NISN/NIP saat pendaftaran atau impor CSV, sistem menolak/melewati duplikasi dengan pesan informatif.
 
 ---
 

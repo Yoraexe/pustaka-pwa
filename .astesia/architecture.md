@@ -252,3 +252,14 @@ pustaka-sekolah-pwa/
   - Asset statis aplikasi (UI, JS, CSS, Font) menggunakan strategi **Cache-First**.
   - Metadata katalog buku menggunakan strategi **Stale-While-Revalidate**.
   - Dokumen e-book yang dipinjam disimpan dalam **IndexedDB Blob Storage** dengan verifikasi jatuh tempo saat aplikasi kembali online.
+
+### ADR 004: Superadmin Account Management, Self-Service Physical Checkout, & Instant Physical Return
+* **Konteks:**
+  1. Superadmin (`ADMIN`) memerlukan antarmuka terdedikasi untuk membuat akun pengguna baru per peran (`STUDENT`, `TEACHER`, `LIBRARIAN`, `ADMIN`), mengelola status aktif/nonaktif, dan mereset kata sandi, selain fitur registrasi mandiri bagi Siswa/Guru.
+  2. Peminjaman buku fisik pada buku `PHYSICAL_ONLY` dan `HYBRID` perlu mendukung alur *Self-Service Checkout* langsung dari katalog/detail buku (mengunci eksemplar ke status `BORROWED` secara atomik) di samping meja sirkulasi.
+  3. Pengembalian buku fisik tidak boleh tertahan di sisi UI atau menunggu jatuh tempo habis; baik peminjam (melalui `Rak Buku Saya`) maupun pustakawan (1-klik di `Meja Sirkulasi`) dapat mengembalikan buku fisik saat itu juga.
+* **Keputusan:**
+  - Menambahkan endpoint publik `POST /api/auth/signup` dengan skema `SelfRegisterSchema` yang membatasi `role` secara ketat pada `['STUDENT', 'TEACHER']` untuk mencegah *privilege escalation*, sedangkan `POST /api/auth/register`, `PATCH /api/auth/users/:id/status`, dan `PATCH /api/auth/users/:id/password` dilindungi RBAC `ADMIN`.
+  - Menambahkan metode atomik `borrowPhysicalBookSelf` dan `returnPhysicalBookSelf` di `CirculationService` menggunakan transaksi SQLite `BEGIN IMMEDIATE ... COMMIT` untuk menjamin konsistensi `books.available_physical_copies` dan `book_copies.status`.
+* **Konsekuensi:** Siklus hidup peminjaman dan pengembalian buku fisik berjalan 100% deterministik dan instan tanpa *bottleneck* manual, sembari mempertahankan kalkulasi denda otomatis jika melewati tanggal jatuh tempo.
+

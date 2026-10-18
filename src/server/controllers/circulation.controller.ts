@@ -6,7 +6,7 @@
  * Tujuan: Menyediakan antarmuka REST API tipis untuk peminjaman/pengembalian buku digital & fisik, reservasi 24 jam, dan perpanjangan masa pinjam.
  * Caller: src/server/app.ts (mounted at /api/circulation).
  * Dependensi: express, circulationService, shared/schemas, auth.middleware.
- * Main Functions: circulationRouter (POST /digital/borrow, POST /digital/return, GET /my-loans, POST /physical/checkout, POST /physical/return, GET /all, POST /physical/reserve, POST /physical/claim, POST /physical/cancel-reserve, GET /reservations, POST /physical/renew).
+ * Main Functions: circulationRouter (POST /digital/borrow, POST /digital/return, GET /my-loans, POST /physical/borrow-self, POST /physical/return-self, POST /physical/checkout, POST /physical/return, GET /all, POST /physical/reserve, POST /physical/claim, POST /physical/cancel-reserve, GET /reservations, POST /physical/renew).
  * Side Effects: Meneruskan input ke service layer dan mengembalikan respons HTTP terstruktur.
  */
 
@@ -16,6 +16,8 @@ import {
   DigitalLoanSchema,
   PhysicalLoanSchema,
   ReturnPhysicalLoanSchema,
+  BorrowPhysicalSelfSchema,
+  ReturnPhysicalSelfSchema,
   ReservePhysicalLoanSchema,
   ClaimReservationSchema,
   CancelReservationSchema,
@@ -62,6 +64,36 @@ circulationRouter.get('/my-loans', authenticateToken, async (req: Request, res: 
     res.json({
       success: true,
       data: loans
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 3b. Physical Loan - Self-Service Borrow (Pemustaka langsung meminjam buku fisik)
+circulationRouter.post('/physical/borrow-self', authenticateToken, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const input = BorrowPhysicalSelfSchema.parse(req.body);
+    const loan = await circulationService.borrowPhysicalBookSelf(req.user!, input.bookId, input.copyBarcode);
+    res.status(201).json({
+      success: true,
+      message: `Buku fisik berhasil dipinjam (Barcode: ${loan.copyBarcode || '-'}).`,
+      data: loan
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// 3c. Physical Loan - Instant Self-Return (Pemustaka atau Staf mengembalikan buku fisik saat itu juga)
+circulationRouter.post('/physical/return-self', authenticateToken, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const input = ReturnPhysicalSelfSchema.parse(req.body);
+    const result = await circulationService.returnPhysicalBookSelf(req.user!, input.loanId);
+    res.json({
+      success: true,
+      message: result.message,
+      data: result
     });
   } catch (err) {
     next(err);
@@ -183,4 +215,5 @@ circulationRouter.post('/physical/renew', authenticateToken, async (req: Request
     next(err);
   }
 });
+
 

@@ -47,8 +47,8 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
   const [isbn, setIsbn] = useState('');
 
   // Physical fields
-  const [shelfLocation, setShelfLocation] = useState('RAK-INF-01');
-  const [totalPhysicalCopies, setTotalPhysicalCopies] = useState<number>(3);
+  const [shelfLocation, setShelfLocation] = useState('');
+  const [totalPhysicalCopies, setTotalPhysicalCopies] = useState<number>(1);
 
   // Digital fields
   const [digitalLicenseCount, setDigitalLicenseCount] = useState<number>(5);
@@ -204,11 +204,15 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
       return;
     }
     if (isPhysical && !shelfLocation.trim()) {
-      setErrorMsg('Lokasi rak wajib diisi untuk koleksi fisik.');
+      setErrorMsg('Lokasi rak wajib diisi untuk koleksi fisik atau hybrid.');
       return;
     }
-    if (bookType === 'DIGITAL_ONLY' && !ebookFile) {
-      setErrorMsg('Dokumen e-book (format PDF) wajib diunggah untuk buku berjenis Digital Only.');
+    if (isDigital && !ebookFile) {
+      setErrorMsg(
+        bookType === 'HYBRID'
+          ? 'Dokumen e-book (format PDF) wajib diunggah untuk buku Hybrid (Fisik + E-Book). Jika tidak ada PDF, pilih format "Buku Fisik".'
+          : 'Dokumen e-book (format PDF) wajib diunggah untuk buku berjenis E-Book.'
+      );
       return;
     }
 
@@ -267,8 +271,8 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
     setPublisher('');
     setPublicationYear(new Date().getFullYear());
     setIsbn('');
-    setShelfLocation('RAK-INF-01');
-    setTotalPhysicalCopies(3);
+    setShelfLocation('');
+    setTotalPhysicalCopies(1);
     setDigitalLicenseCount(5);
     setEbookFile(null);
     handleRemoveCover();
@@ -778,9 +782,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
                   <div>
                     <Label htmlFor="ebookFile" className="flex items-center gap-1.5 text-xs">
                       <span>Berkas Dokumen PDF</span>
-                      {bookType === 'DIGITAL_ONLY' && (
-                        <span className="text-destructive font-bold text-[11px]">* (Wajib)</span>
-                      )}
+                      <span className="text-destructive font-bold text-[11px]">* (Wajib)</span>
                     </Label>
                     <Input
                       id="ebookFile"
@@ -789,9 +791,7 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
                       onChange={(e) => setEbookFile(e.target.files?.[0] || null)}
                     />
                     <p className="text-[10px] text-muted-foreground mt-1">
-                      {bookType === 'DIGITAL_ONLY'
-                        ? 'Wajib diunggah agar siswa dapat meminjam dan membaca e-book di aplikasi.'
-                        : 'Opsional: unggah dokumen PDF untuk mengaktifkan peminjaman digital & luring.'}
+                      Wajib diunggah agar pemustaka dapat meminjam dan membaca e-book secara daring maupun luring.
                     </p>
                   </div>
                 </div>

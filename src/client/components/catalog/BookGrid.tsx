@@ -27,8 +27,11 @@ interface BookGridProps {
   searchTerm: string;
   onSearchChange: (val: string) => void;
   onBorrowDigital: (book: Book) => void;
+  onBorrowPhysical?: (book: Book) => void;
   onSelectDetail: (book: Book) => void;
   borrowedBookIds: Set<number>;
+  borrowedDigitalIds?: Set<number>;
+  borrowedPhysicalIds?: Set<number>;
   isLoading: boolean;
 }
 
@@ -42,8 +45,11 @@ export const BookGrid: React.FC<BookGridProps> = ({
   searchTerm,
   onSearchChange,
   onBorrowDigital,
+  onBorrowPhysical,
   onSelectDetail,
   borrowedBookIds,
+  borrowedDigitalIds,
+  borrowedPhysicalIds,
   isLoading,
 }) => {
   const [onlyAvailable, setOnlyAvailable] = useState<boolean>(false);
@@ -204,8 +210,11 @@ export const BookGrid: React.FC<BookGridProps> = ({
               key={book.id}
               book={book}
               onBorrowDigital={onBorrowDigital}
+              onBorrowPhysical={onBorrowPhysical}
               onSelectDetail={onSelectDetail}
               isBorrowedByUser={borrowedBookIds.has(book.id)}
+              isDigitalBorrowed={borrowedDigitalIds ? borrowedDigitalIds.has(book.id) : borrowedBookIds.has(book.id)}
+              isPhysicalBorrowed={borrowedPhysicalIds ? borrowedPhysicalIds.has(book.id) : borrowedBookIds.has(book.id)}
             />
           ))}
         </div>

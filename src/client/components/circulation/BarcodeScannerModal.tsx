@@ -1,16 +1,17 @@
 /**
  * @file src/client/components/circulation/BarcodeScannerModal.tsx
- * @description Modal pemindai barcode eksemplar buku berbasis WebRTC MediaDevices & Web BarcodeDetector API.
+ * @description Modal pemindai QR Code & Barcode 1D lintas-peramban berbasis html5-qrcode (WebRTC Camera + Image File Decoder).
  * @layer Presentation Component
- * 
- * Tujuan: Memungkinkan pustakawan memindai barcode fisik langsung menggunakan kamera ponsel/laptop untuk check-out dan return.
- * Caller: src/client/components/circulation/CirculationDesk.tsx
- * Dependensi: react, lucide-react, Shadcn Dialog, Button, Input, sonner
+ *
+ * Tujuan: Memungkinkan pemustaka dan pustakawan memindai QR Code / Barcode fisik menggunakan kamera perangkat (Windows/Android/iOS) atau mengunggah berkas gambar QR untuk peminjaman, klaim reservasi, dan pengembalian buku.
+ * Caller: CirculationDesk.tsx, CatalogPage.tsx, MyBooksPage.tsx
+ * Dependensi: react, html5-qrcode, lucide-react, Shadcn Dialog, Button, Input, sonner
  * Main Functions: BarcodeScannerModal
- * Side Effects: Mengaktifkan dan menghentikan MediaStream kamera perangkat, memanggil requestAnimationFrame loop untuk deteksi barcode.
+ * Side Effects: Mengaktifkan/menghentikan MediaStream kamera via Html5Qrcode, membaca file gambar lokal untuk dekode QR/Barcode.
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import {
   Dialog,
   DialogContent,
@@ -21,7 +22,7 @@ import {
 } from '../ui/dialog.js';
 import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
-import { Camera, RefreshCw, AlertCircle } from 'lucide-react';
+import { Camera, RefreshCw, AlertCircle, Upload, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface BarcodeScannerModalProps {
@@ -29,182 +30,228 @@ interface BarcodeScannerModalProps {
   onClose: () => void;
   onScan: (barcode: string) => void;
   title?: string;
+  description?: string;
+  quickOptions?: Array<{ code: string; label: string }>;
 }
+
+const SUPPORTED_FORMATS = [
+  Html5QrcodeSupportedFormats.QR_CODE,
+  Html5QrcodeSupportedFormats.CODE_128,
+  Html5QrcodeSupportedFormats.CODE_39,
+  Html5QrcodeSupportedFormats.EAN_13,
+  Html5QrcodeSupportedFormats.EAN_8,
+  Html5QrcodeSupportedFormats.UPC_A,
+  Html5QrcodeSupportedFormats.UPC_E,
+];
 
 export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
   isOpen,
   onClose,
   onScan,
-  title = 'Pindai Barcode Eksemplar',
+  title = 'Pindai QR Code / Barcode Buku',
+  description = 'Arahkan kamera ke stiker QR / Barcode eksemplar buku, atau unggah gambar QR dari perangkat Anda.',
+  quickOptions = [],
 }) => {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const scanLoopRef = useRef<number | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const hasScannedRef = useRef<boolean>(false);
 
   const [cameraActive, setCameraActive] = useState<boolean>(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isScanningFile, setIsScanningFile] = useState<boolean>(false);
   const [manualCode, setManualCode] = useState<string>('');
 
-  const stopCamera = useCallback(() => {
-    if (scanLoopRef.current) {
-      cancelAnimationFrame(scanLoopRef.current);
-      scanLoopRef.current = null;
-    }
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
+  const readerElementId = 'pustaka-live-qr-reader';
+  const fileReaderElementId = 'pustaka-file-qr-reader';
+
+  const stopCamera = useCallback(async () => {
+    const instance = scannerRef.current;
+    if (instance) {
+      scannerRef.current = null;
+      try {
+        if (instance.isScanning) {
+          await instance.stop();
+        }
+      } catch {
+        // Ignore stop errors if already stopped
+      }
+      try {
+        instance.clear();
+      } catch {
+        // Ignore clear errors
+      }
     }
     setCameraActive(false);
   }, []);
 
-  const startCamera = useCallback(async (facing: 'environment' | 'user') => {
-    stopCamera();
-    setCameraError(null);
+  const handleDecodedValue = useCallback(
+    async (rawValue: string) => {
+      if (hasScannedRef.current) return;
+      const cleaned = rawValue.replace(/^PUSTAKA:(COPY|BOOK|TICKET):/i, '').trim();
+      if (!cleaned) return;
 
-    try {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error('Perangkat tidak mendukung akses media kamera WebRTC.');
-      }
-
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: facing,
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
-        audio: false,
+      hasScannedRef.current = true;
+      await stopCamera();
+      toast.success('QR / Barcode Terdeteksi!', {
+        description: `Kode: ${cleaned}`,
       });
+      onScan(cleaned);
+      onClose();
+    },
+    [onClose, onScan, stopCamera]
+  );
 
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        await videoRef.current.play();
-      }
-      setCameraActive(true);
+  const startCamera = useCallback(
+    async (facing: 'environment' | 'user') => {
+      await stopCamera();
+      setCameraError(null);
+      hasScannedRef.current = false;
 
-      // Start Barcode Detection loop if BarcodeDetector is available
-      if ('BarcodeDetector' in window) {
-        try {
-          // @ts-expect-error Native BarcodeDetector web API
-          const detector = new window.BarcodeDetector({
-            formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'qr_code', 'upc_a', 'upc_e'],
-          });
+      // Pastikan DOM container sudah dirender oleh Dialog
+      await new Promise((r) => setTimeout(r, 120));
+      const container = document.getElementById(readerElementId);
+      if (!container) return;
 
-          const detectFrame = async () => {
-            if (!videoRef.current || !streamRef.current) return;
-            try {
-              if (videoRef.current.readyState >= 2) {
-                const barcodes = await detector.detect(videoRef.current);
-                if (barcodes.length > 0 && barcodes[0].rawValue) {
-                  const scannedValue = barcodes[0].rawValue.trim();
-                  stopCamera();
-                  toast.success('Barcode Terdeteksi!', {
-                    description: `Nilai: ${scannedValue}`,
-                  });
-                  onScan(scannedValue);
-                  onClose();
-                  return;
-                }
-              }
-            } catch {
-              // Ignore single-frame detection errors
-            }
-            scanLoopRef.current = requestAnimationFrame(detectFrame);
-          };
-
-          scanLoopRef.current = requestAnimationFrame(detectFrame);
-        } catch (detectorErr) {
-          console.warn('BarcodeDetector initialization fallback:', detectorErr);
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error('Peramban tidak mendukung akses kamera WebRTC (pastikan menggunakan localhost atau HTTPS).');
         }
+
+        const html5QrCode = new Html5Qrcode(readerElementId, {
+          formatsToSupport: SUPPORTED_FORMATS,
+          verbose: false,
+        });
+        scannerRef.current = html5QrCode;
+
+        await html5QrCode.start(
+          { facingMode: facing },
+          {
+            fps: 12,
+            qrbox: { width: 220, height: 160 },
+            aspectRatio: 1.5,
+          },
+          (decodedText) => {
+            void handleDecodedValue(decodedText);
+          },
+          () => {
+            // Frame tidak memuat QR/barcode, lanjutkan pemindaian
+          }
+        );
+
+        setCameraActive(true);
+      } catch (err: unknown) {
+        console.warn('Kamera gagal diaktifkan:', err);
+        const msg =
+          err instanceof Error
+            ? err.message
+            : 'Kamera tidak dapat diakses pada perangkat ini.';
+        setCameraError(
+          `Kamera tidak dapat diakses (${msg}). Anda tetap dapat memindai dengan tombol "Unggah Gambar QR" di bawah!`
+        );
       }
-    } catch (err: unknown) {
-      console.error('Gagal mengakses kamera:', err);
-      const msg = err instanceof Error ? err.message : 'Kamera tidak dapat diakses.';
-      setCameraError(msg);
-      toast.error('Kamera Tidak Tersedia', {
-        description: 'Pastikan izin kamera diberikan atau gunakan input kode manual di bawah.',
-      });
-    }
-  }, [onClose, onScan, stopCamera]);
+    },
+    [handleDecodedValue, stopCamera]
+  );
 
   useEffect(() => {
     if (isOpen) {
-      startCamera(facingMode);
+      hasScannedRef.current = false;
+      void startCamera(facingMode);
     } else {
-      stopCamera();
+      void stopCamera();
     }
     return () => {
-      stopCamera();
+      void stopCamera();
     };
   }, [isOpen, facingMode, startCamera, stopCamera]);
 
   const handleSwitchFacing = () => {
-    const nextFacing = facingMode === 'environment' ? 'user' : 'environment';
-    setFacingMode(nextFacing);
+    setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'));
   };
 
-  const handleManualSubmit = (e: React.FormEvent) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsScanningFile(true);
+    try {
+      const fileScanner = new Html5Qrcode(fileReaderElementId, {
+        formatsToSupport: SUPPORTED_FORMATS,
+        verbose: false,
+      });
+      const decodedText = await fileScanner.scanFile(file, false);
+      fileScanner.clear();
+      await handleDecodedValue(decodedText);
+    } catch {
+      toast.error('QR / Barcode Tidak Terbaca dari Gambar', {
+        description: 'Pastikan gambar memuat QR Code atau Barcode yang jelas dan tidak buram.',
+      });
+    } finally {
+      setIsScanningFile(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleManualSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualCode.trim()) return;
-    const value = manualCode.trim();
-    stopCamera();
-    onScan(value);
+    await handleDecodedValue(manualCode.trim());
     setManualCode('');
-    onClose();
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          void stopCamera();
+          onClose();
+        }
+      }}
+    >
       <DialogContent className="max-w-md p-6">
         <DialogHeader className="text-left">
           <DialogTitle className="text-base font-bold flex items-center gap-2">
-            <Camera className="w-5 h-5 text-primary" />
+            <QrCode className="w-5 h-5 text-primary" />
             <span>{title}</span>
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
-            Arahkan kamera ke barcode stiker eksemplar buku di perpustakaan.
+            {description}
           </DialogDescription>
         </DialogHeader>
 
-        {/* Viewfinder Area */}
-        <div className="relative aspect-video w-full bg-black/90 rounded-2xl overflow-hidden border border-border flex items-center justify-center my-2 shadow-inner">
-          <video
-            ref={videoRef}
-            playsInline
-            muted
-            className={`w-full h-full object-cover ${cameraActive ? 'block' : 'hidden'}`}
+        {/* Hidden container for Image File QR decoding */}
+        <div id={fileReaderElementId} className="hidden" />
+
+        {/* Live Camera Viewfinder Area */}
+        <div className="relative min-h-[210px] w-full bg-black/95 rounded-2xl overflow-hidden border border-border flex flex-col items-center justify-center my-1.5 shadow-inner">
+          <div
+            id={readerElementId}
+            className="w-full h-full [&_video]:w-full [&_video]:h-full [&_video]:object-cover"
           />
 
-          {cameraActive && (
-            <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center p-6">
-              {/* Scan target box */}
-              <div className="w-48 h-28 border-2 border-primary/80 rounded-xl relative shadow-lg">
-                <div className="absolute -top-1 -left-1 w-3 h-3 border-t-2 border-l-2 border-primary" />
-                <div className="absolute -top-1 -right-1 w-3 h-3 border-t-2 border-r-2 border-primary" />
-                <div className="absolute -bottom-1 -left-1 w-3 h-3 border-b-2 border-l-2 border-primary" />
-                <div className="absolute -bottom-1 -right-1 w-3 h-3 border-b-2 border-r-2 border-primary" />
-
-                {/* Animated scan line */}
-                <div className="w-full h-0.5 bg-primary/80 shadow-[0_0_8px_rgba(59,130,246,0.8)] animate-pulse mt-14" />
-              </div>
-              <span className="text-[10px] text-white/80 font-mono mt-3 bg-black/60 px-2 py-0.5 rounded-full">
-                Posisikan barcode di dalam kotak
-              </span>
+          {!cameraActive && !cameraError && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-white/80 gap-2 p-4 text-center">
+              <Camera className="w-7 h-7 animate-pulse text-primary" />
+              <span className="text-xs font-mono">Mengaktifkan pemindai kamera...</span>
             </div>
           )}
 
           {cameraError && (
-            <div className="p-4 text-center text-white/90 space-y-2">
+            <div className="p-4 text-center text-white/90 space-y-2.5 max-w-xs">
               <AlertCircle className="w-8 h-8 text-amber-400 mx-auto" />
-              <p className="text-xs">{cameraError}</p>
+              <p className="text-[11px] leading-relaxed">{cameraError}</p>
               <Button
+                type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => startCamera(facingMode)}
+                onClick={() => void startCamera(facingMode)}
                 className="text-xs h-7 text-black bg-white hover:bg-white/90"
               >
-                Coba Lagi
+                Coba Aktifkan Kamera Lagi
               </Button>
             </div>
           )}
@@ -213,11 +260,12 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           {cameraActive && (
             <div className="absolute top-2 right-2 flex items-center gap-1.5 z-20">
               <Button
+                type="button"
                 variant="secondary"
                 size="sm"
                 onClick={handleSwitchFacing}
-                className="h-7 px-2 text-[10px] bg-black/50 text-white hover:bg-black/70 border border-white/20"
-                title="Ganti Kamera"
+                className="h-7 px-2.5 text-[10px] bg-black/60 text-white hover:bg-black/80 border border-white/20"
+                title="Ganti Kamera Depan/Belakang"
               >
                 <RefreshCw className="w-3.5 h-3.5 mr-1" />
                 Ganti Kamera
@@ -226,13 +274,61 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           )}
         </div>
 
+        {/* Upload QR Image Button (Works even without a physical webcam!) */}
+        <div className="flex items-center justify-between gap-2 bg-muted/40 p-2.5 rounded-2xl border border-border">
+          <div className="text-[11px] text-muted-foreground leading-tight">
+            <span className="font-semibold text-foreground block">Punya file gambar stiker QR?</span>
+            <span>Pindai langsung dari berkas PNG/JPG di perangkat.</span>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            disabled={isScanningFile}
+            onClick={() => fileInputRef.current?.click()}
+            className="h-8 px-3 text-xs font-semibold gap-1.5 shrink-0"
+          >
+            <Upload className="w-3.5 h-3.5 text-primary" />
+            <span>{isScanningFile ? 'Memindai...' : 'Unggah Gambar QR'}</span>
+          </Button>
+        </div>
+
+        {/* Optional Quick-Pick Chips (for fast testing / selection) */}
+        {quickOptions.length > 0 && (
+          <div className="space-y-1">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground block">
+              Pilih Cepat Kode Tersedia:
+            </span>
+            <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto p-1.5 bg-muted/30 rounded-xl border border-border">
+              {quickOptions.slice(0, 10).map((opt) => (
+                <button
+                  key={opt.code}
+                  type="button"
+                  onClick={() => void handleDecodedValue(opt.code)}
+                  className="px-2 py-1 rounded-lg text-[10px] font-mono bg-background hover:bg-primary hover:text-primary-foreground border border-border transition-colors cursor-pointer"
+                >
+                  <span className="font-bold">{opt.code}</span>
+                  {opt.label ? <span className="opacity-75 ml-1">({opt.label})</span> : null}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Manual Input Fallback */}
         <form onSubmit={handleManualSubmit} className="space-y-2 pt-2 border-t border-border">
           <div className="flex items-center gap-2">
             <Input
               value={manualCode}
               onChange={(e) => setManualCode(e.target.value)}
-              placeholder="Atau ketik barcode (contoh: BK-0001-01)"
+              placeholder="Atau ketik kode QR/Barcode (contoh: BK-0001-01)"
               className="text-xs font-mono h-9"
             />
             <Button type="submit" size="sm" className="h-9 text-xs font-semibold px-4 shrink-0">
@@ -241,9 +337,18 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
           </div>
         </form>
 
-        <DialogFooter className="pt-2">
-          <Button variant="outline" size="sm" onClick={onClose} className="w-full text-xs">
-            Batal
+        <DialogFooter className="pt-1">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              void stopCamera();
+              onClose();
+            }}
+            className="w-full text-xs"
+          >
+            Tutup Pemindai
           </Button>
         </DialogFooter>
       </DialogContent>

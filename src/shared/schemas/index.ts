@@ -6,7 +6,7 @@
  * Tujuan: Menyediakan skema validasi runtime dengan Zod untuk input otentikasi, pembuatan buku, dan transaksi sirkulasi.
  * Caller: Controller layer (auth, book, circulation), UI forms, test suites.
  * Dependensi: zod.
- * Main Functions: LoginSchema, CreateUserSchema, BookFilterSchema, CreateBookSchema, DigitalLoanSchema, PhysicalLoanSchema, ReturnPhysicalLoanSchema, ReservePhysicalLoanSchema, ClaimReservationSchema, CancelReservationSchema, RenewLoanSchema.
+ * Main Functions: LoginSchema, CreateUserSchema, SelfRegisterSchema, UpdateUserStatusSchema, ResetUserPasswordSchema, BookFilterSchema, CreateBookSchema, DigitalLoanSchema, PhysicalLoanSchema, ReturnPhysicalLoanSchema, BorrowPhysicalSelfSchema, ReturnPhysicalSelfSchema, ReservePhysicalLoanSchema, ClaimReservationSchema, CancelReservationSchema, RenewLoanSchema.
  * Side Effects: Melakukan parsing dan validasi data masukan klien (melempar ZodError jika schema dilanggar).
  */
 
@@ -20,14 +20,36 @@ export const LoginSchema = z.object({
 export type LoginInput = z.infer<typeof LoginSchema>;
 
 export const CreateUserSchema = z.object({
-  identityNumber: z.string().min(3).trim(),
+  identityNumber: z.string().min(3, 'Nomor identitas/NISN minimal 3 karakter').trim(),
   name: z.string().min(2, 'Nama minimal 2 karakter').trim(),
   role: z.enum(['STUDENT', 'TEACHER', 'LIBRARIAN', 'ADMIN']),
   className: z.string().optional().nullable(),
-  password: z.string().min(4).default('123456')
+  password: z.string().min(4, 'Kata sandi minimal 4 karakter').default('123456')
 });
 
 export type CreateUserInput = z.infer<typeof CreateUserSchema>;
+
+export const SelfRegisterSchema = z.object({
+  identityNumber: z.string().min(3, 'NISN / NIP minimal 3 karakter').trim(),
+  name: z.string().min(2, 'Nama lengkap minimal 2 karakter').trim(),
+  role: z.enum(['STUDENT', 'TEACHER', 'LIBRARIAN', 'ADMIN']).default('STUDENT'),
+  className: z.string().optional().nullable(),
+  password: z.string().min(4, 'Kata sandi minimal 4 karakter')
+});
+
+export type SelfRegisterInput = z.infer<typeof SelfRegisterSchema>;
+
+export const UpdateUserStatusSchema = z.object({
+  isActive: z.boolean()
+});
+
+export type UpdateUserStatusInput = z.infer<typeof UpdateUserStatusSchema>;
+
+export const ResetUserPasswordSchema = z.object({
+  newPassword: z.string().min(4, 'Kata sandi baru minimal 4 karakter')
+});
+
+export type ResetUserPasswordInput = z.infer<typeof ResetUserPasswordSchema>;
 
 export const BookFilterSchema = z.object({
   search: z.string().optional(),
@@ -58,17 +80,17 @@ export const CreateBookSchema = z.object({
   totalPhysicalCopies: z.coerce.number().int().min(0).default(1),
   shelfLocation: z.string().optional().nullable()
 }).superRefine((data, ctx) => {
-  if (data.bookType === 'DIGITAL_ONLY' && !data.ebookFilePath) {
+  if ((data.bookType === 'DIGITAL_ONLY' || data.bookType === 'HYBRID') && !data.ebookFilePath) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Berkas e-book PDF wajib dilampirkan untuk buku berjenis DIGITAL_ONLY',
+      message: 'Berkas e-book PDF wajib dilampirkan untuk buku berjenis E-Book atau Hybrid',
       path: ['ebookFilePath']
     });
   }
-  if (data.bookType === 'PHYSICAL_ONLY' && data.totalPhysicalCopies < 1) {
+  if ((data.bookType === 'PHYSICAL_ONLY' || data.bookType === 'HYBRID') && data.totalPhysicalCopies < 1) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      message: 'Jumlah eksemplar fisik minimal 1 untuk buku berjenis PHYSICAL_ONLY',
+      message: 'Jumlah eksemplar fisik minimal 1 untuk buku berjenis Fisik atau Hybrid',
       path: ['totalPhysicalCopies']
     });
   }
@@ -96,6 +118,21 @@ export const ReturnPhysicalLoanSchema = z.object({
 
 export type ReturnPhysicalLoanInput = z.infer<typeof ReturnPhysicalLoanSchema>;
 
+export const BorrowPhysicalSelfSchema = z.object({
+  bookId: z.coerce.number().int().positive('ID Buku tidak valid').optional(),
+  copyBarcode: z.string().trim().optional()
+}).refine((data) => Boolean(data.bookId || (data.copyBarcode && data.copyBarcode.length >= 3)), {
+  message: 'ID Buku atau Barcode/QR eksemplar wajib diisi'
+});
+
+export type BorrowPhysicalSelfInput = z.infer<typeof BorrowPhysicalSelfSchema>;
+
+export const ReturnPhysicalSelfSchema = z.object({
+  loanId: z.coerce.number().int().positive('ID Peminjaman tidak valid')
+});
+
+export type ReturnPhysicalSelfInput = z.infer<typeof ReturnPhysicalSelfSchema>;
+
 export const ReservePhysicalLoanSchema = z.object({
   bookId: z.coerce.number().int().positive('ID Buku tidak valid')
 });
@@ -119,4 +156,5 @@ export const RenewLoanSchema = z.object({
 });
 
 export type RenewLoanInput = z.infer<typeof RenewLoanSchema>;
+
 

@@ -23,12 +23,14 @@ import {
 } from '../ui/dialog.js';
 import { Button } from '../ui/button.js';
 import { Badge } from '../ui/badge.js';
+import { QrCodeDisplay } from '../common/QrCodeDisplay.js';
 import { toast } from 'sonner';
 
 interface BookDetailModalProps {
   book: Book;
   onClose: () => void;
   onBorrowDigital?: (book: Book) => void;
+  onBorrowPhysical?: (book: Book, copyBarcode?: string) => void;
   onReservePhysical?: (book: Book) => void;
   onOpenReader?: (book: Book) => void;
   isDigitalBorrowed?: boolean;
@@ -42,6 +44,7 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
   book,
   onClose,
   onBorrowDigital,
+  onBorrowPhysical,
   onReservePhysical,
   onOpenReader,
   isDigitalBorrowed,
@@ -54,6 +57,7 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
   const isDigital = book.bookType === 'DIGITAL_ONLY' || book.bookType === 'HYBRID';
   const isPhysical = book.bookType === 'PHYSICAL_ONLY' || book.bookType === 'HYBRID';
   const [copies, setCopies] = useState<BookCopy[]>(book.copies || []);
+  const [selectedBarcode, setSelectedBarcode] = useState<string | undefined>(undefined);
 
   const digitalActive = isDigitalBorrowed ?? isBorrowed;
   const physicalActive = isPhysicalBorrowed ?? isBorrowed;
@@ -63,11 +67,17 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
     if (isPhysical && (!book.copies || book.copies.length === 0)) {
       api.getBookById(book.id)
         .then((b: Book) => {
-          if (b.copies) setCopies(b.copies);
+          if (b.copies) {
+            setCopies(b.copies);
+            const firstAvail = b.copies.find((c) => c.status === 'AVAILABLE');
+            if (firstAvail) setSelectedBarcode(firstAvail.barcode);
+          }
         })
         .catch((err: unknown) => console.error('Failed to load copies', err));
     } else if (book.copies) {
       setCopies(book.copies);
+      const firstAvail = book.copies.find((c) => c.status === 'AVAILABLE');
+      if (firstAvail) setSelectedBarcode(firstAvail.barcode);
     }
   }, [book.id, isPhysical, book.copies]);
 
@@ -145,34 +155,60 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
                   Tersedia <strong>{book.availablePhysicalCopies}</strong> dari {book.totalPhysicalCopies} eksemplar.
                 </p>
 
-                {/* Daftar Barcode Eksemplar */}
+                {/* Daftar Barcode Eksemplar (Bisa dipilih untuk Pinjam Fisik) & QR Code */}
                 {copies.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-amber-500/20">
-                    <span className="text-[10px] text-amber-900/80 dark:text-amber-300/80 font-mono uppercase tracking-wider block mb-1.5 font-semibold">
-                      Barcode Eksemplar ({copies.length}):
-                    </span>
-                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
-                      {copies.map((c) => (
-                        <button
-                          key={c.id}
-                          type="button"
-                          onClick={() => handleCopy(c.barcode, 'Barcode Eksemplar')}
-                          className={`px-2 py-1 rounded-lg text-[10px] font-mono border transition-colors flex items-center gap-1.5 cursor-pointer ${
-                            c.status === 'AVAILABLE'
-                              ? 'bg-background hover:bg-emerald-500/10 border-emerald-500/30 text-foreground font-semibold shadow-2xs'
-                              : 'bg-muted/70 border-border text-muted-foreground line-through opacity-70'
-                          }`}
-                          title={`Barcode: ${c.barcode} (${c.status === 'AVAILABLE' ? 'Tersedia di rak' : 'Sedang dipinjam'}) - Klik untuk salin`}
-                        >
-                          <span>{c.barcode}</span>
-                          <span
-                            className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                              c.status === 'AVAILABLE' ? 'bg-emerald-500' : 'bg-muted-foreground'
-                            }`}
-                          />
-                        </button>
-                      ))}
+                  <div className="mt-2 pt-2 border-t border-amber-500/20 flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <span className="text-[10px] text-amber-900/80 dark:text-amber-300/80 font-mono uppercase tracking-wider block mb-1.5 font-semibold">
+                        Pilih / Salin Barcode Eksemplar ({copies.length}):
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+                        {copies.map((c) => {
+                          const isSelected = selectedBarcode === c.barcode && c.status === 'AVAILABLE';
+                          return (
+                            <button
+                              key={c.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedBarcode(c.barcode);
+                                handleCopy(c.barcode, 'Barcode Eksemplar');
+                              }}
+                              className={`px-2 py-1 rounded-lg text-[10px] font-mono border transition-colors flex items-center gap-1.5 cursor-pointer ${
+                                isSelected
+                                  ? 'bg-primary text-primary-foreground border-primary font-bold shadow-xs'
+                                  : c.status === 'AVAILABLE'
+                                  ? 'bg-background hover:bg-emerald-500/10 border-emerald-500/30 text-foreground font-semibold shadow-2xs'
+                                  : 'bg-muted/70 border-border text-muted-foreground line-through opacity-70'
+                              }`}
+                              title={`Barcode: ${c.barcode} (${c.status === 'AVAILABLE' ? 'Tersedia - Klik untuk pilih & salin' : 'Sedang dipinjam'})`}
+                            >
+                              <span>{c.barcode}</span>
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                                  isSelected
+                                    ? 'bg-primary-foreground'
+                                    : c.status === 'AVAILABLE'
+                                    ? 'bg-emerald-500'
+                                    : 'bg-muted-foreground'
+                                }`}
+                              />
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
+
+                    {/* Stiker QR Code Nyata yang Dapat Dipindai / Diunduh */}
+                    {(selectedBarcode || copies[0]?.barcode) && (
+                      <div className="shrink-0 flex flex-col items-center bg-background/70 p-2 rounded-xl border border-amber-500/20">
+                        <QrCodeDisplay
+                          value={selectedBarcode || copies[0].barcode}
+                          label={selectedBarcode || copies[0].barcode}
+                          size={76}
+                          showDownload={true}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -236,7 +272,7 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
                 }}
                 className="text-xs font-semibold"
               >
-                Pinjam E-Book (7 Hari)
+                Pinjam E-Book
               </Button>
             ) : (
               <div className="inline-flex items-center px-3 py-1.5 bg-muted text-muted-foreground rounded-xl text-xs font-medium">
@@ -245,27 +281,57 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
             )
           )}
 
-          {/* Opsi Pinjam / Reservasi Buku Fisik */}
+          {/* Opsi Pinjam Fisik Langsung & Reservasi Buku Fisik */}
           {isPhysical && (
             physicalActive ? (
               <div className="inline-flex items-center px-3 py-1.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 rounded-xl text-xs font-semibold border border-blue-500/20">
                 Buku Fisik Dipinjam
               </div>
             ) : physicalReserved ? (
-              <div className="inline-flex items-center px-3 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-xl text-xs font-semibold border border-amber-500/20">
-                Fisik Direservasi {reservationCode ? `(${reservationCode})` : ''}
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center px-3 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-xl text-xs font-semibold border border-amber-500/20">
+                  Tiket: {reservationCode || 'Aktif'}
+                </span>
+                {onBorrowPhysical && (
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      onBorrowPhysical(book, selectedBarcode);
+                      onClose();
+                    }}
+                    className="text-xs font-semibold"
+                  >
+                    Pinjam Fisik Sekarang
+                  </Button>
+                )}
               </div>
             ) : book.availablePhysicalCopies > 0 ? (
-              <Button
-                variant={book.bookType === 'PHYSICAL_ONLY' ? 'default' : 'outline'}
-                onClick={() => {
-                  onReservePhysical?.(book);
-                  onClose();
-                }}
-                className="text-xs font-semibold border-amber-500/40 hover:bg-amber-500/10 text-amber-900 dark:text-amber-200"
-              >
-                Reservasi Buku Fisik
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                {onReservePhysical && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      onReservePhysical(book);
+                      onClose();
+                    }}
+                    className="text-xs font-semibold border-amber-500/40 hover:bg-amber-500/10 text-amber-900 dark:text-amber-200"
+                  >
+                    Reservasi Tiket (24 Jam)
+                  </Button>
+                )}
+                {onBorrowPhysical && (
+                  <Button
+                    variant="default"
+                    onClick={() => {
+                      onBorrowPhysical(book, selectedBarcode);
+                      onClose();
+                    }}
+                    className="text-xs font-semibold shadow-xs"
+                  >
+                    Pinjam Buku Fisik {selectedBarcode ? `(${selectedBarcode})` : ''}
+                  </Button>
+                )}
+              </div>
             ) : (
               <div className="inline-flex items-center px-3 py-1.5 bg-muted text-muted-foreground rounded-xl text-xs font-medium">
                 Stok Fisik Habis
@@ -277,3 +343,4 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
     </Dialog>
   );
 };
+

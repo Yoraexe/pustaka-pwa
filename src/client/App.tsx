@@ -19,6 +19,7 @@ import { InstallPromptIOS } from './components/pwa/InstallPromptIOS.js';
 import { CatalogPage } from './pages/CatalogPage.js';
 import { MyBooksPage } from './pages/MyBooksPage.js';
 import { CirculationDesk } from './components/circulation/CirculationDesk.js';
+import { SuperAdminPanel } from './components/admin/SuperAdminPanel.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { Toaster } from './components/ui/sonner.js';
 import { Button } from './components/ui/button.js';
@@ -131,7 +132,22 @@ export const App: React.FC = () => {
               <CardHeader className="p-0">
                 <CardTitle className="text-lg font-bold">Akses Terbatas</CardTitle>
                 <CardDescription className="text-xs mt-2 leading-relaxed">
-                  Halaman ini hanya dapat diakses oleh pustakawan atau admin sekolah.
+                  Halaman ini hanya dapat diakses oleh pustakawan atau superadmin sekolah.
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          )
+        )}
+
+        {currentTab === 'users' && (
+          isAuthenticated && user?.role === 'ADMIN' ? (
+            <SuperAdminPanel />
+          ) : (
+            <Card className="text-center p-8 max-w-md mx-auto shadow-xs rounded-3xl border-border">
+              <CardHeader className="p-0">
+                <CardTitle className="text-lg font-bold">Akses Khusus Superadmin</CardTitle>
+                <CardDescription className="text-xs mt-2 leading-relaxed">
+                  Halaman Manajemen Akun hanya dapat diakses oleh Superadmin (ADMIN).
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -150,7 +166,7 @@ export const App: React.FC = () => {
                   <CardDescription className="text-xs font-mono">{user?.identityNumber}</CardDescription>
                   <div className="mt-1">
                     <Badge variant="outline" className="font-normal text-[10px]">
-                      {user?.role}
+                      {user?.role === 'ADMIN' ? 'SUPERADMIN' : user?.role}
                     </Badge>
                   </div>
                 </div>
@@ -194,8 +210,6 @@ export const App: React.FC = () => {
         onOpenLogin={() => setIsLoginModalOpen(true)}
       />
 
-
-
       {/* Login Modal */}
       {isLoginModalOpen && (
         <LoginPage
@@ -236,6 +250,16 @@ export const App: React.FC = () => {
                 }}
               >
                 <span>Meja Sirkulasi</span>
+              </CommandItem>
+            )}
+            {isAuthenticated && user?.role === 'ADMIN' && (
+              <CommandItem
+                onSelect={() => {
+                  setCurrentTab('users');
+                  setIsCommandOpen(false);
+                }}
+              >
+                <span>Manajemen Akun (Superadmin)</span>
               </CommandItem>
             )}
           </CommandGroup>
@@ -288,6 +312,27 @@ export const App: React.FC = () => {
               setCurrentTab('my-books');
             } catch (err: unknown) {
               toast.error(err instanceof Error ? err.message : 'Gagal meminjam e-book.');
+            }
+          }}
+          onBorrowPhysical={async (book, copyBarcode) => {
+            if (!isAuthenticated) {
+              toast.warning('Perlu Masuk', {
+                description: 'Silakan masuk untuk meminjam buku fisik.',
+                action: {
+                  label: 'Masuk',
+                  onClick: () => setIsLoginModalOpen(true),
+                },
+              });
+              return;
+            }
+            try {
+              const res = await api.borrowPhysicalBookSelf(book.id, copyBarcode);
+              toast.success('Peminjaman Fisik Berhasil!', {
+                description: `"${book.title}" (Barcode: ${res.copyBarcode || '-'}) resmi dipinjam.`,
+              });
+              setCurrentTab('my-books');
+            } catch (err: unknown) {
+              toast.error(err instanceof Error ? err.message : 'Gagal meminjam buku fisik.');
             }
           }}
           onReservePhysical={async (book) => {

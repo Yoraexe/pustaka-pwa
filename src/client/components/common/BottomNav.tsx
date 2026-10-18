@@ -2,11 +2,17 @@
  * @file src/client/components/common/BottomNav.tsx
  * @description Bottom Navigation Bar untuk mobile view PWA (Android & iOS) dengan token tema yang konsisten.
  * @layer Presentation Component
+ *
+ * Tujuan: Menyediakan navigasi bawah responsif untuk perangkat seluler termasuk tab Manajemen Akun bagi Superadmin.
+ * Caller: src/client/App.tsx
+ * Dependensi: react, useAuth, lucide-react
+ * Main Functions: BottomNav
+ * Side Effects: Mengubah tab aktif atau membuka modal login.
  */
 
 import React from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
-import { BookOpen, BookmarkCheck, Layers, User as UserIcon } from 'lucide-react';
+import { BookOpen, BookmarkCheck, Layers, ShieldAlert, User as UserIcon } from 'lucide-react';
 
 interface BottomNavProps {
   currentTab: string;
@@ -17,10 +23,17 @@ interface BottomNavProps {
 export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab, onOpenLogin }) => {
   const { user, isAuthenticated } = useAuth();
   const isStaff = user?.role === 'LIBRARIAN' || user?.role === 'ADMIN';
+  const isSuperAdmin = user?.role === 'ADMIN';
+
+  const gridColsClass = isSuperAdmin
+    ? 'grid-cols-5'
+    : isStaff
+    ? 'grid-cols-4'
+    : 'grid-cols-3';
 
   return (
     <div className="md:hidden fixed bottom-0 inset-x-0 bg-card/95 backdrop-blur-md border-t border-border z-40 pb-safe shadow-lg">
-      <div className={`grid ${isStaff ? 'grid-cols-4' : 'grid-cols-3'} h-16 max-w-md mx-auto`}>
+      <div className={`grid ${gridColsClass} h-16 max-w-md mx-auto`}>
         {/* Tab 1: Katalog */}
         <button
           onClick={() => onSelectTab('catalog')}
@@ -62,7 +75,20 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab, o
           </button>
         )}
 
-        {/* Tab 4: Profil / Login */}
+        {/* Tab 4: Manajemen Akun (Superadmin Only) */}
+        {isSuperAdmin && (
+          <button
+            onClick={() => onSelectTab('users')}
+            className={`flex flex-col items-center justify-center gap-1 transition-all min-h-[44px] ${
+              currentTab === 'users' ? 'text-primary font-bold' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <ShieldAlert size={20} />
+            <span className="text-[10px] sm:text-[11px]">Akun</span>
+          </button>
+        )}
+
+        {/* Tab 5: Profil / Login */}
         <button
           onClick={() => {
             if (!isAuthenticated) {

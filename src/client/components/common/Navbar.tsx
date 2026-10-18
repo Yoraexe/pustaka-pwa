@@ -1,7 +1,13 @@
 /**
  * @file src/client/components/common/Navbar.tsx
- * @description Header navigasi desktop dengan tipografi bersih, pencarian kilat, dan navigasi peran tanpa icon dekoratif.
+ * @description Header navigasi desktop dengan tipografi bersih, pencarian kilat, dan navigasi peran termasuk Superadmin.
  * @layer Presentation Component
+ *
+ * Tujuan: Menyediakan navigasi utama desktop (Katalog, Rak Buku Saya, Meja Sirkulasi, Manajemen Akun Superadmin) dan profil pengguna.
+ * Caller: src/client/App.tsx
+ * Dependensi: react, useAuth, Button, Badge, lucide-react
+ * Main Functions: Navbar
+ * Side Effects: Memicu pergantian tab aktif, membuka modal login, atau membuka Command Palette.
  */
 
 import React from 'react';
@@ -81,6 +87,19 @@ export const Navbar: React.FC<NavbarProps> = ({
               Meja Sirkulasi
             </button>
           )}
+
+          {isAuthenticated && user?.role === 'ADMIN' && (
+            <button
+              onClick={() => onSelectTab('users')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+                currentTab === 'users'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+            >
+              Manajemen Akun
+            </button>
+          )}
         </nav>
 
         {/* Actions & Profile */}
@@ -105,7 +124,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
                 <div className="mt-0.5">
                   <Badge variant="outline" className="text-[9px] py-0 px-1.5 font-normal">
-                    {user.role === 'STUDENT' ? `Siswa • ${user.className || 'Reguler'}` : user.role}
+                    {user.role === 'STUDENT'
+                      ? `Siswa • ${user.className || 'Reguler'}`
+                      : user.role === 'ADMIN'
+                      ? 'Superadmin'
+                      : user.role}
                   </Badge>
                 </div>
               </div>

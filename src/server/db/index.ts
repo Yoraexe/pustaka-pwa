@@ -2,6 +2,12 @@
  * @file src/server/db/index.ts
  * @description Inisialisasi koneksi SQLite database dengan Drizzle ORM dan bootstrap tabel otomatis.
  * @layer Database Connection Layer
+ *
+ * Tujuan: Membuka koneksi SQLite WAL mode, memastikan struktur DDL tabel mutakhir, dan menginisialisasi kategori dasar katalog.
+ * Caller: Seluruh repository layer, seed script, dan test suite.
+ * Dependensi: better-sqlite3, drizzle-orm, src/server/db/schema.ts, src/server/config/index.ts.
+ * Main Functions: sqlite, db.
+ * Side Effects: Membuat berkas SQLite, tabel-tabel skema, dan kategori dasar jika belum tersedia.
  */
 
 import Database from 'better-sqlite3';
@@ -83,8 +89,22 @@ sqlite.exec(`
     status TEXT NOT NULL DEFAULT 'BORROWED',
     fine_amount INTEGER NOT NULL DEFAULT 0,
     is_fine_paid INTEGER NOT NULL DEFAULT 0,
+    is_renewed INTEGER NOT NULL DEFAULT 0,
+    reservation_code TEXT,
+    reserved_until TEXT,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
+
+  INSERT OR IGNORE INTO categories (name, slug) VALUES
+    ('Informatika & Komputer', 'informatika'),
+    ('Sains & Matematika', 'sains-matematika'),
+    ('Bahasa & Sastra', 'bahasa-sastra'),
+    ('Ilmu Pengetahuan Sosial & Sejarah', 'ips-sejarah'),
+    ('Agama & Budi Pekerti', 'agama-budi-pekerti'),
+    ('Seni, Budaya & Prakarya', 'seni-budaya'),
+    ('Fiksi, Novel & Literasi', 'fiksi-literasi'),
+    ('Pengetahuan Umum & Referensi', 'umum');
 `);
 
 export const db = drizzle(sqlite, { schema });
+

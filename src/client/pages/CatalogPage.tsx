@@ -13,15 +13,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../services/api.js';
 import { useAuth } from '../hooks/useAuth.js';
-import type { Book, Category, BookType, Loan } from '../../shared/types/index.js';
+import type { Book, Category, BookType, Loan, AvailableCopy } from '../../shared/types/index.js';
 import { BookGrid } from '../components/catalog/BookGrid.js';
 import { BookDetailModal } from '../components/catalog/BookDetailModal.js';
 import { AddBookModal } from '../components/catalog/AddBookModal.js';
+import { BarcodeScannerModal } from '../components/circulation/BarcodeScannerModal.js';
 import { PDFReader } from '../components/reader/PDFReader.js';
 import { Button } from '../components/ui/button.js';
 import { Spotlight } from '../components/ui/spotlight.js';
 import { FlipWords } from '../components/ui/flip-words.js';
 import { MovingBorderButton } from '../components/ui/moving-border.js';
+import { QrCode } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface CatalogPageProps {
@@ -45,9 +47,13 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
 
   const [selectedDetailBook, setSelectedDetailBook] = useState<Book | null>(null);
   const [borrowedBookIds, setBorrowedBookIds] = useState<Set<number>>(new Set());
+  const [borrowedDigitalIds, setBorrowedDigitalIds] = useState<Set<number>>(new Set());
+  const [borrowedPhysicalIds, setBorrowedPhysicalIds] = useState<Set<number>>(new Set());
   const [userLoans, setUserLoans] = useState<Loan[]>([]);
   const [readingBook, setReadingBook] = useState<Book | null>(null);
   const [isAddBookOpen, setIsAddBookOpen] = useState<boolean>(false);
+  const [isQrScannerOpen, setIsQrScannerOpen] = useState<boolean>(false);
+  const [availableCopies, setAvailableCopies] = useState<AvailableCopy[]>([]);
 
   // Fetch Categories
   useEffect(() => {
@@ -66,14 +72,24 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
   const fetchUserBorrows = useCallback(async () => {
     if (!isAuthenticated) {
       setBorrowedBookIds(new Set());
+      setBorrowedDigitalIds(new Set());
+      setBorrowedPhysicalIds(new Set());
       setUserLoans([]);
       return;
     }
     try {
       const myLoans = await api.getMyLoans(true);
       setUserLoans(myLoans);
-      const ids = new Set(myLoans.map((l) => l.bookId));
-      setBorrowedBookIds(ids);
+      const allActiveIds = new Set(myLoans.filter((l) => l.status === 'BORROWED').map((l) => l.bookId));
+      const digitalIds = new Set(
+        myLoans.filter((l) => l.loanType === 'DIGITAL' && l.status === 'BORROWED').map((l) => l.bookId)
+      );
+      const physicalIds = new Set(
+        myLoans.filter((l) => l.loanType === 'PHYSICAL' && l.status === 'BORROWED').map((l) => l.bookId)
+      );
+      setBorrowedBookIds(allActiveIds);
+      setBorrowedDigitalIds(digitalIds);
+      setBorrowedPhysicalIds(physicalIds);
     } catch {
       // Unauthenticated
     }
@@ -122,7 +138,7 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
 
     try {
       await api.borrowDigitalBook(book.id);
-      toast.success('Peminjaman Berhasil', {
+      toast.success('Peminjaman E-Book Berhasil', {
         description: `Buku "${book.title}" telah ditambahkan ke Rak Buku Saya. Siap dibaca online & offline.`,
         action: {
           label: 'Buka Rak Saya',
@@ -131,8 +147,38 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
       });
       await fetchUserBorrows();
     } catch (err: unknown) {
-      toast.error('Gagal Meminjam', {
+      toast.error('Gagal Meminjam E-Book', {
         description: err instanceof Error ? err.message : 'Terjadi kendala saat memproses peminjaman e-book.',
+      });
+    }
+  };
+
+  const handleBorrowPhysical = async (book: Book, copyBarcode?: string) => {
+    if (!isAuthenticated) {
+      toast.warning('Akses Dibatasi', {
+        description: 'Silakan masuk terlebih dahulu menggunakan NISN atau NIP untuk meminjam buku fisik.',
+        action: {
+          label: 'Masuk Sekarang',
+          onClick: onOpenLogin,
+        },
+      });
+      return;
+    }
+
+    try {
+      const loan = await api.borrowPhysicalBookSelf(book.id, copyBarcode);
+      toast.success('Peminjaman Buku Fisik Berhasil!', {
+        description: `"${book.title}" (Eksemplar: ${loan.copyBarcode || '-'}) resmi dipinjam dan masuk ke Rak Buku Saya.`,
+        action: {
+          label: 'Buka Rak Saya',
+          onClick: onNavigateToMyBooks,
+        },
+      });
+      fetchBooks();
+      await fetchUserBorrows();
+    } catch (err: unknown) {
+      toast.error('Gagal Meminjam Buku Fisik', {
+        description: err instanceof Error ? err.message : 'Terjadi kendala saat memproses peminjaman fisik.',
       });
     }
   };
@@ -169,6 +215,46 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
 
 
 
+  const handleOpenQrScanner = async () => {
+    if (!isAuthenticated) {
+      toast.warning('Akses Dibatasi', {
+        description: 'Silakan masuk terlebih dahulu menggunakan NISN atau NIP untuk memindai QR buku fisik.',
+        action: {
+          label: 'Masuk Sekarang',
+          onClick: onOpenLogin,
+        },
+      });
+      return;
+    }
+
+    try {
+      const copies = await api.getAvailableCopies();
+      setAvailableCopies(copies);
+    } catch {
+      // Abaikan jika gagal memuat daftar saran cepat
+    }
+    setIsQrScannerOpen(true);
+  };
+
+  const handleScanQrBorrow = async (scannedBarcode: string) => {
+    try {
+      const loan = await api.borrowPhysicalByBarcode(scannedBarcode);
+      toast.success('Peminjaman via Scan QR Berhasil!', {
+        description: `Eksemplar "${loan.copyBarcode || scannedBarcode}" resmi dipinjam dan masuk ke Rak Buku Saya.`,
+        action: {
+          label: 'Buka Rak Saya',
+          onClick: onNavigateToMyBooks,
+        },
+      });
+      fetchBooks();
+      await fetchUserBorrows();
+    } catch (err: unknown) {
+      toast.error('Gagal Meminjam via Scan QR', {
+        description: err instanceof Error ? err.message : 'Kode QR/Barcode tidak ditemukan atau sedang dipinjam.',
+      });
+    }
+  };
+
   return (
     <div className="space-y-6 sm:space-y-8 w-full min-w-0">
       {/* Aceternity UI Spotlight Hero Section (Clean & Theme-Adaptive) */}
@@ -195,7 +281,7 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
 
           {/* Action CTAs */}
           <div className="mt-5 flex flex-wrap items-center gap-2.5">
-            {onOpenCommand && (
+            {onOpenCommand && books.length > 0 && (
               <MovingBorderButton
                 borderRadius="0.75rem"
                 duration={3500}
@@ -207,14 +293,39 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
               </MovingBorderButton>
             )}
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onNavigateToMyBooks}
-              className="h-10 px-4 rounded-xl text-xs font-semibold"
-            >
-              Rak Buku Saya
-            </Button>
+            {!isAuthenticated ? (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={onOpenLogin}
+                className="h-10 px-4 rounded-xl text-xs font-semibold shadow-xs"
+              >
+                Masuk / Daftar Akun
+              </Button>
+            ) : (
+              <>
+                {books.some((b) => b.bookType !== 'DIGITAL_ONLY' && b.availablePhysicalCopies > 0) && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleOpenQrScanner}
+                    className="h-10 px-4 rounded-xl text-xs font-semibold gap-1.5 shadow-xs"
+                  >
+                    <QrCode className="w-4 h-4" />
+                    <span>Pindai QR Buku</span>
+                  </Button>
+                )}
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onNavigateToMyBooks}
+                  className="h-10 px-4 rounded-xl text-xs font-semibold"
+                >
+                  Rak Buku Saya
+                </Button>
+              </>
+            )}
 
             {isAuthenticated && (user?.role === 'LIBRARIAN' || user?.role === 'ADMIN') && (
               <Button
@@ -256,8 +367,11 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
           searchTerm={searchTerm}
           onSearchChange={setSearchTerm}
           onBorrowDigital={handleBorrowDigital}
+          onBorrowPhysical={handleBorrowPhysical}
           onSelectDetail={setSelectedDetailBook}
           borrowedBookIds={borrowedBookIds}
+          borrowedDigitalIds={borrowedDigitalIds}
+          borrowedPhysicalIds={borrowedPhysicalIds}
           isLoading={isLoading}
         />
       </div>
@@ -279,6 +393,7 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
             book={selectedDetailBook}
             onClose={() => setSelectedDetailBook(null)}
             onBorrowDigital={handleBorrowDigital}
+            onBorrowPhysical={handleBorrowPhysical}
             onReservePhysical={handleReservePhysical}
             onOpenReader={(b) => setReadingBook(b)}
             isDigitalBorrowed={!!digitalLoan}
@@ -308,6 +423,19 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
             description: 'Buku baru telah masuk ke katalog perpustakaan sekolah.',
           });
         }}
+      />
+
+      {/* Self-Service QR / Barcode Scanner Modal for Borrowing Physical Books */}
+      <BarcodeScannerModal
+        isOpen={isQrScannerOpen}
+        onClose={() => setIsQrScannerOpen(false)}
+        onScan={handleScanQrBorrow}
+        title="Pindai QR / Barcode untuk Pinjam Buku Fisik"
+        description="Arahkan kamera ke stiker QR eksemplar buku fisik atau unggah gambar stiker QR untuk langsung meminjamnya."
+        quickOptions={availableCopies.map((c) => ({
+          code: c.barcode,
+          label: c.bookTitle,
+        }))}
       />
     </div>
   );

@@ -1,14 +1,20 @@
 /**
  * @file src/server/services/auth.service.ts
- * @description Layanan bisnis untuk otentikasi akun lokal sekolah, hashing kata sandi, dan JWT tokens.
+ * @description Layanan bisnis untuk otentikasi akun lokal sekolah, registrasi mandiri, manajemen akun Superadmin, hashing kata sandi, dan JWT tokens.
  * @layer Service Layer (Business Logic)
+ * 
+ * Tujuan: Mengelola autentikasi pengguna, pendaftaran mandiri (Siswa/Guru), pembuatan/pengelolaan akun oleh Superadmin, dan impor massal CSV.
+ * Caller: src/server/controllers/auth.controller.ts, src/server/db/seed.ts, test suites.
+ * Dependensi: bcryptjs, jsonwebtoken, userRepository, config, shared/types.
+ * Main Functions: login, registerUser, selfRegister, getAllUsers, toggleUserStatus, resetUserPassword, verifyToken, importUsersFromCsv.
+ * Side Effects: Membaca/menulis data pengguna via UserRepository dan menandatangani token JWT.
  */
 
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { userRepository, type UserRepository } from '../repositories/user.repository.js';
 import { config } from '../config/index.js';
-import type { LoginInput, CreateUserInput, User, AuthSession, CsvImportResult, UserRole } from '../../shared/types/index.js';
+import type { LoginInput, CreateUserInput, SelfRegisterInput, User, AuthSession, CsvImportResult, UserRole } from '../../shared/types/index.js';
 
 export class AuthService {
   constructor(private userRepo: UserRepository = userRepository) {}
@@ -59,6 +65,84 @@ export class AuthService {
     });
   }
 
+  /**
+   * Pendaftaran Mandiri (Self-Registration) untuk pembuatan akun awal (Siswa, Guru, Pustakawan, atau Superadmin)
+   */
+  async selfRegister(input: SelfRegisterInput): Promise<AuthSession> {
+    const allowedRoles: UserRole[] = ['STUDENT', 'TEACHER', 'LIBRARIAN', 'ADMIN'];
+    if (!allowedRoles.includes(input.role)) {
+      throw new Error('Peran akun tidak valid.');
+    }
+
+    const newUser = await this.registerUser({
+      identityNumber: input.identityNumber,
+      name: input.name,
+      role: input.role,
+      className: input.className || null,
+      password: input.password
+    });
+
+    const token = jwt.sign(
+      {
+        id: newUser.id,
+        identityNumber: newUser.identityNumber,
+        role: newUser.role,
+        name: newUser.name
+      },
+      config.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    return { token, user: newUser };
+  }
+
+  /**
+   * Daftar seluruh akun pengguna (Superadmin & Pustakawan)
+   */
+  async getAllUsers(actor: User): Promise<User[]> {
+    if (actor.role !== 'ADMIN' && actor.role !== 'LIBRARIAN') {
+      throw new Error('Hanya Superadmin atau Pustakawan yang berwenang melihat daftar pengguna.');
+    }
+    return this.userRepo.findAll();
+  }
+
+  /**
+   * Mengubah status aktif/nonaktif pengguna (Khusus Superadmin)
+   */
+  async toggleUserStatus(adminUser: User, targetUserId: number, isActive: boolean): Promise<User> {
+    if (adminUser.role !== 'ADMIN') {
+      throw new Error('Hanya Superadmin yang berwenang mengubah status akun pengguna.');
+    }
+
+    if (adminUser.id === targetUserId && !isActive) {
+      throw new Error('Anda tidak dapat menonaktifkan akun Anda sendiri yang sedang aktif.');
+    }
+
+    const updated = await this.userRepo.updateStatus(targetUserId, isActive);
+    if (!updated) {
+      throw new Error('Pengguna tidak ditemukan.');
+    }
+    return updated;
+  }
+
+  /**
+   * Reset kata sandi pengguna oleh Superadmin
+   */
+  async resetUserPassword(adminUser: User, targetUserId: number, newPassword: string): Promise<void> {
+    if (adminUser.role !== 'ADMIN') {
+      throw new Error('Hanya Superadmin yang berwenang mereset kata sandi pengguna.');
+    }
+
+    const target = await this.userRepo.findById(targetUserId);
+    if (!target) {
+      throw new Error('Pengguna tidak ditemukan.');
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+    await this.userRepo.updatePassword(targetUserId, passwordHash);
+  }
+
   async verifyToken(token: string): Promise<User> {
     try {
       const decoded = jwt.verify(token, config.JWT_SECRET) as { id: number };
@@ -71,6 +155,7 @@ export class AuthService {
       throw new Error('Sesi tidak valid atau telah kedaluwarsa.');
     }
   }
+
 
   /**
    * Impor Massal Pengguna via CSV (Admin Only - BRD Section 3.4 & AC-4.2)

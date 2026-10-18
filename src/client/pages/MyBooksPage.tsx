@@ -15,6 +15,7 @@ import { api } from '../services/api.js';
 import { offlineStorage } from '../services/offlineStorage.js';
 import type { Loan, Book, User } from '../../shared/types/index.js';
 import { PDFReader } from '../components/reader/PDFReader.js';
+import { QrCodeDisplay } from '../components/common/QrCodeDisplay.js';
 import { Button } from '../components/ui/button.js';
 import { Badge } from '../components/ui/badge.js';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../components/ui/tabs.js';
@@ -44,6 +45,11 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
 
   const [activeTab, setActiveTab] = useState<string>('active');
   const [bookToReturn, setBookToReturn] = useState<{ id: number; title: string } | null>(null);
+  const [physicalLoanToReturn, setPhysicalLoanToReturn] = useState<{
+    id: number;
+    title: string;
+    barcode?: string | null;
+  } | null>(null);
   const [bookToDeleteOffline, setBookToDeleteOffline] = useState<{ id: number; title: string } | null>(null);
   const [reservations, setReservations] = useState<Loan[]>([]);
   const [reservationToCancel, setReservationToCancel] = useState<{ id: number; title: string; code: string } | null>(null);
@@ -118,6 +124,21 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
     }
   };
 
+  const handleSelfBorrowFromReservation = async (loan: Loan) => {
+    try {
+      await api.borrowPhysicalBookSelf(loan.bookId, loan.copyBarcode || undefined);
+      toast.success('Buku Fisik Resmi Dipinjam!', {
+        description: `Tiket reservasi "${loan.bookTitle}" telah diaktifkan menjadi pinjaman aktif.`,
+      });
+      setActiveTab('active');
+      fetchMyLoans();
+    } catch (err: unknown) {
+      toast.error('Gagal Meminjam Buku Fisik', {
+        description: err instanceof Error ? err.message : 'Terjadi kendala saat mengaktifkan pinjaman fisik.',
+      });
+    }
+  };
+
   useEffect(() => {
     fetchMyLoans();
   }, [fetchMyLoans]);
@@ -141,6 +162,25 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
     } catch (err: unknown) {
       toast.error('Gagal Mengembalikan', {
         description: err instanceof Error ? err.message : 'Terjadi kendala saat mengembalikan e-book.',
+      });
+    }
+  };
+
+  const confirmReturnPhysical = async () => {
+    if (!physicalLoanToReturn) return;
+    try {
+      const result = await api.returnPhysicalBookSelf(physicalLoanToReturn.id);
+      toast.success('Buku Fisik Dikembalikan!', {
+        description:
+          result.overdueDays > 0
+            ? `"${physicalLoanToReturn.title}" dikembalikan (Terlambat ${result.overdueDays} hari, Denda: Rp ${result.fineAmount.toLocaleString('id-ID')}).`
+            : `"${physicalLoanToReturn.title}" telah dikembalikan tepat waktu dan stok eksemplar telah dipulihkan ke rak.`,
+      });
+      setPhysicalLoanToReturn(null);
+      fetchMyLoans();
+    } catch (err: unknown) {
+      toast.error('Gagal Mengembalikan Buku Fisik', {
+        description: err instanceof Error ? err.message : 'Terjadi kendala saat mengembalikan buku fisik.',
       });
     }
   };
@@ -333,6 +373,21 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                       <p className="text-xs text-muted-foreground mt-1.5 font-normal">
                         Jatuh Tempo: {dueDate.toLocaleDateString('id-ID', { dateStyle: 'medium' })}
                       </p>
+
+                      {loan.loanType === 'PHYSICAL' && loan.copyBarcode && (
+                        <div className="mt-3 p-2.5 bg-muted/40 rounded-2xl border border-border flex items-center justify-between gap-3">
+                          <div className="text-[11px] font-mono text-muted-foreground">
+                            <span className="block text-[9px] uppercase tracking-wider">Stiker QR Eksemplar</span>
+                            <span className="font-bold text-foreground">{loan.copyBarcode}</span>
+                          </div>
+                          <QrCodeDisplay
+                            value={loan.copyBarcode}
+                            size={56}
+                            showDownload={true}
+                            className="flex-row gap-2"
+                          />
+                        </div>
+                      )}
                     </div>
 
                     {/* Actions */}
@@ -382,9 +437,20 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                               Sudah Diperpanjang
                             </Badge>
                           ) : null}
-                          <span className="text-[11px] text-muted-foreground bg-muted/50 px-2.5 py-1.5 rounded-xl font-medium shrink-0">
-                            Kembalikan di Meja
-                          </span>
+                          <Button
+                            size="sm"
+                            variant="default"
+                            onClick={() =>
+                              setPhysicalLoanToReturn({
+                                id: loan.id,
+                                title: loan.bookTitle || 'Buku Fisik',
+                                barcode: loan.copyBarcode,
+                              })
+                            }
+                            className="flex-1 text-xs font-semibold"
+                          >
+                            Kembalikan Buku
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -433,31 +499,37 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                         {loan.bookTitle}
                       </h3>
 
-                      {/* Ticket Code Box */}
-                      <div className="mt-3 p-3 bg-muted/50 rounded-2xl border border-dashed border-border/80 flex items-center justify-between">
+                      {/* Ticket Code Box + Scannable QR Code */}
+                      <div className="mt-3 p-3 bg-muted/50 rounded-2xl border border-dashed border-border/80 flex items-center justify-between gap-3">
                         <div>
                           <span className="text-[9px] uppercase tracking-wider text-muted-foreground font-mono block">
                             Kode Tiket Pengambilan
                           </span>
-                          <span className="text-base font-black font-mono tracking-wider text-primary">
+                          <span className="text-base font-black font-mono tracking-wider text-primary block">
                             {loan.reservationCode || `RSV-${loan.id}`}
                           </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 px-2.5 text-[10px] font-semibold mt-1.5"
+                            onClick={() => {
+                              if (loan.reservationCode) {
+                                navigator.clipboard.writeText(loan.reservationCode);
+                                toast.success('Kode Disalin!', {
+                                  description: `Kode ${loan.reservationCode} disalin ke clipboard.`,
+                                });
+                              }
+                            }}
+                          >
+                            Salin Kode
+                          </Button>
                         </div>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 px-2.5 text-xs font-semibold"
-                          onClick={() => {
-                            if (loan.reservationCode) {
-                              navigator.clipboard.writeText(loan.reservationCode);
-                              toast.success('Kode Disalin!', {
-                                description: `Kode ${loan.reservationCode} disalin ke clipboard.`,
-                              });
-                            }
-                          }}
-                        >
-                          Salin
-                        </Button>
+
+                        <QrCodeDisplay
+                          value={loan.reservationCode || `RSV-${loan.id}`}
+                          size={68}
+                          showDownload={true}
+                        />
                       </div>
 
                       <div className="mt-3 space-y-1 text-[11px] text-muted-foreground font-mono">
@@ -474,6 +546,13 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
 
                     <div className="mt-5 pt-3.5 border-t border-border flex items-center gap-2">
                       <Button
+                        size="sm"
+                        onClick={() => handleSelfBorrowFromReservation(loan)}
+                        className="flex-1 text-xs font-semibold"
+                      >
+                        Pinjam Sekarang
+                      </Button>
+                      <Button
                         variant="outline"
                         size="sm"
                         onClick={() =>
@@ -483,9 +562,9 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
                             code: loan.reservationCode || '',
                           })
                         }
-                        className="w-full text-xs text-destructive hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
+                        className="flex-1 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
                       >
-                        Batalkan Reservasi
+                        Batalkan
                       </Button>
                     </div>
                   </div>
@@ -496,7 +575,7 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
             <div className="text-center py-16 bg-card rounded-3xl border border-border p-8">
               <h3 className="font-semibold text-sm text-foreground">Tidak ada tiket reservasi aktif</h3>
               <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                Pilih buku fisik atau buku hybrid dari katalog, lalu klik "Reservasi Buku Fisik" untuk mengambil tiket.
+                Pilih buku fisik atau buku hybrid dari katalog, lalu klik "Pinjam Fisik" atau "Reservasi Buku Fisik".
               </p>
             </div>
           )}
@@ -643,6 +722,31 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
             <AlertDialogCancel>Batal</AlertDialogCancel>
             <AlertDialogAction onClick={confirmReturnDigital}>
               Kembalikan
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Alert Dialog: Return Physical Book Confirmation (Instant Return Anytime) */}
+      <AlertDialog
+        open={!!physicalLoanToReturn}
+        onOpenChange={(open: boolean) => !open && setPhysicalLoanToReturn(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Kembalikan Buku Fisik Sekarang?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Kembalikan buku fisik <strong>"{physicalLoanToReturn?.title}"</strong>{' '}
+              {physicalLoanToReturn?.barcode ? (
+                <span className="font-mono">({physicalLoanToReturn.barcode})</span>
+              ) : null}{' '}
+              sekarang juga tanpa perlu menunggu masa pinjam berakhir? Stok eksemplar akan langsung dipulihkan ke rak dan kuota pinjaman Anda dikosongkan.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Batal</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmReturnPhysical}>
+              Kembalikan Sekarang
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

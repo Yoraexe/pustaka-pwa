@@ -76,6 +76,7 @@
     "src/client/hooks/useAuth.tsx",
     "src/client/components/common/Navbar.tsx",
     "src/client/components/common/BottomNav.tsx",
+    "src/client/components/common/QrCodeDisplay.tsx",
     "src/client/components/pwa/OfflineBanner.tsx",
     "src/client/components/pwa/InstallPromptIOS.tsx",
     "src/client/components/catalog/BookCard.tsx",
@@ -84,6 +85,7 @@
     "src/client/components/reader/PDFReader.tsx",
     "src/client/components/circulation/CirculationDesk.tsx",
     "src/client/components/circulation/BarcodeScannerModal.tsx",
+    "src/client/components/admin/SuperAdminPanel.tsx",
     "src/client/pages/CatalogPage.tsx",
     "src/client/pages/MyBooksPage.tsx",
     "src/client/pages/LoginPage.tsx",
@@ -166,9 +168,20 @@
       "timestamp": "2026-09-29T20:30:00+08:00",
       "action": "Comprehensive Audit Remediation & Hardening",
       "agent_note": "Remediated 10 audit findings: Restricted static serving exclusively to covers (preventing direct unwatermarked PDF download), protected /stream-pdf with digital loan authorization check (403 for non-borrowers), added is_renewed column to loans schema, implemented atomic 1-time physical loan renewal (+7 days) in CirculationService and exposed POST /api/circulation/physical/renew, enforced circulation suspension checks (unpaid fines & overdue loans), changed PDFReader URL to #toolbar=0&navpanes=0 to prevent native print/download bypass, ensured offline IndexedDB eviction on e-book return, decoupled digital and physical borrowing in BookDetailModal for hybrid books, added WebRTC camera-based BarcodeScannerModal and renew buttons to CirculationDesk and MyBooksPage, and expanded Vitest test suite to 36 tests passing 100% with clean Vite production build."
+    },
+    {
+      "layer": "engineering",
+      "timestamp": "2026-10-11T21:48:00+08:00",
+      "action": "Superadmin Account Management, Self-Service Physical Checkout, & Instant Physical Return (v1.1)",
+      "agent_note": "Implemented 3 major revisions: (1) Superadmin Panel (SuperAdminPanel.tsx) for multi-role account creation, status toggling, password reset, and self-registration tab in LoginPage.tsx for STUDENT/TEACHER; (2) 100% working self-service physical book borrowing (POST /api/circulation/physical/borrow-self) directly from BookCard, BookDetailModal, and MyBooksPage with decoupled digital/physical borrow states; (3) Instant physical book return at any time without waiting for due date expiry (POST /api/circulation/physical/return-self) from MyBooksPage and 1-click return in CirculationDesk. Verified 42/42 Vitest tests passing and clean Vite production build."
     }
   ],
   "decisions": [
+    {
+      "id": "ADR-004",
+      "title": "Superadmin Account Management & Self-Service Physical Circulation",
+      "rationale": "Memfasilitasi pendaftaran mandiri Siswa/Guru dan kendali penuh Superadmin (ADMIN), serta memungkinkan peminjaman dan pengembalian buku fisik secara instan kapan saja tanpa harus menunggu tanggal jatuh tempo habis."
+    },
     {
       "id": "DEC-007",
       "title": "Physical & Hybrid Book Reservation (Option A: Pick-up Ticket)",
@@ -229,7 +242,7 @@
       "frontend": "TailwindCSS + PDF.js Canvas Reader"
     },
     "created_at": "2026-09-22T20:13:30+08:00",
-    "last_updated": "2026-09-29T20:30:00+08:00"
+    "last_updated": "2026-10-11T21:48:00+08:00"
   },
   "context_paths": {
     "brd": "./.astesia/brd.md",

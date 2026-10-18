@@ -13,7 +13,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../services/api.js';
 import { useAuth } from '../../hooks/useAuth.js';
-import type { Loan, AvailableCopy } from '../../../shared/types/index.js';
+import type { Loan, AvailableCopy, User } from '../../../shared/types/index.js';
 import { AddBookModal } from '../catalog/AddBookModal.js';
 import { UserImportModal } from '../admin/UserImportModal.js';
 import { BarcodeScannerModal } from './BarcodeScannerModal.js';
@@ -32,13 +32,14 @@ export const CirculationDesk: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('checkout');
   const [loans, setLoans] = useState<Loan[]>([]);
   const [availableCopies, setAvailableCopies] = useState<AvailableCopy[]>([]);
+  const [members, setMembers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isAddBookModalOpen, setIsAddBookModalOpen] = useState<boolean>(false);
   const [isUserImportModalOpen, setIsUserImportModalOpen] = useState<boolean>(false);
 
   // Camera Barcode Scanner State
   const [isScannerOpen, setIsScannerOpen] = useState<boolean>(false);
-  const [scannerTarget, setScannerTarget] = useState<'checkout' | 'return'>('checkout');
+  const [scannerTarget, setScannerTarget] = useState<'checkout' | 'borrower' | 'claim' | 'return'>('checkout');
 
   // Form Check-out
   const [borrowerIdentity, setBorrowerIdentity] = useState<string>('');
@@ -91,10 +92,20 @@ export const CirculationDesk: React.FC = () => {
     }
   };
 
+  const fetchMembers = async () => {
+    try {
+      const data = await api.getUsers();
+      setMembers(data.filter((u) => u.isActive !== false));
+    } catch (err) {
+      console.warn('Gagal memuat daftar anggota:', err);
+    }
+  };
+
   useEffect(() => {
     fetchCirculationHistory();
     fetchAvailableCopies();
     fetchReservations();
+    fetchMembers();
   }, []);
 
   const handleProcessClaim = async (codeToClaim?: string) => {
@@ -122,7 +133,7 @@ export const CirculationDesk: React.FC = () => {
     }
   };
 
-  const handleOpenScanner = (target: 'checkout' | 'return') => {
+  const handleOpenScanner = (target: 'checkout' | 'borrower' | 'claim' | 'return') => {
     setScannerTarget(target);
     setIsScannerOpen(true);
   };
@@ -130,10 +141,16 @@ export const CirculationDesk: React.FC = () => {
   const handleScanResult = (scannedBarcode: string) => {
     if (scannerTarget === 'checkout') {
       setCheckoutBarcode(scannedBarcode);
-      toast.info(`Barcode Terpindai: ${scannedBarcode}`);
+      toast.info(`QR / Barcode Buku Terpindai: ${scannedBarcode}`);
+    } else if (scannerTarget === 'borrower') {
+      setBorrowerIdentity(scannedBarcode);
+      toast.info(`Identitas Anggota Terpindai: ${scannedBarcode}`);
+    } else if (scannerTarget === 'claim') {
+      setClaimCode(scannedBarcode.toUpperCase());
+      void handleProcessClaim(scannedBarcode.toUpperCase());
     } else {
       setReturnBarcode(scannedBarcode);
-      toast.info(`Barcode Terpindai: ${scannedBarcode}`);
+      toast.info(`QR / Barcode Pengembalian Terpindai: ${scannedBarcode}`);
     }
   };
 
@@ -147,6 +164,24 @@ export const CirculationDesk: React.FC = () => {
     } catch (err: unknown) {
       toast.error('Gagal Memperpanjang', {
         description: err instanceof Error ? err.message : 'Terjadi kendala saat memperpanjang masa pinjam.',
+      });
+    }
+  };
+
+  const handleQuickReturnPhysical = async (barcode: string, bookTitle?: string) => {
+    try {
+      const res = await api.returnPhysicalBook(barcode, true);
+      toast.success('Buku Fisik Dikembalikan!', {
+        description:
+          res.overdueDays > 0
+            ? `"${bookTitle || barcode}" dikembalikan (Terlambat ${res.overdueDays} hari, Denda Rp ${res.fineAmount.toLocaleString('id-ID')} lunas).`
+            : `"${bookTitle || barcode}" berhasil dikembalikan tepat waktu dan stok rak dipulihkan.`,
+      });
+      fetchCirculationHistory();
+      fetchAvailableCopies();
+    } catch (err: unknown) {
+      toast.error('Gagal Mengembalikan Buku', {
+        description: err instanceof Error ? err.message : 'Terjadi kendala saat mengembalikan buku fisik.',
       });
     }
   };
@@ -363,14 +398,53 @@ export const CirculationDesk: React.FC = () => {
               <form onSubmit={handleProcessCheckout} className="space-y-4 max-w-lg">
                 <div>
                   <Label htmlFor="borrowerIdentity">NISN / NIP Peminjam</Label>
-                  <Input
-                    id="borrowerIdentity"
-                    value={borrowerIdentity}
-                    onChange={(e) => setBorrowerIdentity(e.target.value)}
-                    placeholder="Contoh: NISN202601 atau GURU001"
-                    className="font-mono text-xs"
-                    required
-                  />
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input
+                      id="borrowerIdentity"
+                      value={borrowerIdentity}
+                      onChange={(e) => setBorrowerIdentity(e.target.value)}
+                      placeholder="Contoh: NISN202601 atau GURU001"
+                      className="font-mono text-xs flex-1"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenScanner('borrower')}
+                      className="h-9 px-3 gap-1.5 text-xs font-semibold shrink-0"
+                    >
+                      <Camera className="w-4 h-4 text-primary" />
+                      <span>Pindai</span>
+                    </Button>
+                  </div>
+                  {members.length > 0 && (
+                    <div className="mt-2">
+                      <span className="text-[10px] text-muted-foreground uppercase font-mono tracking-wider block mb-1">
+                        Pilih Cepat Anggota Aktif:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-1.5 bg-muted/30 border border-border rounded-xl">
+                        {members.slice(0, 15).map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            onClick={() => setBorrowerIdentity(m.identityNumber)}
+                            className={`px-2 py-1 rounded-lg text-[11px] font-mono transition-colors border text-left cursor-pointer ${
+                              borrowerIdentity === m.identityNumber
+                                ? 'bg-primary text-primary-foreground border-primary font-bold shadow-xs'
+                                : 'bg-background hover:bg-muted text-foreground border-border'
+                            }`}
+                            title={`${m.name} (${m.role})`}
+                          >
+                            <span>{m.identityNumber}</span>
+                            <span className="text-[9px] opacity-75 ml-1 truncate max-w-[100px] inline-block align-bottom">
+                              {m.name}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -479,9 +553,19 @@ export const CirculationDesk: React.FC = () => {
                       value={claimCode}
                       onChange={(e) => setClaimCode(e.target.value.toUpperCase())}
                       placeholder="Contoh: RSV-ABC123XY"
-                      className="font-mono text-xs uppercase"
+                      className="font-mono text-xs uppercase flex-1"
                       required
                     />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenScanner('claim')}
+                      className="h-9 px-3 gap-1.5 text-xs font-semibold shrink-0"
+                    >
+                      <Camera className="w-4 h-4 text-primary" />
+                      <span>Pindai QR</span>
+                    </Button>
                     <Button type="submit" className="text-xs font-semibold shrink-0">
                       Klaim & Serahkan
                     </Button>
@@ -764,10 +848,7 @@ export const CirculationDesk: React.FC = () => {
                         variant="outline"
                         size="sm"
                         className="h-7 px-2.5 text-[11px] font-semibold text-amber-600 border-amber-500/30 hover:bg-amber-500 hover:text-white"
-                        onClick={() => {
-                          setClaimCode(l.reservationCode!);
-                          setActiveTab('reservations');
-                        }}
+                        onClick={() => handleProcessClaim(l.reservationCode!)}
                       >
                         Klaim Tiket
                       </Button>
@@ -788,13 +869,7 @@ export const CirculationDesk: React.FC = () => {
                           variant="outline"
                           size="sm"
                           className="h-7 px-2.5 text-[11px] font-semibold text-primary hover:text-primary-foreground hover:bg-primary"
-                          onClick={() => {
-                            setReturnBarcode(l.copyBarcode!);
-                            setActiveTab('return');
-                            toast.info(`Barcode ${l.copyBarcode} dipilih`, {
-                              description: 'Silakan klik "Proses Pengembalian" pada form di atas.',
-                            });
-                          }}
+                          onClick={() => handleQuickReturnPhysical(l.copyBarcode!, l.bookTitle)}
                         >
                           Kembalikan
                         </Button>
@@ -837,12 +912,34 @@ export const CirculationDesk: React.FC = () => {
         }}
       />
 
-      {/* Modal Pindai Barcode Kamera */}
+      {/* Modal Pindai QR / Barcode Kamera & File */}
       <BarcodeScannerModal
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
         onScan={handleScanResult}
-        title={scannerTarget === 'checkout' ? 'Pindai Barcode Peminjaman' : 'Pindai Barcode Pengembalian'}
+        title={
+          scannerTarget === 'checkout'
+            ? 'Pindai QR / Barcode Eksemplar Peminjaman'
+            : scannerTarget === 'borrower'
+            ? 'Pindai QR Kartu Anggota (NISN / NIP)'
+            : scannerTarget === 'claim'
+            ? 'Pindai QR Tiket Reservasi (RSV-...)'
+            : 'Pindai QR / Barcode Pengembalian Buku'
+        }
+        quickOptions={
+          scannerTarget === 'checkout'
+            ? availableCopies.map((c) => ({ code: c.barcode, label: c.bookTitle }))
+            : scannerTarget === 'borrower'
+            ? members.map((m) => ({ code: m.identityNumber, label: m.name }))
+            : scannerTarget === 'claim'
+            ? reservations
+                .filter((r) => Boolean(r.reservationCode))
+                .map((r) => ({ code: r.reservationCode!, label: r.bookTitle || '' }))
+            : activePhysicalLoans.map((l) => ({
+                code: l.copyBarcode!,
+                label: l.bookTitle || '',
+              }))
+        }
       />
     </div>
   );

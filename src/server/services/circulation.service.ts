@@ -3,10 +3,10 @@
  * @description Layanan bisnis sirkulasi peminjaman hybrid (Digital E-book & Buku Fisik Meja Pustakawan).
  * @layer Service Layer (Business Logic)
  * 
- * Tujuan: Menyediakan logika bisnis untuk sirkulasi buku digital, check-out/in buku fisik, reservasi 24 jam, perpanjangan, dan validasi hak akses streaming.
+ * Tujuan: Menyediakan logika bisnis untuk sirkulasi buku digital, peminjaman fisik mandiri & meja pustakawan, pengembalian fisik instan, reservasi 24 jam, perpanjangan, dan validasi hak akses streaming.
  * Caller: src/server/controllers/circulation.controller.ts, src/server/controllers/book.controller.ts, test suites.
  * Dependensi: loanRepository, bookRepository, userRepository, sqlite, config, shared/types.
- * Main Functions: borrowDigitalBook, returnDigitalBook, checkOutPhysicalBook, returnPhysicalBook, reservePhysicalBook, claimPhysicalReservation, cancelPhysicalReservation, renewPhysicalLoan, hasActiveDigitalAccess.
+ * Main Functions: borrowDigitalBook, returnDigitalBook, borrowPhysicalBookSelf, returnPhysicalBookSelf, checkOutPhysicalBook, returnPhysicalBook, reservePhysicalBook, claimPhysicalReservation, cancelPhysicalReservation, renewPhysicalLoan, hasActiveDigitalAccess.
  * Side Effects: Mutasi transaksi database SQLite secara atomik (BEGIN IMMEDIATE/COMMIT/ROLLBACK).
  */
 
@@ -91,6 +91,200 @@ export class CirculationService {
     }
 
     await this.loanRepo.updateReturn(loan.id, new Date().toISOString(), 0, true);
+  }
+
+  /**
+   * Peminjaman Buku Fisik Mandiri (Self-Service Checkout) langsung oleh Pemustaka
+   * Mendukung peminjaman via ID Buku maupun langsung via hasil Scan QR / Barcode eksemplar.
+   */
+  async borrowPhysicalBookSelf(user: User, bookId?: number, copyBarcode?: string): Promise<Loan> {
+    if (!user.isActive) {
+      throw new Error('Akun Anda sedang dinonaktifkan.');
+    }
+
+    const cleanBarcode = copyBarcode
+      ? copyBarcode.replace(/^PUSTAKA:(COPY|BOOK):/i, '').trim()
+      : undefined;
+
+    let resolvedBookId = bookId;
+    if (!resolvedBookId && cleanBarcode) {
+      const scannedCopy = await this.bookRepo.findCopyByBarcode(cleanBarcode);
+      if (!scannedCopy) {
+        throw new Error(`Kode QR / Barcode eksemplar "${cleanBarcode}" tidak ditemukan di database perpustakaan.`);
+      }
+      resolvedBookId = scannedCopy.bookId;
+    }
+
+    if (!resolvedBookId) {
+      throw new Error('ID Buku atau Kode QR/Barcode eksemplar wajib disertakan.');
+    }
+
+    const bookIdNum = resolvedBookId;
+    const book = await this.bookRepo.findById(bookIdNum);
+    if (!book) {
+      throw new Error(`Buku dengan ID ${bookIdNum} tidak ditemukan.`);
+    }
+
+    if (book.bookType === 'DIGITAL_ONLY') {
+      throw new Error('Buku ini hanya tersedia dalam format digital e-book.');
+    }
+
+    // 1. Cek apakah user sudah meminjam buku fisik ini secara aktif
+    const existingLoan = await this.loanRepo.findActiveLoan(user.id, bookIdNum, 'PHYSICAL');
+    if (existingLoan) {
+      throw new Error('Anda sudah meminjam buku fisik ini. Silakan cek di menu "Rak Buku Saya".');
+    }
+
+    // 2. Validasi Penangguhan Sirkulasi (Denda tertunggak / Keterlambatan buku fisik)
+    const suspension = await this.loanRepo.checkUserCirculationSuspension(user.id);
+    if (suspension.isSuspended) {
+      throw new Error(suspension.reason);
+    }
+
+    // 3. Jika user sudah punya tiket reservasi aktif untuk buku ini, langsung konversi menjadi BORROWED
+    const existingRes = await this.loanRepo.findActiveReservation(user.id, bookIdNum);
+    const loanDays = user.role === 'TEACHER' ? config.TEACHER_LOAN_DAYS : config.STUDENT_LOAN_DAYS;
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + loanDays);
+    dueDate.setHours(23, 59, 59, 999);
+    const nowIso = new Date().toISOString();
+
+    if (existingRes) {
+      sqlite.exec('BEGIN IMMEDIATE');
+      try {
+        if (existingRes.copyId) {
+          await this.bookRepo.updateCopyStatus(existingRes.copyId, 'BORROWED');
+        }
+        await this.loanRepo.updateClaimReservation(existingRes.id, nowIso, dueDate.toISOString());
+        sqlite.exec('COMMIT');
+        return {
+          ...existingRes,
+          borrowDate: nowIso,
+          dueDate: dueDate.toISOString(),
+          status: 'BORROWED'
+        };
+      } catch (err) {
+        sqlite.exec('ROLLBACK');
+        throw err;
+      }
+    }
+
+    // 4. Cek kuota peminjaman fisik aktif pengguna
+    const limit = user.role === 'TEACHER' ? config.TEACHER_LOAN_LIMIT : config.STUDENT_LOAN_LIMIT;
+    const activeLoansCount = await this.loanRepo.countActiveUserPhysicalLoansAndReservations(user.id);
+    if (activeLoansCount >= limit) {
+      throw new Error(`Batas maksimal peminjaman buku fisik (${limit} buku) tercapai. Kembalikan buku fisik yang sedang dipinjam terlebih dahulu.`);
+    }
+
+    // 5. Tentukan eksemplar fisik yang akan dipinjam
+    let targetCopy = null;
+    if (cleanBarcode) {
+      const byBarcode = await this.bookRepo.findCopyByBarcode(cleanBarcode);
+      if (!byBarcode || byBarcode.bookId !== bookIdNum) {
+        throw new Error(`Barcode eksemplar ${cleanBarcode} tidak sesuai dengan buku ini.`);
+      }
+      if (byBarcode.status !== 'AVAILABLE') {
+        throw new Error(`Eksemplar ${cleanBarcode} sedang tidak tersedia (${byBarcode.status}).`);
+      }
+      targetCopy = byBarcode;
+    } else {
+      targetCopy = await this.bookRepo.findFirstAvailableCopy(bookIdNum);
+    }
+
+    if (!targetCopy || book.availablePhysicalCopies <= 0) {
+      throw new Error('Seluruh eksemplar fisik buku ini sedang dipinjam. Silakan coba kembali nanti.');
+    }
+
+    // 6. Catat peminjaman fisik secara atomik
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      await this.bookRepo.updateCopyStatus(targetCopy.id, 'BORROWED');
+      await this.bookRepo.updateAvailableCopies(book.id, -1);
+
+      const createdLoan = await this.loanRepo.create({
+        userId: user.id,
+        bookId: book.id,
+        copyId: targetCopy.id,
+        loanType: 'PHYSICAL',
+        dueDate: dueDate.toISOString()
+      });
+
+      sqlite.exec('COMMIT');
+      return createdLoan;
+    } catch (err) {
+      sqlite.exec('ROLLBACK');
+      throw err;
+    }
+  }
+
+  /**
+   * Pengembalian Buku Fisik Instan (Saat Itu Juga) oleh Peminjam atau Staf
+   * Tidak mengharuskan masa pinjam habis terlebih dahulu.
+   */
+  async returnPhysicalBookSelf(actorUser: User, loanId: number): Promise<{
+    loan: Loan;
+    overdueDays: number;
+    fineAmount: number;
+    message: string;
+  }> {
+    const activeLoan = await this.loanRepo.findById(loanId);
+    if (!activeLoan) {
+      throw new Error('Data peminjaman buku fisik tidak ditemukan.');
+    }
+
+    if (activeLoan.loanType !== 'PHYSICAL') {
+      throw new Error('Transaksi ini bukan peminjaman buku fisik.');
+    }
+
+    if (activeLoan.status !== 'BORROWED') {
+      throw new Error(`Buku ini sudah berstatus ${activeLoan.status}.`);
+    }
+
+    const isStaff = actorUser.role === 'LIBRARIAN' || actorUser.role === 'ADMIN';
+    if (!isStaff && activeLoan.userId !== actorUser.id) {
+      throw new Error('Anda tidak memiliki wewenang untuk mengembalikan pinjaman milik pengguna lain.');
+    }
+
+    // Hitung keterlambatan berdasarkan hari kalender (0 hari jika dikembalikan sebelum/pada hari jatuh tempo)
+    const now = new Date();
+    const dueDate = new Date(activeLoan.dueDate);
+    const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+    const diffTime = nowDateOnly.getTime() - dueDateOnly.getTime();
+    const overdueDays = diffTime > 0 ? Math.round(diffTime / (1000 * 60 * 60 * 24)) : 0;
+    const fineAmount = overdueDays * config.DAILY_FINE_AMOUNT;
+    const isFinePaid = fineAmount === 0 || isStaff;
+
+    sqlite.exec('BEGIN IMMEDIATE');
+    try {
+      await this.loanRepo.updateReturn(activeLoan.id, now.toISOString(), fineAmount, isFinePaid);
+      if (activeLoan.copyId) {
+        await this.bookRepo.updateCopyStatus(activeLoan.copyId, 'AVAILABLE');
+      }
+      await this.bookRepo.updateAvailableCopies(activeLoan.bookId, 1);
+      sqlite.exec('COMMIT');
+    } catch (err) {
+      sqlite.exec('ROLLBACK');
+      throw err;
+    }
+
+    let message = 'Buku fisik berhasil dikembalikan tepat waktu.';
+    if (overdueDays > 0) {
+      message = `Buku dikembalikan dengan keterlambatan ${overdueDays} hari. Denda: Rp ${fineAmount.toLocaleString('id-ID')}.`;
+    }
+
+    return {
+      loan: {
+        ...activeLoan,
+        returnDate: now.toISOString(),
+        status: 'RETURNED',
+        fineAmount,
+        isFinePaid
+      },
+      overdueDays,
+      fineAmount,
+      message
+    };
   }
 
   /**
@@ -235,6 +429,7 @@ export class CirculationService {
   async getAllCirculationLoans(limit = 100): Promise<Loan[]> {
     return this.loanRepo.findAllLoans(limit);
   }
+
 
   /**
    * 7. Reservasi Mandiri Buku Fisik oleh Pengguna (Siswa/Guru)

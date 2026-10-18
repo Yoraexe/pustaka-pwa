@@ -1,7 +1,13 @@
 /**
  * @file src/client/components/catalog/BookCard.tsx
- * @description Kartu buku katalog hybrid dengan tipografi tajam, Aceternity CardSpotlight & BackgroundGradient, bebas dari icon dekoratif.
+ * @description Kartu buku katalog hybrid dengan tipografi tajam, Aceternity CardSpotlight, serta aksi langsung Pinjam E-Book & Pinjam Fisik.
  * @layer Presentation Component
+ * 
+ * Tujuan: Menampilkan kartu ringkasan buku di katalog dengan status stok real-time dan tombol peminjaman langsung (Digital & Fisik).
+ * Caller: src/client/components/catalog/BookGrid.tsx
+ * Dependensi: react, shared/types, CardSpotlight, Badge, Button.
+ * Main Functions: BookCard
+ * Side Effects: Memicu callback onBorrowDigital, onBorrowPhysical, atau onSelectDetail.
  */
 
 import React from 'react';
@@ -13,19 +19,28 @@ import { Button } from '../ui/button.js';
 interface BookCardProps {
   book: Book;
   onBorrowDigital?: (book: Book) => void;
+  onBorrowPhysical?: (book: Book) => void;
   onSelectDetail?: (book: Book) => void;
   isBorrowedByUser?: boolean;
+  isDigitalBorrowed?: boolean;
+  isPhysicalBorrowed?: boolean;
 }
 
 export const BookCard: React.FC<BookCardProps> = ({
   book,
   onBorrowDigital,
+  onBorrowPhysical,
   onSelectDetail,
   isBorrowedByUser = false,
+  isDigitalBorrowed,
+  isPhysicalBorrowed,
 }) => {
   const isDigital = book.bookType === 'DIGITAL_ONLY' || book.bookType === 'HYBRID';
   const isPhysical = book.bookType === 'PHYSICAL_ONLY' || book.bookType === 'HYBRID';
   const isHybrid = book.bookType === 'HYBRID';
+
+  const digitalBorrowed = isDigitalBorrowed ?? isBorrowedByUser;
+  const physicalBorrowed = isPhysicalBorrowed ?? isBorrowedByUser;
 
   const cardContent = (
     <div className="flex flex-col justify-between h-full bg-card rounded-[22px] overflow-hidden">
@@ -113,34 +128,114 @@ export const BookCard: React.FC<BookCardProps> = ({
           </div>
         </div>
 
-        {/* Action Button */}
+        {/* Action Buttons */}
         <div className="mt-3.5 pt-2">
-          {isBorrowedByUser ? (
+          {isHybrid ? (
+            <div className="grid grid-cols-2 gap-1.5">
+              {digitalBorrowed ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onSelectDetail?.(book)}
+                  className="w-full text-emerald-700 dark:text-emerald-300 border-emerald-300/50 bg-emerald-50/50 dark:bg-emerald-950/40 font-semibold text-[11px] px-2"
+                >
+                  E-Book Aktif
+                </Button>
+              ) : book.ebookFilePath ? (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => onBorrowDigital?.(book)}
+                  className="w-full shadow-xs font-semibold text-[11px] px-2"
+                >
+                  Pinjam E-Book
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled
+                  className="w-full text-[11px] px-2 opacity-60"
+                >
+                  PDF Kosong
+                </Button>
+              )}
+
+              {physicalBorrowed ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onSelectDetail?.(book)}
+                  className="w-full text-blue-700 dark:text-blue-300 border-blue-300/50 bg-blue-50/50 dark:bg-blue-950/40 font-semibold text-[11px] px-2"
+                >
+                  Fisik Aktif
+                </Button>
+              ) : book.availablePhysicalCopies > 0 ? (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => (onBorrowPhysical ? onBorrowPhysical(book) : onSelectDetail?.(book))}
+                  className="w-full font-semibold text-[11px] px-2 border border-amber-500/30 text-amber-900 dark:text-amber-200 hover:bg-amber-500/15"
+                >
+                  Pinjam Fisik
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled
+                  className="w-full text-[11px] px-2 opacity-60"
+                >
+                  Fisik Habis
+                </Button>
+              )}
+            </div>
+          ) : isDigital ? (
+            digitalBorrowed ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onSelectDetail?.(book)}
+                className="w-full text-emerald-700 dark:text-emerald-300 border-emerald-300/50 bg-emerald-50/50 dark:bg-emerald-950/40 hover:bg-emerald-100/60 font-semibold text-xs"
+              >
+                E-Book Dipinjam
+              </Button>
+            ) : (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => onBorrowDigital?.(book)}
+                className="w-full shadow-xs font-semibold text-xs"
+              >
+                Pinjam E-Book
+              </Button>
+            )
+          ) : physicalBorrowed ? (
             <Button
               variant="outline"
               size="sm"
               onClick={() => onSelectDetail?.(book)}
-              className="w-full text-emerald-700 dark:text-emerald-300 border-emerald-300/50 bg-emerald-50/50 dark:bg-emerald-950/40 hover:bg-emerald-100/60 font-semibold text-xs"
+              className="w-full text-blue-700 dark:text-blue-300 border-blue-300/50 bg-blue-50/50 dark:bg-blue-950/40 font-semibold text-xs"
             >
-              Sudah Dipinjam
+              Fisik Dipinjam
             </Button>
-          ) : isDigital ? (
+          ) : book.availablePhysicalCopies > 0 ? (
             <Button
               variant="default"
               size="sm"
-              onClick={() => onBorrowDigital?.(book)}
+              onClick={() => (onBorrowPhysical ? onBorrowPhysical(book) : onSelectDetail?.(book))}
               className="w-full shadow-xs font-semibold text-xs"
             >
-              Pinjam E-Book
+              Pinjam Fisik
             </Button>
           ) : (
             <Button
-              variant="secondary"
+              variant="outline"
               size="sm"
-              onClick={() => onSelectDetail?.(book)}
-              className="w-full text-muted-foreground font-semibold text-xs"
+              disabled
+              className="w-full text-xs opacity-60"
             >
-              Pinjam Fisik
+              Stok Fisik Habis
             </Button>
           )}
         </div>
@@ -158,3 +253,4 @@ export const BookCard: React.FC<BookCardProps> = ({
     </CardSpotlight>
   );
 };
+

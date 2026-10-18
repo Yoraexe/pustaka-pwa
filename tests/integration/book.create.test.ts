@@ -18,6 +18,7 @@ import { books, bookCopies, loans } from '../../src/server/db/schema.js';
 import { eq } from 'drizzle-orm';
 import fs from 'fs';
 import path from 'path';
+import { ensureTestDatabaseSeeded } from '../helpers/test-fixture.js';
 
 describe('Book Creation & Ingestion API Integration Tests', () => {
   const app = createApp();
@@ -47,6 +48,7 @@ describe('Book Creation & Ingestion API Integration Tests', () => {
   });
 
   beforeAll(async () => {
+    await ensureTestDatabaseSeeded();
     // 1. Login sebagai Siswa
     const studentLogin = await request(app)
       .post('/api/auth/login')

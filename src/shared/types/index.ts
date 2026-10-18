@@ -117,14 +117,20 @@ export interface CsvImportResult {
 export type {
   LoginInput,
   CreateUserInput,
+  SelfRegisterInput,
+  UpdateUserStatusInput,
+  ResetUserPasswordInput,
   BookFilterInput,
   CreateBookInput,
   DigitalLoanInput,
   PhysicalLoanInput,
   ReturnPhysicalLoanInput,
+  BorrowPhysicalSelfInput,
+  ReturnPhysicalSelfInput,
   ReservePhysicalLoanInput,
   ClaimReservationInput,
   CancelReservationInput,
   RenewLoanInput
 } from '../schemas/index.js';
+
 

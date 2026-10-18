@@ -9,6 +9,7 @@ import { circulationService } from '../../src/server/services/circulation.servic
 import { bookRepository } from '../../src/server/repositories/book.repository.js';
 import { userRepository } from '../../src/server/repositories/user.repository.js';
 import type { User } from '../../src/shared/types/index.js';
+import { ensureTestDatabaseSeeded, cleanupTestPdf } from '../helpers/test-fixture.js';
 
 describe('CirculationService Unit Tests', () => {
   let studentUser: User;
@@ -16,7 +17,12 @@ describe('CirculationService Unit Tests', () => {
   let hybridBookId: number;
   let physicalOnlyBookId: number;
 
+  afterAll(() => {
+    cleanupTestPdf();
+  });
+
   beforeAll(async () => {
+    await ensureTestDatabaseSeeded();
     const student = await userRepository.findByIdentityNumber('NISN202602');
     if (!student) throw new Error('Student user not found in seed');
     studentUser = student;
@@ -215,5 +221,77 @@ describe('CirculationService Unit Tests', () => {
       }
     });
   });
+
+  describe('Self-Service Physical Borrowing & Instant Return', () => {
+    it('harus mengizinkan pemustaka meminjam buku fisik secara mandiri dan langsung mengembalikannya saat itu juga tanpa menunggu masa pinjam habis', async () => {
+      const bookBefore = await bookRepository.findById(physicalOnlyBookId);
+      expect(bookBefore).toBeDefined();
+      const initialAvail = bookBefore!.availablePhysicalCopies;
+
+      // 1. Peminjaman fisik mandiri langsung (status langsung BORROWED)
+      const loan = await circulationService.borrowPhysicalBookSelf(studentUser, physicalOnlyBookId);
+      expect(loan).toBeDefined();
+      expect(loan.status).toBe('BORROWED');
+      expect(loan.loanType).toBe('PHYSICAL');
+      expect(loan.copyBarcode).toBeTruthy();
+
+      const bookDuring = await bookRepository.findById(physicalOnlyBookId);
+      expect(bookDuring!.availablePhysicalCopies).toBe(initialAvail - 1);
+
+      // 2. Pengembalian instan saat itu juga oleh pemustaka tanpa menunggu waktu habis
+      const returnRes = await circulationService.returnPhysicalBookSelf(studentUser, loan.id);
+      expect(returnRes.loan.status).toBe('RETURNED');
+      expect(returnRes.overdueDays).toBe(0);
+      expect(returnRes.fineAmount).toBe(0);
+
+      const bookAfter = await bookRepository.findById(physicalOnlyBookId);
+      expect(bookAfter!.availablePhysicalCopies).toBe(initialAvail);
+    });
+
+    it('harus mengizinkan peminjaman fisik langsung hanya dengan hasil Scan QR / Barcode eksemplar tanpa bookId', async () => {
+      const copies = await bookRepository.findCopiesByBookId(physicalOnlyBookId);
+      const availCopy = copies.find((c) => c.status === 'AVAILABLE');
+      expect(availCopy).toBeDefined();
+
+      const loan = await circulationService.borrowPhysicalBookSelf(
+        studentUser,
+        undefined,
+        `PUSTAKA:COPY:${availCopy!.barcode}`
+      );
+      expect(loan.status).toBe('BORROWED');
+      expect(loan.bookId).toBe(physicalOnlyBookId);
+      expect(loan.copyBarcode).toBe(availCopy!.barcode);
+
+      // Kembalikan lagi agar bersih
+      const returnRes = await circulationService.returnPhysicalBookSelf(studentUser, loan.id);
+      expect(returnRes.loan.status).toBe('RETURNED');
+    });
+
+    it('harus mendukung peminjaman HYBRID (E-Book Digital & Buku Fisik sekaligus pada buku yang sama) dan pengembalian independen', async () => {
+      // 1. Pinjam versi Digital E-Book dari buku Hybrid
+      const digitalLoan = await circulationService.borrowDigitalBook(studentUser, hybridBookId);
+      expect(digitalLoan.loanType).toBe('DIGITAL');
+      expect(digitalLoan.status).toBe('BORROWED');
+
+      // 2. Pinjam juga versi Buku Fisik dari buku Hybrid yang sama
+      const physicalLoan = await circulationService.borrowPhysicalBookSelf(studentUser, hybridBookId);
+      expect(physicalLoan.loanType).toBe('PHYSICAL');
+      expect(physicalLoan.status).toBe('BORROWED');
+      expect(physicalLoan.copyBarcode).toBeTruthy();
+
+      // 3. Kembalikan buku fisik secara instan; e-book digital harus tetap aktif
+      const physReturn = await circulationService.returnPhysicalBookSelf(studentUser, physicalLoan.id);
+      expect(physReturn.loan.status).toBe('RETURNED');
+
+      const stillHasDigital = await circulationService.hasActiveDigitalAccess(studentUser, hybridBookId);
+      expect(stillHasDigital).toBe(true);
+
+      // 4. Kembalikan e-book digital
+      await circulationService.returnDigitalBook(studentUser, hybridBookId);
+      const afterDigitalReturn = await circulationService.hasActiveDigitalAccess(studentUser, hybridBookId);
+      expect(afterDigitalReturn).toBe(false);
+    });
+  });
 });
+
 

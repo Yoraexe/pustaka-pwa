@@ -1,17 +1,24 @@
 /**
  * @file src/client/hooks/useAuth.tsx
- * @description React Context & Hook untuk manajemen state otentikasi pengguna secara reaktif.
+ * @description React Context & Hook untuk manajemen state otentikasi dan registrasi pengguna secara reaktif.
  * @layer Client State & Hook Layer
+ * 
+ * Tujuan: Menyediakan konteks sesi otentikasi reaktif (login, signup, logout, current user) bagi seluruh komponen klien.
+ * Caller: src/client/main.tsx, App.tsx, Navbar.tsx, BottomNav.tsx, LoginPage.tsx, CatalogPage.tsx, CirculationDesk.tsx, SuperAdminPanel.tsx.
+ * Dependensi: react, src/client/services/api.ts, shared/types.
+ * Main Functions: AuthProvider, useAuth.
+ * Side Effects: Membaca/menulis profil pengguna ke localStorage dan memverifikasi token JWT ke server.
  */
 
 import React, { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import { api } from '../services/api.js';
-import type { User, LoginInput } from '../../shared/types/index.js';
+import type { User, LoginInput, SelfRegisterInput } from '../../shared/types/index.js';
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (input: LoginInput) => Promise<void>;
+  signup: (input: SelfRegisterInput) => Promise<void>;
   logout: () => void;
   isAuthenticated: boolean;
 }
@@ -46,7 +53,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           const profile = await api.getCurrentUser();
           setUser(profile);
           localStorage.setItem('pustaka_cached_user', JSON.stringify(profile));
-        } catch (err: unknown) {
+        } catch {
           // Hanya logout jika token benar-benar ditolak oleh server (401)
           if (!api.getToken()) {
             localStorage.removeItem('pustaka_cached_user');
@@ -72,6 +79,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const signup = async (input: SelfRegisterInput) => {
+    setIsLoading(true);
+    try {
+      const session = await api.signup(input);
+      setUser(session.user);
+      localStorage.setItem('pustaka_cached_user', JSON.stringify(session.user));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = () => {
     api.logout();
     localStorage.removeItem('pustaka_cached_user');
@@ -85,6 +103,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         user,
         isLoading,
         login,
+        signup,
         logout,
         isAuthenticated: !!user
       }}
@@ -101,3 +120,4 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+

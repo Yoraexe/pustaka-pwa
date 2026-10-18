@@ -4,15 +4,16 @@
  * @layer Client Service Layer
  * 
  * Tujuan: Menyediakan abstraksi HTTP Client berbasis Fetch dengan penyisipan token JWT, caching offline localStorage, dan error handling terpusat.
- * Caller: Seluruh komponen UI klien (CatalogPage, MyBooksPage, CirculationDesk, PDFReader, AddBookModal, UserImportModal).
+ * Caller: Seluruh komponen UI klien (CatalogPage, MyBooksPage, CirculationDesk, SuperAdminPanel, LoginPage, PDFReader, AddBookModal, UserImportModal).
  * Dependensi: shared/types.
- * Main Functions: ApiClient (login, getCurrentUser, getBooks, getBookDetail, borrowDigitalBook, returnDigitalBook, reservePhysicalBook, claimReservation, cancelReservation, renewPhysicalLoan, importUsersCsv, dll).
+ * Main Functions: ApiClient (login, signup, registerUserByAdmin, getUsers, updateUserStatus, resetUserPassword, getCurrentUser, getBooks, getBookDetail, borrowDigitalBook, returnDigitalBook, borrowPhysicalBookSelf, returnPhysicalBookSelf, reservePhysicalBook, claimReservation, cancelReservation, renewPhysicalLoan, importUsersCsv).
  * Side Effects: Melakukan request jaringan HTTP ke backend Express, menulis/membaca token dan cache ke localStorage.
  */
 
 import type {
   ApiResponse, AuthSession, Book, BookCopy, BookFilterInput,
-  Category, CreateBookInput, Loan, LoginInput, CsvImportResult, AvailableCopy
+  Category, CreateBookInput, CreateUserInput, SelfRegisterInput, User,
+  Loan, LoginInput, CsvImportResult, AvailableCopy
 } from '../../shared/types/index.js';
 
 const API_BASE = '/api';
@@ -72,9 +73,18 @@ class ApiClient {
   }
 
 
-  // --- Auth Endpoints ---
+  // --- Auth & User Management Endpoints ---
   async login(input: LoginInput): Promise<AuthSession> {
     const data = await this.request<AuthSession>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+    this.setToken(data.token);
+    return data;
+  }
+
+  async signup(input: SelfRegisterInput): Promise<AuthSession> {
+    const data = await this.request<AuthSession>('/auth/signup', {
       method: 'POST',
       body: JSON.stringify(input)
     });
@@ -90,6 +100,31 @@ class ApiClient {
     this.setToken(null);
   }
 
+  async getUsers(): Promise<User[]> {
+    return this.request<User[]>('/auth/users');
+  }
+
+  async registerUserByAdmin(input: CreateUserInput): Promise<User> {
+    return this.request<User>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+  }
+
+  async updateUserStatus(userId: number, isActive: boolean): Promise<User> {
+    return this.request<User>(`/auth/users/${userId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isActive })
+    });
+  }
+
+  async resetUserPassword(userId: number, newPassword: string): Promise<void> {
+    return this.request<void>(`/auth/users/${userId}/password`, {
+      method: 'PATCH',
+      body: JSON.stringify({ newPassword })
+    });
+  }
+
   async importUsersCsv(data: FormData | { csvText: string }): Promise<CsvImportResult> {
     const isFormData = data instanceof FormData;
     const body = isFormData ? data : JSON.stringify(data);
@@ -98,6 +133,7 @@ class ApiClient {
       body
     });
   }
+
 
   // --- Books & Catalog ---
   async getCategories(): Promise<Category[]> {
@@ -194,6 +230,32 @@ class ApiClient {
     return this.request<Loan>('/circulation/physical/checkout', {
       method: 'POST',
       body: JSON.stringify({ userIdentity, copyBarcode })
+    });
+  }
+
+  async borrowPhysicalBookSelf(bookId?: number, copyBarcode?: string): Promise<Loan> {
+    return this.request<Loan>('/circulation/physical/borrow-self', {
+      method: 'POST',
+      body: JSON.stringify({ bookId, copyBarcode })
+    });
+  }
+
+  async borrowPhysicalByBarcode(copyBarcode: string): Promise<Loan> {
+    return this.request<Loan>('/circulation/physical/borrow-self', {
+      method: 'POST',
+      body: JSON.stringify({ copyBarcode })
+    });
+  }
+
+  async returnPhysicalBookSelf(loanId: number): Promise<{
+    loan: Loan;
+    overdueDays: number;
+    fineAmount: number;
+    message: string;
+  }> {
+    return this.request('/circulation/physical/return-self', {
+      method: 'POST',
+      body: JSON.stringify({ loanId })
     });
   }
 

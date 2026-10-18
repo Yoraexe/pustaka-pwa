@@ -4,21 +4,27 @@
  * @layer Quality Assurance (Integration Test)
  */
 
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../../src/server/app.js';
 import { db } from '../../src/server/db/index.js';
 import { users } from '../../src/server/db/schema.js';
 import { inArray } from 'drizzle-orm';
+import { ensureTestDatabaseSeeded, cleanupTestPdf } from '../helpers/test-fixture.js';
 
 describe('Pustaka Sekolah API Integration Tests', () => {
   const app = createApp();
   let studentToken = '';
   let adminToken = '';
-  const testIdentities = ['NISN_API_001', 'NIP_API_002'];
+  const testIdentities = ['NISN_API_001', 'NIP_API_002', 'NISN_SIGNUP_99', 'ADMIN_SIGNUP_99', 'NIP_SUPER_99'];
+
+  beforeAll(async () => {
+    await ensureTestDatabaseSeeded();
+  });
 
   afterAll(() => {
     db.delete(users).where(inArray(users.identityNumber, testIdentities)).run();
+    cleanupTestPdf();
   });
 
   it('GET /api/health harus mengembalikan status healthy', async () => {
@@ -92,18 +98,18 @@ describe('Pustaka Sekolah API Integration Tests', () => {
       expect(borrowRes.body.success).toBe(true);
       expect(borrowRes.body.data.loanType).toBe('DIGITAL');
       expect(borrowRes.body.data.status).toBe('BORROWED');
-
-      // Kembalikan lagi agar state bersih
-      const returnRes = await request(app)
-        .post('/api/circulation/digital/return')
-        .set('Authorization', `Bearer ${studentToken}`)
-        .send({ bookId: digitalBook.id });
-
-      expect(returnRes.status).toBe(200);
-      expect(returnRes.body.success).toBe(true);
     } else {
       expect(borrowRes.status).toBe(400);
     }
+
+    // Kembalikan lagi agar state bersih untuk pengujian berikutnya
+    const returnRes = await request(app)
+      .post('/api/circulation/digital/return')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ bookId: digitalBook.id });
+
+    expect(returnRes.status).toBe(200);
+    expect(returnRes.body.success).toBe(true);
   });
 
   it('GET /api/books/:id/stream-pdf harus menerapkan proteksi otorisasi pinjaman digital', async () => {
@@ -193,4 +199,114 @@ describe('Pustaka Sekolah API Integration Tests', () => {
     expect(res.body.data.totalRows).toBe(2);
     expect(res.body.data.importedCount).toBe(2);
   });
+
+  it('POST /api/auth/signup harus mengizinkan pendaftaran akun baru (termasuk ADMIN & STUDENT) dan menolak role tidak valid', async () => {
+    // 1. Role tidak dikenal harus ditolak (400 Bad Request dari Zod)
+    const invalidRoleRes = await request(app)
+      .post('/api/auth/signup')
+      .send({
+        identityNumber: 'NISN_SIGNUP_99',
+        name: 'Pengguna Role Asing',
+        role: 'UNKNOWN_ROLE',
+        password: 'password123'
+      });
+    expect(invalidRoleRes.status).toBe(400);
+
+    // 2. Pendaftaran mandiri valid sebagai ADMIN (Superadmin)
+    const adminSignupRes = await request(app)
+      .post('/api/auth/signup')
+      .send({
+        identityNumber: 'ADMIN_SIGNUP_99',
+        name: 'Superadmin Baru',
+        role: 'ADMIN',
+        className: 'Administrator Utama',
+        password: 'password123'
+      });
+    expect(adminSignupRes.status).toBe(201);
+    expect(adminSignupRes.body.success).toBe(true);
+    expect(adminSignupRes.body.data.user.role).toBe('ADMIN');
+
+    // 3. Pendaftaran mandiri valid sebagai STUDENT
+    const signupRes = await request(app)
+      .post('/api/auth/signup')
+      .send({
+        identityNumber: 'NISN_SIGNUP_99',
+        name: 'Siswa Pendaftar Mandiri',
+        role: 'STUDENT',
+        className: 'X DKV 1',
+        password: 'password123'
+      });
+    expect(signupRes.status).toBe(201);
+    expect(signupRes.body.success).toBe(true);
+    expect(signupRes.body.data.token).toBeDefined();
+    expect(signupRes.body.data.user.role).toBe('STUDENT');
+  });
+
+  it('Superadmin endpoints (/api/auth/register, /api/auth/users, PATCH status & password) harus berfungsi penuh', async () => {
+    const createRes = await request(app)
+      .post('/api/auth/register')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        identityNumber: 'NIP_SUPER_99',
+        name: 'Pustakawan Superadmin Test',
+        role: 'LIBRARIAN',
+        className: 'Staf Perpustakaan',
+        password: 'awal123'
+      });
+    expect(createRes.status).toBe(201);
+    const createdUserId = createRes.body.data.id;
+
+    const listRes = await request(app)
+      .get('/api/auth/users')
+      .set('Authorization', `Bearer ${adminToken}`);
+    expect(listRes.status).toBe(200);
+    expect(Array.isArray(listRes.body.data)).toBe(true);
+
+    const statusRes = await request(app)
+      .patch(`/api/auth/users/${createdUserId}/status`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ isActive: false });
+    expect(statusRes.status).toBe(200);
+    expect(statusRes.body.data.isActive).toBe(false);
+
+    const passRes = await request(app)
+      .patch(`/api/auth/users/${createdUserId}/password`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({ newPassword: 'reset789' });
+    expect(passRes.status).toBe(200);
+    expect(passRes.body.success).toBe(true);
+  });
+
+  it('POST /api/circulation/physical/borrow-self & /return-self harus meminjam dan langsung mengembalikan buku fisik saat itu juga', async () => {
+    const booksRes = await request(app).get('/api/books');
+    const physicalBook = booksRes.body.data.find(
+      (b: { bookType: string; availablePhysicalCopies: number }) =>
+        (b.bookType === 'PHYSICAL_ONLY' || b.bookType === 'HYBRID') && b.availablePhysicalCopies > 0
+    );
+    expect(physicalBook).toBeDefined();
+
+    // 1. Pinjam fisik mandiri
+    const borrowRes = await request(app)
+      .post('/api/circulation/physical/borrow-self')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ bookId: physicalBook.id });
+
+    expect(borrowRes.status).toBe(201);
+    expect(borrowRes.body.success).toBe(true);
+    expect(borrowRes.body.data.loanType).toBe('PHYSICAL');
+    expect(borrowRes.body.data.status).toBe('BORROWED');
+    const loanId = borrowRes.body.data.id;
+
+    // 2. Kembalikan buku fisik saat itu juga tanpa menunggu masa pinjam habis
+    const returnRes = await request(app)
+      .post('/api/circulation/physical/return-self')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ loanId });
+
+    expect(returnRes.status).toBe(200);
+    expect(returnRes.body.success).toBe(true);
+    expect(returnRes.body.data.loan.status).toBe('RETURNED');
+    expect(returnRes.body.data.fineAmount).toBe(0);
+  });
 });
+
