@@ -46,6 +46,7 @@ export default defineConfig({
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/api/books') && !url.pathname.includes('/stream-pdf'),
             handler: 'StaleWhileRevalidate',
+            method: 'GET',
             options: {
               cacheName: 'api-books-cache',
               cacheableResponse: {
@@ -56,6 +57,7 @@ export default defineConfig({
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/api/circulation/my-loans'),
             handler: 'NetworkFirst',
+            method: 'GET',
             options: {
               cacheName: 'api-loans-cache',
               cacheableResponse: {

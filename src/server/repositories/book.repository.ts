@@ -48,7 +48,7 @@ export class BookRepository {
     if (filters.search && filters.search.trim() !== '') {
       const term = `%${filters.search.trim().toLowerCase()}%`;
       conditions.push(
-        sql`(LOWER(${books.title}) LIKE ${term} OR LOWER(${books.author}) LIKE ${term} OR LOWER(${categories.name}) LIKE ${term})`
+        sql`(LOWER(${books.title}) LIKE ${term} OR LOWER(${books.author}) LIKE ${term} OR LOWER(${categories.name}) LIKE ${term} OR LOWER(COALESCE(${books.isbn}, '')) LIKE ${term})`
       );
     }
 

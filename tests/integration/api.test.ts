@@ -369,5 +369,34 @@ describe('Pustaka Sekolah API Integration Tests', () => {
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('INVALID_FILE_PATH');
   });
+
+  it('POST /api/auth/import-users harus menolak file non-CSV via fileFilter (400 Bad Request)', async () => {
+    const res = await request(app)
+      .post('/api/auth/import-users')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .attach('file', Buffer.from('MZ_BINARY_EXE_DATA'), 'dangerous.exe');
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.message).toContain('berekstensi .csv');
+  });
+
+  it('GET /api/books dengan filter search harus dapat menemukan buku berdasarkan nomor ISBN', async () => {
+    const res = await request(app).get('/api/books?search=978-602-000-001-1');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.length).toBeGreaterThan(0);
+    expect(res.body.data[0].isbn).toBe('978-602-000-001-1');
+  });
+
+  it('GET /api/circulation/all harus mematuhi parameter query limit', async () => {
+    const res = await request(app)
+      .get('/api/circulation/all?limit=1')
+      .set('Authorization', `Bearer ${adminToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(Array.isArray(res.body.data)).toBe(true);
+    expect(res.body.data.length).toBeLessThanOrEqual(1);
+  });
 });
 

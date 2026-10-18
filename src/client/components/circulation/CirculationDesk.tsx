@@ -24,13 +24,17 @@ import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
 import { Label } from '../ui/label.js';
 import { Badge } from '../ui/badge.js';
-import { Camera } from 'lucide-react';
+import { Camera, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const CirculationDesk: React.FC = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<string>('checkout');
   const [loans, setLoans] = useState<Loan[]>([]);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 15;
+  const totalPages = Math.max(1, Math.ceil(loans.length / pageSize));
+  const paginatedLoans = loans.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const [availableCopies, setAvailableCopies] = useState<AvailableCopy[]>([]);
   const [members, setMembers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -66,6 +70,10 @@ export const CirculationDesk: React.FC = () => {
     try {
       const data = await api.getAllLoans();
       setLoans(data);
+      setCurrentPage((prev) => {
+        const nextTotal = Math.max(1, Math.ceil(data.length / pageSize));
+        return prev > nextTotal ? nextTotal : prev;
+      });
     } catch (err: unknown) {
       console.error(err);
       toast.error('Gagal Memuat Riwayat Sirkulasi');
@@ -796,7 +804,7 @@ export const CirculationDesk: React.FC = () => {
           </TableHeader>
           <TableBody>
             {loans.length > 0 ? (
-              loans.slice(0, 20).map((l) => (
+              paginatedLoans.map((l) => (
                 <TableRow key={l.id}>
                   <TableCell>
                     <div className="font-semibold text-foreground">{l.userName || 'Siswa'}</div>
@@ -895,6 +903,41 @@ export const CirculationDesk: React.FC = () => {
             )}
           </TableBody>
         </Table>
+
+        {/* Pagination Controls */}
+        {loans.length > pageSize && (
+          <div className="p-4 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+            <div>
+              Menampilkan {Math.min((currentPage - 1) * pageSize + 1, loans.length)} -{' '}
+              {Math.min(currentPage * pageSize, loans.length)} dari {loans.length} transaksi
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                <ChevronLeft className="w-3.5 h-3.5 mr-1" />
+                Sebelumnya
+              </Button>
+              <span className="text-xs font-semibold px-2 text-foreground">
+                Halaman {currentPage} dari {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 px-3 text-xs"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              >
+                Selanjutnya
+                <ChevronRight className="w-3.5 h-3.5 ml-1" />
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Modal Pendaftaran Koleksi Buku Baru */}

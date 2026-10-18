@@ -265,6 +265,15 @@ export class AuthService {
           role = 'ADMIN';
         }
 
+        if (customPassword && customPassword.length < 4) {
+          errors.push({
+            row: rowNum,
+            identity: identityNumber,
+            reason: 'Password minimal 4 karakter'
+          });
+          continue;
+        }
+
         try {
           const existing = await this.userRepo.findByIdentityNumber(identityNumber);
           if (existing) {

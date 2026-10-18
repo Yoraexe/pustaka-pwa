@@ -131,9 +131,11 @@ circulationRouter.post('/physical/return', authenticateToken, requireRole(['LIBR
 });
 
 // 6. All Loans List (Meja Pustakawan & Audit)
-circulationRouter.get('/all', authenticateToken, requireRole(['LIBRARIAN', 'ADMIN']), async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
+circulationRouter.get('/all', authenticateToken, requireRole(['LIBRARIAN', 'ADMIN']), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const loans = await circulationService.getAllCirculationLoans();
+    const rawLimit = req.query.limit ? Number(req.query.limit) : 100;
+    const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 500) : 100;
+    const loans = await circulationService.getAllCirculationLoans(limit);
     res.json({
       success: true,
       data: loans

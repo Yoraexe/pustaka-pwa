@@ -98,6 +98,19 @@ describe('AuthService Unit Tests', () => {
       expect(result.importedCount).toBe(0);
       expect(result.skippedCount).toBe(1);
     });
+
+    it('harus menolak baris dengan customPassword yang kurang dari 4 karakter', async () => {
+      const csvData = [
+        'identityNumber,name,role,email,password',
+        'NISN_SHORT_01,Budi Pendek,Siswa,budi@sekolah.sch.id,123',
+      ].join('\n');
+
+      const result = await authService.importUsersFromCsv(csvData);
+      expect(result.totalRows).toBe(1);
+      expect(result.importedCount).toBe(0);
+      expect(result.errors.length).toBe(1);
+      expect(result.errors[0].reason).toBe('Password minimal 4 karakter');
+    });
   });
 
   describe('Self-Registration & Superadmin Account Management', () => {

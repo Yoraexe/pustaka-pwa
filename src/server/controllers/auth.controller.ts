@@ -22,7 +22,28 @@ import {
 } from '../../shared/schemas/index.js';
 import { authenticateToken, requireRole } from '../middleware/auth.middleware.js';
 
-const uploadCsv = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
+const ALLOWED_CSV_MIMES = [
+  'text/csv',
+  'text/plain',
+  'application/vnd.ms-excel',
+  'application/csv',
+  'text/x-csv',
+  'application/x-csv'
+];
+
+const uploadCsv = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const isCsvExt = file.originalname.toLowerCase().endsWith('.csv');
+    const isCsvMime = ALLOWED_CSV_MIMES.includes(file.mimetype);
+    if (isCsvExt || isCsvMime) {
+      cb(null, true);
+    } else {
+      cb(new Error('Format berkas tidak didukung. Harap unggah berkas berekstensi .csv.'));
+    }
+  }
+});
 
 export const authRouter = Router();
 
