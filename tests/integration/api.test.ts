@@ -27,11 +27,14 @@ describe('Pustaka Sekolah API Integration Tests', () => {
     cleanupTestPdf();
   });
 
-  it('GET /api/health harus mengembalikan status healthy', async () => {
+  it('GET /api/health harus mengembalikan status healthy dan security headers (BUG-804)', async () => {
     const res = await request(app).get('/api/health');
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('healthy');
     expect(res.body.app).toBe('Pustaka Sekolah PWA');
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+    expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
+    expect(res.headers['x-xss-protection']).toBe('1; mode=block');
   });
 
   it('POST /api/auth/login harus berhasil mengembalikan token JWT', async () => {

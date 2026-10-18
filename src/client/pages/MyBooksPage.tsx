@@ -63,11 +63,13 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
     setIsLoading(true);
 
     // 1. Muat cache lokal jika ada
+    let cachedActiveLoans: Loan[] = [];
     const cachedLoans = localStorage.getItem('pustaka_my_loans_false');
     if (cachedLoans) {
       try {
         const parsed: Loan[] = JSON.parse(cachedLoans);
-        setActiveLoans(parsed.filter((l) => l.status === 'BORROWED'));
+        cachedActiveLoans = parsed.filter((l) => l.status === 'BORROWED');
+        setActiveLoans(cachedActiveLoans);
         setHistoryLoans(parsed.filter((l) => l.status === 'RETURNED'));
         setReservations(parsed.filter((l) => l.status === 'RESERVED'));
       } catch {
@@ -75,11 +77,26 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
       }
     }
 
-    // 2. Muat berkas offline dari IndexedDB
+    // 2. Muat berkas offline dari IndexedDB (dan bersihkan pinjaman luring yang kadaluwarsa offline)
     try {
       const offlineList = await offlineStorage.getAllOfflineEbooks();
-      setOfflineBooks(offlineList);
-      setSavedOfflineIds(new Set(offlineList.map((b) => b.id)));
+      const now = Date.now();
+      const validOffline: typeof offlineList = [];
+      const validIds = new Set<number>();
+
+      for (const b of offlineList) {
+        const matchedLoan = cachedActiveLoans.find((l) => l.bookId === b.id && l.loanType === 'DIGITAL');
+        // Jika ada di cache dan tanggal jatuh temponya sudah lewat, cabut akses luring
+        if (matchedLoan && new Date(matchedLoan.dueDate).getTime() < now) {
+          await offlineStorage.removeEbook(b.id);
+        } else {
+          validOffline.push(b);
+          validIds.add(b.id);
+        }
+      }
+
+      setOfflineBooks(validOffline);
+      setSavedOfflineIds(validIds);
     } catch (err) {
       console.warn('Gagal membaca IndexedDB offline books:', err);
     }
@@ -95,14 +112,31 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
       setHistoryLoans(finished);
       setReservations(reserved);
 
-      const offlineIds = new Set<number>();
-      for (const loan of allLoans) {
-        if (loan.loanType === 'DIGITAL') {
-          const isSaved = await offlineStorage.isEbookSaved(loan.bookId);
-          if (isSaved) offlineIds.add(loan.bookId);
+      // Auto-eviction hak akses DRM luring (BUG-801 & BRD 3.2 AC-2.2)
+      // Jika masa pinjam habis atau buku dikembalikan di server, berkas PDF di IndexedDB wajib dicabut seketika
+      const activeDigitalBookIds = new Set(
+        active.filter((l) => l.loanType === 'DIGITAL').map((l) => l.bookId)
+      );
+
+      const currentOfflineBooks = await offlineStorage.getAllOfflineEbooks();
+      const validOfflineBooks: Array<{ id: number; title: string; savedAt: string; size: number }> = [];
+      const validOfflineIds = new Set<number>();
+
+      for (const item of currentOfflineBooks) {
+        if (!activeDigitalBookIds.has(item.id)) {
+          try {
+            await offlineStorage.removeEbook(item.id);
+          } catch (e) {
+            console.warn(`Gagal menghapus e-book kedaluwarsa ID ${item.id} dari IndexedDB:`, e);
+          }
+        } else {
+          validOfflineBooks.push(item);
+          validOfflineIds.add(item.id);
         }
       }
-      setSavedOfflineIds((prev) => new Set([...prev, ...offlineIds]));
+
+      setOfflineBooks(validOfflineBooks);
+      setSavedOfflineIds(validOfflineIds);
     } catch (err) {
       console.warn('Tidak dapat menghubungi server (offline mode):', err);
     } finally {

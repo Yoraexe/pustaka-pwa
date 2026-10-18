@@ -75,10 +75,11 @@ export class CirculationService {
         throw new Error('Seluruh lisensi digital buku ini sedang dipinjam siswa lain. Silakan coba kembali nanti.');
       }
 
-      // 4. Kalkulasi tanggal jatuh tempo (Durasi pinjam)
+      // 4. Kalkulasi tanggal jatuh tempo (Durasi pinjam dinormalisasi ke akhir hari 23:59:59)
       const loanDays = user.role === 'TEACHER' ? config.TEACHER_LOAN_DAYS : config.STUDENT_LOAN_DAYS;
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + loanDays);
+      dueDate.setHours(23, 59, 59, 999);
 
       const createdLoan = await this.loanRepo.create({
         userId: user.id,
@@ -594,7 +595,10 @@ export class CirculationService {
 
     sqlite.exec('BEGIN IMMEDIATE');
     try {
-      await this.loanRepo.updateCancelReservation(loan.id);
+      const changes = await this.loanRepo.updateCancelReservation(loan.id);
+      if (changes === 0) {
+        throw new Error('Tiket reservasi sudah tidak aktif atau telah dibatalkan.');
+      }
       if (loan.copyId) {
         await this.bookRepo.updateCopyStatus(loan.copyId, 'AVAILABLE');
       }

@@ -26,8 +26,18 @@ export const createApp = () => {
     origin: true,
     credentials: true
   }));
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+
+  // Security Headers Middleware (BUG-804: Protection against MIME-sniffing, clickjacking, and XSS)
+  app.use((_req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    next();
+  });
+
+  // Body Parser with explicit payload limits (Astesia Hardening)
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // Static uploads directory terbatas HANYA untuk sampul buku (/uploads/covers)
   // Berkas e-book PDF (/uploads/ebooks) TIDAK BOLEH disajikan statis dan wajib melalui proteksi /stream-pdf

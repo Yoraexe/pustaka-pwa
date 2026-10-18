@@ -427,12 +427,18 @@ export class LoanRepository {
       .where(eq(loans.id, loanId));
   }
 
-  async updateCancelReservation(loanId: number): Promise<void> {
-    await db.update(loans)
+  async updateCancelReservation(loanId: number): Promise<number> {
+    const res = await db.update(loans)
       .set({
         status: 'CANCELLED'
       })
-      .where(eq(loans.id, loanId));
+      .where(
+        and(
+          eq(loans.id, loanId),
+          eq(loans.status, 'RESERVED')
+        )
+      );
+    return res.changes;
   }
 
   async updateReturn(loanId: number, returnDate: string, fineAmount: number, isFinePaid: boolean): Promise<void> {

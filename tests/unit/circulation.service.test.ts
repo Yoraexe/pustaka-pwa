@@ -44,13 +44,18 @@ describe('CirculationService Unit Tests', () => {
     physicalOnlyBookId = physical.id;
   });
 
-  it('harus berhasil meminjam e-book digital yang tersedia', async () => {
+  it('harus berhasil meminjam e-book digital yang tersedia dengan jatuh tempo dinormalisasi (BUG-803)', async () => {
     const loan = await circulationService.borrowDigitalBook(studentUser, hybridBookId);
     expect(loan).toBeDefined();
     expect(loan.userId).toBe(studentUser.id);
     expect(loan.bookId).toBe(hybridBookId);
     expect(loan.loanType).toBe('DIGITAL');
     expect(loan.status).toBe('BORROWED');
+
+    const due = new Date(loan.dueDate);
+    expect(due.getHours()).toBe(23);
+    expect(due.getMinutes()).toBe(59);
+    expect(due.getSeconds()).toBe(59);
   });
 
   it('harus menolak meminjam kembali e-book yang sedang aktif dipinjam oleh user yang sama', async () => {
@@ -146,6 +151,13 @@ describe('CirculationService Unit Tests', () => {
       await expect(
         circulationService.cancelPhysicalReservation(studentUser, reservationLoanId)
       ).resolves.toBeUndefined();
+    });
+
+    it('harus menolak pembatalan reservasi ganda / tiket yang sudah tidak aktif (BUG-802)', async () => {
+      // reservationLoanId sudah dibatalkan pada test sebelumnya
+      await expect(
+        circulationService.cancelPhysicalReservation(studentUser, reservationLoanId)
+      ).rejects.toThrow('sudah tidak aktif');
 
       // Verifikasi bisa reservasi kembali setelah pembatalan
       const reReserve = await circulationService.reservePhysicalBook(studentUser, physicalOnlyBookId);
