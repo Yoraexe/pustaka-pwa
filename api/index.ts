@@ -4,8 +4,11 @@
  * @layer Infrastructure Entry Point (Vercel)
  */
 
+import type { Request, Response } from 'express';
 import { createApp } from '../src/server/app.js';
 
 const app = createApp();
 
-export default app;
+export default function handler(req: Request, res: Response) {
+  return app(req, res);
+}

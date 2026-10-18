@@ -44,8 +44,8 @@ export const createApp = () => {
   // Berkas e-book PDF (/uploads/ebooks) TIDAK BOLEH disajikan statis dan wajib melalui proteksi /stream-pdf
   app.use('/uploads/covers', express.static(path.resolve(process.cwd(), 'uploads/covers')));
 
-  // Health check endpoint
-  app.get('/api/health', (_req, res) => {
+  // Health check endpoint (support both /api/health and /health)
+  app.get(['/api/health', '/health'], (_req, res) => {
     res.json({
       status: 'healthy',
       app: 'Pustaka Sekolah PWA',
@@ -53,10 +53,10 @@ export const createApp = () => {
     });
   });
 
-  // Mount API Routers
-  app.use('/api/auth', authRouter);
-  app.use('/api/books', bookRouter);
-  app.use('/api/circulation', circulationRouter);
+  // Mount API Routers (support both /api/* and /* for Vercel serverless rewrite compatibility)
+  app.use(['/api/auth', '/auth'], authRouter);
+  app.use(['/api/books', '/books'], bookRouter);
+  app.use(['/api/circulation', '/circulation'], circulationRouter);
 
   // Serve PWA Frontend Static Build & SPA Routing Fallback (Production)
   const distPath = path.resolve(process.cwd(), 'dist');

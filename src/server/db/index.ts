@@ -10,16 +10,14 @@
  * Side Effects: Membuat berkas SQLite, tabel-tabel skema, dan kategori dasar jika belum tersedia.
  */
 
-import Database from 'better-sqlite3';
-import { drizzle as drizzleBetterSqlite, type BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
-import { drizzle as drizzleLibsql } from 'drizzle-orm/libsql';
+import { drizzle as drizzleLibsql, type LibSQLDatabase } from 'drizzle-orm/libsql';
 import { createClient } from '@libsql/client';
 import * as schema from './schema.js';
 import { config } from '../config/index.js';
 import fs from 'fs';
 import path from 'path';
 
-export type AppDatabase = BetterSQLite3Database<typeof schema>;
+export type AppDatabase = LibSQLDatabase<typeof schema>;
 export let db: AppDatabase;
 export let sqlite: any;
 
@@ -135,12 +133,15 @@ if (config.isTursoEnabled && config.TURSO_DATABASE_URL) {
     fs.mkdirSync(config.uploadsFullPath, { recursive: true });
   }
 
+  const { default: Database } = await import('better-sqlite3');
+  const { drizzle: drizzleBetterSqlite } = await import('drizzle-orm/better-sqlite3');
+
   const localSqlite = new Database(config.databaseFullPath);
   localSqlite.pragma('journal_mode = WAL');
   localSqlite.pragma('foreign_keys = ON');
   localSqlite.exec(DDL_BOOTSTRAP);
 
   sqlite = localSqlite;
-  db = drizzleBetterSqlite(localSqlite, { schema });
+  db = drizzleBetterSqlite(localSqlite, { schema }) as unknown as AppDatabase;
 }
 

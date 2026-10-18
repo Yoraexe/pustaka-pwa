@@ -35,7 +35,7 @@ export class LoanRepository {
           sql`${loans.dueDate} < ${nowIso}`
         )
       );
-    return result.changes;
+    return (result as any).changes ?? (result as any).rowsAffected ?? 0;
   }
 
   async findActiveLoan(userId: number, bookId: number, loanType: LoanType): Promise<Loan | null> {
@@ -166,7 +166,8 @@ export class LoanRepository {
             )
           );
 
-        if (updateRes.changes > 0) {
+        const changes = (updateRes as any).changes ?? (updateRes as any).rowsAffected ?? 0;
+        if (changes > 0) {
           expiredCount++;
           if (r.copyId) {
             await db.update(bookCopies)
@@ -439,7 +440,7 @@ export class LoanRepository {
           eq(loans.status, 'RESERVED')
         )
       );
-    return res.changes;
+    return (res as any).changes ?? (res as any).rowsAffected ?? 0;
   }
 
   async updateCancelReservation(loanId: number): Promise<number> {
@@ -453,7 +454,7 @@ export class LoanRepository {
           eq(loans.status, 'RESERVED')
         )
       );
-    return res.changes;
+    return (res as any).changes ?? (res as any).rowsAffected ?? 0;
   }
 
   async updateReturn(loanId: number, returnDate: string, fineAmount: number, isFinePaid: boolean): Promise<number> {
@@ -470,7 +471,7 @@ export class LoanRepository {
           eq(loans.status, 'BORROWED')
         )
       );
-    return res.changes;
+    return (res as any).changes ?? (res as any).rowsAffected ?? 0;
   }
 
   async updateSettleFine(loanId: number): Promise<number> {
@@ -482,7 +483,7 @@ export class LoanRepository {
           eq(loans.isFinePaid, false)
         )
       );
-    return res.changes;
+    return (res as any).changes ?? (res as any).rowsAffected ?? 0;
   }
 
   /**
@@ -501,7 +502,7 @@ export class LoanRepository {
           eq(loans.status, 'BORROWED')
         )
       );
-    return res.changes;
+    return (res as any).changes ?? (res as any).rowsAffected ?? 0;
   }
 
   /**

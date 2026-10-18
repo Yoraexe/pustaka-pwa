@@ -205,7 +205,7 @@ export class BookRepository {
     const res = await db.update(bookCopies)
       .set({ status })
       .where(and(...conditions));
-    return res.changes;
+    return (res as any).changes ?? (res as any).rowsAffected ?? 0;
   }
 
   async updateAvailableCopies(bookId: number, delta: number): Promise<void> {
