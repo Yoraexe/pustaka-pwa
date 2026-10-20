@@ -18,6 +18,8 @@ import { authRouter } from './controllers/auth.controller.js';
 import { bookRouter } from './controllers/book.controller.js';
 import { circulationRouter } from './controllers/circulation.controller.js';
 import { errorHandler } from './middleware/error.middleware.js';
+import { config } from './config/index.js';
+import { storageService } from './services/storage.service.js';
 
 export const createApp = () => {
   const app = express();
@@ -49,7 +51,9 @@ export const createApp = () => {
     res.json({
       status: 'healthy',
       app: 'Pustaka Sekolah PWA',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      isTursoEnabled: Boolean(config.isTursoEnabled),
+      isSupabaseEnabled: Boolean(storageService.isCloud())
     });
   });
 

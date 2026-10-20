@@ -18,16 +18,24 @@ export class StorageService {
   private supabase: SupabaseClient | null = null;
 
   constructor() {
-    if (config.isSupabaseEnabled && config.SUPABASE_URL && config.SUPABASE_SERVICE_ROLE_KEY) {
-      this.supabase = createClient(config.SUPABASE_URL, config.SUPABASE_SERVICE_ROLE_KEY, {
+    this.getSupabase();
+  }
+
+  private getSupabase(): SupabaseClient | null {
+    if (this.supabase) return this.supabase;
+    const url = process.env.SUPABASE_URL || config.SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY || config.SUPABASE_SERVICE_ROLE_KEY;
+    if (url && key) {
+      this.supabase = createClient(url, key, {
         auth: { persistSession: false },
         realtime: { transport: WebSocket as any }
       });
     }
+    return this.supabase;
   }
 
   isCloud(): boolean {
-    return this.supabase !== null;
+    return this.getSupabase() !== null;
   }
 
   isCloudStorage(storedPath: string): boolean {
@@ -39,12 +47,14 @@ export class StorageService {
     const sanitizedBase = path.basename(file.originalname, rawExt).replace(/[^a-zA-Z0-9_-]/g, '_');
     const filename = `cover-${sanitizedBase}-${Date.now()}-${Math.round(Math.random() * 1e6)}${rawExt}`;
 
-    if (this.supabase) {
+    const supabase = this.getSupabase();
+    if (supabase) {
       const buffer = file.buffer || (file.path ? fs.readFileSync(file.path) : null);
       if (!buffer) throw new Error('Buffer berkas tidak ditemukan untuk upload cover.');
 
-      const { error } = await this.supabase.storage
-        .from(config.SUPABASE_BUCKET_COVERS)
+      const bucketName = process.env.SUPABASE_BUCKET_COVERS || config.SUPABASE_BUCKET_COVERS || 'covers';
+      const { error } = await supabase.storage
+        .from(bucketName)
         .upload(filename, buffer, {
           contentType: file.mimetype || 'image/jpeg',
           upsert: true
@@ -54,8 +64,8 @@ export class StorageService {
         throw new Error(`Gagal mengunggah cover ke Supabase: ${error.message}`);
       }
 
-      const { data: publicUrlData } = this.supabase.storage
-        .from(config.SUPABASE_BUCKET_COVERS)
+      const { data: publicUrlData } = supabase.storage
+        .from(bucketName)
         .getPublicUrl(filename);
 
       // Bersihkan file disk temporary jika ada
@@ -64,6 +74,13 @@ export class StorageService {
       }
 
       return publicUrlData.publicUrl;
+    }
+
+    if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      throw new Error(
+        'Penyimpanan Cloud (Supabase) belum terhubung di Vercel. ' +
+        'Silakan tambahkan SUPABASE_URL dan SUPABASE_SERVICE_ROLE_KEY pada Environment Variables Vercel agar file sampul & e-book dapat disimpan.'
+      );
     }
 
     // Penyimpanan Lokal Disk
@@ -84,12 +101,14 @@ export class StorageService {
     const sanitizedBase = path.basename(file.originalname, path.extname(file.originalname)).replace(/[^a-zA-Z0-9_-]/g, '_');
     const filename = `ebook-${sanitizedBase}-${Date.now()}-${Math.round(Math.random() * 1e6)}${rawExt}`;
 
-    if (this.supabase) {
+    const supabase = this.getSupabase();
+    if (supabase) {
       const buffer = file.buffer || (file.path ? fs.readFileSync(file.path) : null);
       if (!buffer) throw new Error('Buffer berkas tidak ditemukan untuk upload e-book.');
 
-      const { error } = await this.supabase.storage
-        .from(config.SUPABASE_BUCKET_EBOOKS)
+      const bucketName = process.env.SUPABASE_BUCKET_EBOOKS || config.SUPABASE_BUCKET_EBOOKS || 'ebooks';
+      const { error } = await supabase.storage
+        .from(bucketName)
         .upload(filename, buffer, {
           contentType: 'application/pdf',
           upsert: true
@@ -104,7 +123,14 @@ export class StorageService {
         try { fs.unlinkSync(file.path); } catch { /* ignore */ }
       }
 
-      return `supabase://${config.SUPABASE_BUCKET_EBOOKS}/${filename}`;
+      return `supabase://${bucketName}/${filename}`;
+    }
+
+    if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+      throw new Error(
+        'Penyimpanan Cloud (Supabase) belum terhubung di Vercel. ' +
+        'Silakan tambahkan SUPABASE_URL dan SUPABASE_SERVICE_ROLE_KEY pada Environment Variables Vercel agar file sampul & e-book dapat disimpan.'
+      );
     }
 
     // Penyimpanan Lokal Disk
@@ -122,14 +148,15 @@ export class StorageService {
 
   async getEbookData(storedPath: string): Promise<{ buffer: Buffer; size: number }> {
     if (storedPath.startsWith('supabase://')) {
-      if (!this.supabase) {
+      const supabase = this.getSupabase();
+      if (!supabase) {
         throw new Error('Supabase client tidak aktif untuk membaca e-book cloud.');
       }
       const parts = storedPath.replace('supabase://', '').split('/');
       const bucket = parts[0];
       const filename = parts.slice(1).join('/');
 
-      const { data, error } = await this.supabase.storage.from(bucket).download(filename);
+      const { data, error } = await supabase.storage.from(bucket).download(filename);
       if (error || !data) {
         throw new Error(`Gagal mengunduh e-book dari cloud storage: ${error?.message || 'File tidak ditemukan'}`);
       }
