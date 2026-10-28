@@ -244,6 +244,45 @@ class ApiClient {
     }
   }
 
+  async getPresignedUploadUrl(input: { filename: string; fileType: 'ebook' | 'cover'; fileSize?: number }): Promise<{
+    direct: boolean;
+    uploadUrl?: string;
+    token?: string;
+    path?: string;
+    storagePath?: string;
+    publicUrl?: string;
+    maxFileSize: number;
+  }> {
+    return this.request<{
+      direct: boolean;
+      uploadUrl?: string;
+      token?: string;
+      path?: string;
+      storagePath?: string;
+      publicUrl?: string;
+      maxFileSize: number;
+    }>('/books/presign-upload', {
+      method: 'POST',
+      body: JSON.stringify(input)
+    });
+  }
+
+  async uploadFileDirect(uploadUrl: string, file: File): Promise<void> {
+    const res = await fetch(uploadUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': file.type || 'application/octet-stream',
+        'x-upsert': 'true'
+      },
+      body: file
+    });
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`Gagal mengunggah berkas ke Cloud Storage (Status ${res.status}): ${errText || 'Terjadi kendala jaringan saat pengunggahan berkas.'}`);
+    }
+  }
+
   async createBook(data: FormData | CreateBookInput): Promise<Book & { copies?: BookCopy[] }> {
     const isFormData = data instanceof FormData;
     const body = isFormData ? data : JSON.stringify(data);

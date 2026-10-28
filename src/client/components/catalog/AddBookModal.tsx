@@ -148,6 +148,28 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
     }
   };
 
+  const handleEbookChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    if (file) {
+      const MAX_EBOOK_SIZE = 20 * 1024 * 1024; // Batas maksimal 20 MB
+      if (file.size > MAX_EBOOK_SIZE) {
+        const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
+        toast.error('Berkas PDF Terlalu Besar', {
+          description: `Ukuran berkas "${file.name}" (${sizeMb} MB) melebihi batas maksimal 20 MB. Harap pilih berkas dengan ukuran di bawah 20 MB.`
+        });
+        e.target.value = '';
+        setEbookFile(null);
+        return;
+      }
+      setEbookFile(file);
+      toast.success('Berkas E-Book Terpilih', {
+        description: `${file.name} (${(file.size / (1024 * 1024)).toFixed(1)} MB)`
+      });
+    } else {
+      setEbookFile(null);
+    }
+  };
+
   const handleRemoveCover = useCallback(() => {
     if (coverPreviewUrl && coverPreviewUrl.startsWith('blob:')) {
       URL.revokeObjectURL(coverPreviewUrl);
@@ -224,6 +246,49 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
     setIsSubmitting(true);
 
     try {
+      let finalEbookFilePath: string | null = null;
+      let finalCoverUrl: string | null = null;
+
+      // 1. Direct Cloud Storage Upload untuk E-Book (Mencegah kendala Vercel 4.5 MB Payload Limit / HTTP 413)
+      if (isDigital && ebookFile) {
+        try {
+          const presign = await api.getPresignedUploadUrl({
+            filename: ebookFile.name,
+            fileType: 'ebook',
+            fileSize: ebookFile.size
+          });
+
+          if (presign.direct && presign.uploadUrl && presign.storagePath) {
+            toast.info('Mengunggah Dokumen PDF ke Cloud...', {
+              description: `Mengunggah berkas ${(ebookFile.size / (1024 * 1024)).toFixed(1)} MB langsung ke Cloud Storage.`
+            });
+            await api.uploadFileDirect(presign.uploadUrl, ebookFile);
+            finalEbookFilePath = presign.storagePath;
+          }
+        } catch (presignErr: unknown) {
+          console.warn('[Direct Cloud Upload Notice]:', presignErr);
+          // Fallback ke form data multipart biasa jika presign tidak aktif (misal running on-premise)
+        }
+      }
+
+      // 2. Direct Cloud Storage Upload untuk Cover Buku jika berupa berkas lokal
+      if (coverFile) {
+        try {
+          const presign = await api.getPresignedUploadUrl({
+            filename: coverFile.name,
+            fileType: 'cover',
+            fileSize: coverFile.size
+          });
+
+          if (presign.direct && presign.uploadUrl && presign.storagePath) {
+            await api.uploadFileDirect(presign.uploadUrl, coverFile);
+            finalCoverUrl = presign.publicUrl || presign.storagePath;
+          }
+        } catch (presignCoverErr: unknown) {
+          console.warn('[Direct Cover Upload Notice]:', presignCoverErr);
+        }
+      }
+
       const formData = new FormData();
       formData.append('title', title.trim());
       formData.append('author', author.trim());
@@ -242,14 +307,18 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
 
       if (isDigital) {
         formData.append('digitalLicenseCount', String(digitalLicenseCount));
-        if (ebookFile) {
+        if (finalEbookFilePath) {
+          formData.append('ebookFilePath', finalEbookFilePath);
+        } else if (ebookFile) {
           formData.append('ebook', ebookFile);
         }
       } else {
         formData.append('digitalLicenseCount', '0');
       }
 
-      if (coverFile) {
+      if (finalCoverUrl) {
+        formData.append('coverUrl', finalCoverUrl);
+      } else if (coverFile) {
         formData.append('cover', coverFile);
       } else if (coverUrlInput.trim()) {
         formData.append('coverUrl', coverUrlInput.trim());
@@ -793,11 +862,16 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
                       id="ebookFile"
                       type="file"
                       accept=".pdf"
-                      onChange={(e) => setEbookFile(e.target.files?.[0] || null)}
+                      onChange={handleEbookChange}
                     />
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      Wajib diunggah agar pemustaka dapat meminjam dan membaca e-book secara daring maupun luring.
-                    </p>
+                    <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1">
+                      <span>Format PDF (Maksimal 20 MB)</span>
+                      {ebookFile && (
+                        <span className="font-mono text-primary font-bold">
+                          {(ebookFile.size / (1024 * 1024)).toFixed(1)} MB / 20 MB
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

@@ -86,6 +86,56 @@ const cleanupUploadedFiles = (files?: { [fieldname: string]: Express.Multer.File
   }
 };
 
+// POST /api/books/presign-upload (Librarian / Admin - Dapatkan Signed Upload URL untuk Direct Cloud Upload ke Supabase)
+bookRouter.post('/presign-upload', authenticateToken, requireRole(['LIBRARIAN', 'ADMIN']), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const { filename, fileType, fileSize } = req.body;
+    if (!filename || !fileType) {
+      res.status(400).json({ success: false, error: { code: 'INVALID_INPUT', message: 'Parameter filename dan fileType wajib diisi.' } });
+      return;
+    }
+
+    if (fileType !== 'ebook' && fileType !== 'cover') {
+      res.status(400).json({ success: false, error: { code: 'INVALID_FILE_TYPE', message: 'Tipe berkas hanya boleh ebook atau cover.' } });
+      return;
+    }
+
+    // Validasi ukuran berkas maksimal 20 MB (20 * 1024 * 1024)
+    const MAX_SIZE = 20 * 1024 * 1024;
+    if (fileSize && Number(fileSize) > MAX_SIZE) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'FILE_TOO_LARGE', message: 'Ukuran berkas melebihi batas maksimal 20 MB.' }
+      });
+      return;
+    }
+
+    if (!storageService.isCloud()) {
+      // Lingkungan disk lokal (tanpa Supabase Cloud): klien diarahkan menggunakan multipart upload standar
+      res.json({
+        success: true,
+        data: {
+          direct: false,
+          maxFileSize: MAX_SIZE
+        }
+      });
+      return;
+    }
+
+    const presignData = await storageService.createSignedUploadUrl(fileType, String(filename));
+    res.json({
+      success: true,
+      data: {
+        direct: true,
+        ...presignData,
+        maxFileSize: MAX_SIZE
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/books (Librarian / Admin - Multipart Upload & JSON)
 bookRouter.post('/', authenticateToken, requireRole(['LIBRARIAN', 'ADMIN']), uploadBookFiles, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
@@ -156,19 +206,26 @@ bookRouter.get('/:id/stream-pdf', authenticateToken, async (req: Request, res: R
       return;
     }
 
-    // Dukungan Cloud Storage (Supabase)
+    // Dukungan Cloud Storage (Supabase) - Redirect ke Signed Download URL agar terbebas dari limit 4.5 MB Vercel Serverless
     if (storageService.isCloudStorage(book.ebookFilePath)) {
       try {
-        const { buffer, size } = await storageService.getEbookData(book.ebookFilePath);
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', 'inline; filename="document.pdf"');
-        res.setHeader('Cache-Control', 'private, max-age=0, must-revalidate');
-        res.setHeader('Content-Length', size);
-        res.send(buffer);
+        const signedDownloadUrl = await storageService.createSignedDownloadUrl(book.ebookFilePath, 300);
+        res.redirect(307, signedDownloadUrl);
         return;
-      } catch (err: any) {
-        res.status(404).json({ success: false, error: { code: 'FILE_NOT_FOUND', message: err.message || 'File dokumen e-book tidak ditemukan di cloud storage.' } });
-        return;
+      } catch (signedErr) {
+        // Fallback: Jika pembuatan signed download url gagal, stream langsung melalui buffer memori
+        try {
+          const { buffer, size } = await storageService.getEbookData(book.ebookFilePath);
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Content-Disposition', 'inline; filename="document.pdf"');
+          res.setHeader('Cache-Control', 'private, max-age=0, must-revalidate');
+          res.setHeader('Content-Length', size);
+          res.send(buffer);
+          return;
+        } catch (err: any) {
+          res.status(404).json({ success: false, error: { code: 'FILE_NOT_FOUND', message: err.message || 'File dokumen e-book tidak ditemukan di cloud storage.' } });
+          return;
+        }
       }
     }
 

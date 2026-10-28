@@ -38,9 +38,9 @@ export const createApp = () => {
     next();
   });
 
-  // Body Parser with explicit payload limits (Astesia Hardening)
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  // Body Parser with explicit payload limits (Astesia Hardening - dinaikkan ke 25mb untuk mendukung buku e-book PDF 20 MB)
+  app.use(express.json({ limit: '25mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
   // Static uploads directory terbatas HANYA untuk sampul buku (/uploads/covers)
   // Berkas e-book PDF (/uploads/ebooks) TIDAK BOLEH disajikan statis dan wajib melalui proteksi /stream-pdf

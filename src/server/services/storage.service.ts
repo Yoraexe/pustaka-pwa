@@ -174,6 +174,75 @@ export class StorageService {
     const buffer = fs.readFileSync(fullPath);
     return { buffer, size: buffer.length };
   }
+
+  async createSignedUploadUrl(fileType: 'ebook' | 'cover', originalFilename: string): Promise<{
+    uploadUrl: string;
+    token: string;
+    path: string;
+    storagePath: string;
+    publicUrl?: string;
+  }> {
+    const supabase = this.getSupabase();
+    if (!supabase) {
+      throw new Error('Supabase client tidak aktif.');
+    }
+
+    const bucketName = fileType === 'ebook'
+      ? (process.env.SUPABASE_BUCKET_EBOOKS || config.SUPABASE_BUCKET_EBOOKS || 'ebooks')
+      : (process.env.SUPABASE_BUCKET_COVERS || config.SUPABASE_BUCKET_COVERS || 'covers');
+
+    const rawExt = path.extname(originalFilename).toLowerCase();
+    const sanitizedBase = path.basename(originalFilename, rawExt).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeExt = fileType === 'ebook'
+      ? '.pdf'
+      : (['.jpg', '.jpeg', '.png', '.webp'].includes(rawExt) ? rawExt : '.jpg');
+    const filename = `${fileType}-${sanitizedBase}-${Date.now()}-${Math.round(Math.random() * 1e6)}${safeExt}`;
+
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .createSignedUploadUrl(filename);
+
+    if (error || !data) {
+      throw new Error(`Gagal membuat Signed Upload URL Supabase: ${error?.message || 'Unknown error'}`);
+    }
+
+    let publicUrl: string | undefined;
+    if (fileType === 'cover') {
+      const { data: pubData } = supabase.storage.from(bucketName).getPublicUrl(filename);
+      publicUrl = pubData.publicUrl;
+    }
+
+    return {
+      uploadUrl: data.signedUrl,
+      token: data.token,
+      path: data.path,
+      storagePath: fileType === 'ebook' ? `supabase://${bucketName}/${filename}` : (publicUrl || `supabase://${bucketName}/${filename}`),
+      publicUrl
+    };
+  }
+
+  async createSignedDownloadUrl(storedPath: string, expiresInSeconds = 300): Promise<string> {
+    if (!this.isCloudStorage(storedPath)) {
+      throw new Error('Hanya berkas cloud storage yang mendukung pembuatan signed download URL.');
+    }
+    const supabase = this.getSupabase();
+    if (!supabase) {
+      throw new Error('Supabase client tidak aktif.');
+    }
+    const parts = storedPath.replace('supabase://', '').split('/');
+    const bucket = parts[0];
+    const filename = parts.slice(1).join('/');
+
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(filename, expiresInSeconds);
+
+    if (error || !data?.signedUrl) {
+      throw new Error(`Gagal membuat Signed Download URL: ${error?.message || 'File tidak ditemukan'}`);
+    }
+
+    return data.signedUrl;
+  }
 }
 
 export const storageService = new StorageService();

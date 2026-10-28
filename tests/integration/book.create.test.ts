@@ -335,4 +335,66 @@ describe('Book Creation & Ingestion API Integration Tests', () => {
     expect(newEbooks.length).toBe(0);
     expect(newCovers.length).toBe(0);
   });
+
+  it('POST /api/books/presign-upload harus memvalidasi batas ukuran 20 MB dan RBAC', async () => {
+    // 1. Tanpa token -> 401
+    const noAuth = await request(app)
+      .post('/api/books/presign-upload')
+      .send({ filename: 'buku.pdf', fileType: 'ebook', fileSize: 1024 });
+    expect(noAuth.status).toBe(401);
+
+    // 2. Token Siswa -> 403
+    const studentReq = await request(app)
+      .post('/api/books/presign-upload')
+      .set('Authorization', `Bearer ${studentToken}`)
+      .send({ filename: 'buku.pdf', fileType: 'ebook', fileSize: 1024 });
+    expect(studentReq.status).toBe(403);
+
+    // 3. File melebihi batas 20 MB -> 400 FILE_TOO_LARGE
+    const tooLarge = await request(app)
+      .post('/api/books/presign-upload')
+      .set('Authorization', `Bearer ${librarianToken}`)
+      .send({
+        filename: 'buku-raksasa.pdf',
+        fileType: 'ebook',
+        fileSize: 25 * 1024 * 1024 // 25 MB > 20 MB
+      });
+    expect(tooLarge.status).toBe(400);
+    expect(tooLarge.body.error.code).toBe('FILE_TOO_LARGE');
+
+    // 4. File valid di lingkungan test/lokal (tanpa Cloud Supabase) -> 200 direct: false
+    const validReq = await request(app)
+      .post('/api/books/presign-upload')
+      .set('Authorization', `Bearer ${librarianToken}`)
+      .send({
+        filename: 'bse-bahasa-indonesia-x.pdf',
+        fileType: 'ebook',
+        fileSize: 15 * 1024 * 1024 // 15 MB <= 20 MB
+      });
+    expect(validReq.status).toBe(200);
+    expect(validReq.body.success).toBe(true);
+    expect(validReq.body.data.direct).toBe(false);
+    expect(validReq.body.data.maxFileSize).toBe(20 * 1024 * 1024);
+  });
+
+  it('POST /api/books harus berhasil menerima ebookFilePath cloud (Supabase) via body JSON', async () => {
+    const res = await request(app)
+      .post('/api/books')
+      .set('Authorization', `Bearer ${librarianToken}`)
+      .send({
+        title: 'Buku Cloud E-Book 20MB',
+        author: 'Pustakawan Digital',
+        publisher: 'Kemendikbud',
+        publicationYear: 2026,
+        categoryId: 1,
+        bookType: 'DIGITAL_ONLY',
+        digitalLicenseCount: 20,
+        ebookFilePath: 'supabase://ebooks/ebook-bse-bahasa-indonesia-15mb.pdf'
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.ebookFilePath).toBe('supabase://ebooks/ebook-bse-bahasa-indonesia-15mb.pdf');
+    createdBookIds.push(res.body.data.id);
+  });
 });

@@ -87,7 +87,7 @@ const upload = multer({
   storage,
   fileFilter,
   limits: {
-    fileSize: 50 * 1024 * 1024 // Batas maksimal 50 MB per file
+    fileSize: 25 * 1024 * 1024 // Batas maksimal 25 MB per file (mendukung hingga 20 MB buku e-book PDF)
   }
 });
 

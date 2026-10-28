@@ -215,9 +215,20 @@
       "timestamp": "2026-10-18T22:45:00+08:00",
       "action": "Vercel Serverless + Turso SQLite + Supabase Storage Hybrid Architecture",
       "agent_note": "Architected zero-compromise Hybrid Cloud engine: (1) Created api/index.ts and vercel.json for Vercel Serverless routing with static dist edge CDN; (2) Integrated @libsql/client in src/server/db/index.ts enabling Turso SQLite cloud connection when TURSO_DATABASE_URL is set, while retaining local better-sqlite3; (3) Created StorageService hybrid in src/server/services/storage.service.ts with Supabase Storage bucket integration and multer.memoryStorage fallback; (4) Verified 67/67 Vitest tests passing 100% and clean Vite production build."
+    },
+    {
+      "layer": "engineering",
+      "timestamp": "2026-10-28T12:25:00+08:00",
+      "action": "20 MB E-Book Upload Limit & Vercel 4.5 MB Serverless Payload Limit Bypass",
+      "agent_note": "Resolved HTTP 413 Payload Too Large on Vercel deployment: (1) Diagnosed Vercel Serverless Function hard 4.5 MB request body limit causing HTTP 413 on PDF uploads > 10 MB; (2) Implemented Direct Signed Cloud Upload in storage.service.ts via createSignedUploadUrl & createSignedDownloadUrl; (3) Added POST /api/books/presign-upload endpoint enforcing 20 MB limit and delivering signed Supabase URLs; (4) Updated AddBookModal.tsx with client-side 20 MB validation, badge indicator, and direct-to-cloud upload sending only lightweight JSON metadata to Vercel; (5) Raised Express body-parser limit to 25mb and adjusted Multer; (6) Added signed URL redirect (HTTP 307) on /stream-pdf to prevent Vercel 4.5 MB response truncation; (7) Verified 69/69 Vitest tests passing and 0-error production build."
     }
   ],
   "decisions": [
+    {
+      "id": "ADR-005",
+      "title": "Direct Supabase Storage Upload via Signed URLs for Large E-Books (20 MB)",
+      "rationale": "Vercel Serverless Function membatasi payload request dan response maksimal 4.5 MB (HTTP 413). Dengan menggunakan Signed Upload URL dan HTTP 307 Signed Stream Redirect, berkas PDF hingga 20 MB dialirkan langsung antara browser dan Supabase Storage CDN tanpa membebani edge proxy Vercel."
+    },
     {
       "id": "ADR-004",
       "title": "Superadmin Account Management & Self-Service Physical Circulation",
