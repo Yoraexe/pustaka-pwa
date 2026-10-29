@@ -3,9 +3,11 @@
  * @description Storage service hybrid untuk menangani berkas sampul dan e-book (Lokal & Supabase Cloud Storage).
  * @layer Service Layer (Storage)
  *
- * Tujuan: Mengabstraksi operasi upload dan download berkas antara disk lokal (pengembangan/on-premise) dan Supabase Storage (produksi Vercel).
- * Caller: src/server/controllers/book.controller.ts.
+ * Tujuan: Mengabstraksi operasi upload, streaming download, dan penghapusan berkas antara disk lokal dan Supabase Storage.
+ * Caller: src/server/controllers/book.controller.ts, src/server/services/book.service.ts.
  * Dependensi: @supabase/supabase-js, src/server/config/index.ts, fs, path.
+ * Main Functions: isCloud, isCloudStorage, saveCover, saveEbook, getEbookData, createSignedUploadUrl, createSignedDownloadUrl, deleteFile.
+ * Side Effects: Membaca, menulis, dan menghapus berkas pada disk lokal atau bucket Supabase Storage.
  */
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
@@ -242,6 +244,65 @@ export class StorageService {
     }
 
     return data.signedUrl;
+  }
+
+  /**
+   * Menghapus berkas dari penyimpanan lokal disk atau Supabase Storage.
+   * Menghindari crash jika berkas sudah tidak ada (idempotent).
+   */
+  async deleteFile(storedPath: string): Promise<boolean> {
+    if (!storedPath) return false;
+
+    // 1. Supabase Cloud Storage (URI schema: supabase://bucket/filename)
+    if (storedPath.startsWith('supabase://')) {
+      const supabase = this.getSupabase();
+      if (!supabase) return false;
+      const parts = storedPath.replace('supabase://', '').split('/');
+      const bucket = parts[0];
+      const filename = parts.slice(1).join('/');
+      const { error } = await supabase.storage.from(bucket).remove([filename]);
+      return !error;
+    }
+
+    // Supabase Public HTTP URL (covers)
+    if (storedPath.startsWith('http://') || storedPath.startsWith('https://')) {
+      const supabase = this.getSupabase();
+      if (!supabase) return false;
+      try {
+        const urlObj = new URL(storedPath);
+        const match = urlObj.pathname.match(/\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/);
+        if (match) {
+          const bucket = match[1];
+          const filename = decodeURIComponent(match[2]);
+          const { error } = await supabase.storage.from(bucket).remove([filename]);
+          return !error;
+        }
+      } catch {
+        // Abaikan jika bukan format URL standar Supabase
+      }
+      return false;
+    }
+
+    // 2. Penyimpanan Disk Lokal
+    try {
+      const cleanPath = storedPath.replace(/^[/\\]+/, '');
+      const fullPath = path.resolve(process.cwd(), cleanPath);
+      const cwd = path.resolve(process.cwd());
+
+      // Cegah Path Traversal di luar direktori kerja server
+      if (!fullPath.startsWith(cwd)) {
+        console.warn(`[Storage Warning] Upaya penghapusan file di luar root server ditolak: ${storedPath}`);
+        return false;
+      }
+
+      if (fs.existsSync(fullPath)) {
+        fs.unlinkSync(fullPath);
+        return true;
+      }
+    } catch (err) {
+      console.error(`[Storage Warning] Gagal menghapus berkas lokal ${storedPath}:`, err);
+    }
+    return false;
   }
 }
 

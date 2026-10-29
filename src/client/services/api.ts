@@ -4,9 +4,9 @@
  * @layer Client Service Layer
  * 
  * Tujuan: Menyediakan abstraksi HTTP Client berbasis Fetch dengan penyisipan token JWT, caching offline localStorage, dan error handling terpusat.
- * Caller: Seluruh komponen UI klien (CatalogPage, MyBooksPage, CirculationDesk, SuperAdminPanel, LoginPage, PDFReader, AddBookModal, UserImportModal).
+ * Caller: Seluruh komponen UI klien (CatalogPage, MyBooksPage, CirculationDesk, SuperAdminPanel, LoginPage, PDFReader, AddBookModal, UserImportModal, BookDetailModal).
  * Dependensi: shared/types.
- * Main Functions: ApiClient (login, signup, registerUserByAdmin, getUsers, updateUserStatus, resetUserPassword, getCurrentUser, getBooks, getBookDetail, borrowDigitalBook, returnDigitalBook, borrowPhysicalBookSelf, returnPhysicalBookSelf, reservePhysicalBook, claimReservation, cancelReservation, renewPhysicalLoan, importUsersCsv).
+ * Main Functions: ApiClient (login, signup, registerUserByAdmin, getUsers, updateUserStatus, resetUserPassword, getCurrentUser, getBooks, getBookDetail, createBook, deleteBook, borrowDigitalBook, returnDigitalBook, borrowPhysicalBookSelf, returnPhysicalBookSelf, reservePhysicalBook, claimReservation, cancelReservation, renewPhysicalLoan, importUsersCsv).
  * Side Effects: Melakukan request jaringan HTTP ke backend Express, menulis/membaca token dan cache ke localStorage.
  */
 
@@ -291,6 +291,23 @@ class ApiClient {
       method: 'POST',
       body
     });
+  }
+
+  async deleteBook(id: number): Promise<{ id: number; title: string }> {
+    const result = await this.request<{ id: number; title: string }>(`/books/${id}`, {
+      method: 'DELETE'
+    });
+
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem(`pustaka_book_${id}`);
+        localStorage.removeItem('pustaka_cached_books');
+      }
+    } catch {
+      // Abaikan jika localStorage tidak tersedia
+    }
+
+    return result;
   }
 
   // --- Circulation ---

@@ -1,18 +1,19 @@
 /**
  * @file src/client/components/catalog/BookDetailModal.tsx
- * @description Modal detail buku dengan arsitektur Radix UI Dialog Shadcn, fitur click-to-copy lokasi rak & ISBN, serta bebas icon dekoratif.
+ * @description Modal detail buku dengan arsitektur Radix UI Dialog & AlertDialog Shadcn, fitur click-to-copy, dan aksi hapus buku terproteksi RBAC.
  * @layer Presentation Component
  * 
- * Tujuan: Menampilkan informasi mendalam mengenai ketersediaan buku fisik di rak dan buku digital, disertai aksi pinjam dan salin metadata.
- * Caller: src/client/pages/CatalogPage.tsx, src/client/App.tsx (Command Palette)
- * Dependensi: react, shared/types, Radix UI Dialog, Button, Badge, sonner.
+ * Tujuan: Menampilkan informasi mendalam mengenai ketersediaan buku fisik di rak dan buku digital, disertai aksi pinjam, salin metadata, dan penghapusan buku bagi pustakawan/admin.
+ * Caller: src/client/pages/CatalogPage.tsx, src/client/App.tsx (Command Palette).
+ * Dependensi: react, shared/types, Radix UI Dialog & AlertDialog, useAuth, Button, Badge, sonner.
  * Main Functions: BookDetailModal
- * Side Effects: Membaca clipboard API, trigger Sonner toast feedback, memanggil callback onBorrowDigital.
+ * Side Effects: Membaca clipboard API, trigger Sonner toast feedback, memanggil callback onBorrowDigital, onBorrowPhysical, onReservePhysical, atau onDeleteBook.
  */
 
 import React, { useState, useEffect } from 'react';
 import type { Book, BookCopy } from '../../../shared/types/index.js';
 import { api } from '../../services/api.js';
+import { useAuth } from '../../hooks/useAuth.js';
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from '../ui/dialog.js';
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from '../ui/alert-dialog.js';
 import { Button } from '../ui/button.js';
 import { Badge } from '../ui/badge.js';
 import { QrCodeDisplay } from '../common/QrCodeDisplay.js';
@@ -33,6 +44,7 @@ interface BookDetailModalProps {
   onBorrowPhysical?: (book: Book, copyBarcode?: string) => void;
   onReservePhysical?: (book: Book) => void;
   onOpenReader?: (book: Book) => void;
+  onDeleteBook?: (book: Book) => Promise<void> | void;
   isDigitalBorrowed?: boolean;
   isPhysicalBorrowed?: boolean;
   isPhysicalReserved?: boolean;
@@ -47,12 +59,18 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
   onBorrowPhysical,
   onReservePhysical,
   onOpenReader,
+  onDeleteBook,
   isDigitalBorrowed,
   isPhysicalBorrowed,
   isPhysicalReserved,
   reservationCode,
   isBorrowed = false,
 }) => {
+  const { user } = useAuth();
+  const canDelete = user?.role === 'LIBRARIAN' || user?.role === 'ADMIN';
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const hasEbook = Boolean(book.ebookFilePath);
   const isDigital = book.bookType === 'DIGITAL_ONLY' || book.bookType === 'HYBRID';
   const isPhysical = book.bookType === 'PHYSICAL_ONLY' || book.bookType === 'HYBRID';
@@ -91,8 +109,25 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
     });
   };
 
+  const handleConfirmDelete = async () => {
+    if (!onDeleteBook) return;
+    setIsDeleting(true);
+    try {
+      await onDeleteBook(book);
+      setIsConfirmDeleteOpen(false);
+      onClose();
+    } catch (err: unknown) {
+      toast.error('Gagal Menghapus Buku', {
+        description: err instanceof Error ? err.message : 'Terjadi kendala saat menghapus buku.',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   return (
-    <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
+    <>
+      <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-xl">
         <DialogHeader className="text-left">
           <div className="flex items-center gap-2 mb-1.5">
@@ -244,109 +279,152 @@ export const BookDetailModal: React.FC<BookDetailModalProps> = ({
           </div>
         </div>
 
-        <DialogFooter className="border-t border-border pt-4 flex-wrap gap-2">
-          <Button variant="outline" onClick={onClose} className="text-xs">
-            Tutup
-          </Button>
-
-          {/* Opsi Pinjam / Baca E-Book Digital */}
-          {isDigital && (
-            digitalActive ? (
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center px-3 py-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-semibold border border-emerald-500/20">
-                  E-Book Dipinjam
-                </span>
-                {onOpenReader && (
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      onOpenReader(book);
-                      onClose();
-                    }}
-                    className="text-xs font-semibold"
-                  >
-                    Baca Sekarang
-                  </Button>
-                )}
-              </div>
-            ) : hasEbook ? (
+        <DialogFooter className="border-t border-border pt-4 flex-wrap gap-2 justify-between items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={onClose} className="text-xs">
+              Tutup
+            </Button>
+            {canDelete && onDeleteBook && (
               <Button
-                variant={book.bookType === 'DIGITAL_ONLY' ? 'default' : 'secondary'}
-                onClick={() => {
-                  onBorrowDigital?.(book);
-                  onClose();
-                }}
-                className="text-xs font-semibold"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsConfirmDeleteOpen(true)}
+                disabled={isDeleting}
+                className="text-xs text-destructive hover:text-destructive border-destructive/30 hover:bg-destructive/10"
               >
-                Pinjam E-Book
+                Hapus Buku
               </Button>
-            ) : (
-              <div className="inline-flex items-center px-3 py-1.5 bg-muted text-muted-foreground rounded-xl text-xs font-medium">
-                E-Book Belum Tersedia
-              </div>
-            )
-          )}
+            )}
+          </div>
 
-          {/* Opsi Pinjam Fisik Langsung & Reservasi Buku Fisik */}
-          {isPhysical && (
-            physicalActive ? (
-              <div className="inline-flex items-center px-3 py-1.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 rounded-xl text-xs font-semibold border border-blue-500/20">
-                Buku Fisik Dipinjam
-              </div>
-            ) : physicalReserved ? (
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center px-3 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-xl text-xs font-semibold border border-amber-500/20">
-                  Tiket: {reservationCode || 'Aktif'}
-                </span>
-                {onBorrowPhysical && (
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      onBorrowPhysical(book, selectedBarcode);
-                      onClose();
-                    }}
-                    className="text-xs font-semibold"
-                  >
-                    Pinjam Fisik Sekarang
-                  </Button>
-                )}
-              </div>
-            ) : book.availablePhysicalCopies > 0 ? (
-              <div className="flex flex-wrap items-center gap-2">
-                {onReservePhysical && (
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      onReservePhysical(book);
-                      onClose();
-                    }}
-                    className="text-xs font-semibold border-amber-500/40 hover:bg-amber-500/10 text-amber-900 dark:text-amber-200"
-                  >
-                    Reservasi Tiket (24 Jam)
-                  </Button>
-                )}
-                {onBorrowPhysical && (
-                  <Button
-                    variant="default"
-                    onClick={() => {
-                      onBorrowPhysical(book, selectedBarcode);
-                      onClose();
-                    }}
-                    className="text-xs font-semibold shadow-xs"
-                  >
-                    Pinjam Buku Fisik {selectedBarcode ? `(${selectedBarcode})` : ''}
-                  </Button>
-                )}
-              </div>
-            ) : (
-              <div className="inline-flex items-center px-3 py-1.5 bg-muted text-muted-foreground rounded-xl text-xs font-medium">
-                Stok Fisik Habis
-              </div>
-            )
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Opsi Pinjam / Baca E-Book Digital */}
+            {isDigital && (
+              digitalActive ? (
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-3 py-1.5 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 rounded-xl text-xs font-semibold border border-emerald-500/20">
+                    E-Book Dipinjam
+                  </span>
+                  {onOpenReader && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        onOpenReader(book);
+                        onClose();
+                      }}
+                      className="text-xs font-semibold"
+                    >
+                      Baca Sekarang
+                    </Button>
+                  )}
+                </div>
+              ) : hasEbook ? (
+                <Button
+                  variant={book.bookType === 'DIGITAL_ONLY' ? 'default' : 'secondary'}
+                  onClick={() => {
+                    onBorrowDigital?.(book);
+                    onClose();
+                  }}
+                  className="text-xs font-semibold"
+                >
+                  Pinjam E-Book
+                </Button>
+              ) : (
+                <div className="inline-flex items-center px-3 py-1.5 bg-muted text-muted-foreground rounded-xl text-xs font-medium">
+                  E-Book Belum Tersedia
+                </div>
+              )
+            )}
+
+            {/* Opsi Pinjam Fisik Langsung & Reservasi Buku Fisik */}
+            {isPhysical && (
+              physicalActive ? (
+                <div className="inline-flex items-center px-3 py-1.5 bg-blue-500/10 text-blue-700 dark:text-blue-300 rounded-xl text-xs font-semibold border border-blue-500/20">
+                  Buku Fisik Dipinjam
+                </div>
+              ) : physicalReserved ? (
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center px-3 py-1.5 bg-amber-500/10 text-amber-700 dark:text-amber-300 rounded-xl text-xs font-semibold border border-amber-500/20">
+                    Tiket: {reservationCode || 'Aktif'}
+                  </span>
+                  {onBorrowPhysical && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        onBorrowPhysical(book, selectedBarcode);
+                        onClose();
+                      }}
+                      className="text-xs font-semibold"
+                    >
+                      Pinjam Fisik Sekarang
+                    </Button>
+                  )}
+                </div>
+              ) : book.availablePhysicalCopies > 0 ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  {onReservePhysical && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        onReservePhysical(book);
+                        onClose();
+                      }}
+                      className="text-xs font-semibold border-amber-500/40 hover:bg-amber-500/10 text-amber-900 dark:text-amber-200"
+                    >
+                      Reservasi Tiket (24 Jam)
+                    </Button>
+                  )}
+                  {onBorrowPhysical && (
+                    <Button
+                      variant="default"
+                      onClick={() => {
+                        onBorrowPhysical(book, selectedBarcode);
+                        onClose();
+                      }}
+                      className="text-xs font-semibold shadow-xs"
+                    >
+                      Pinjam Buku Fisik {selectedBarcode ? `(${selectedBarcode})` : ''}
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="inline-flex items-center px-3 py-1.5 bg-muted text-muted-foreground rounded-xl text-xs font-medium">
+                  Stok Fisik Habis
+                </div>
+              )
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  );
+
+    {/* Alert Dialog Konfirmasi Penghapusan Destruktif */}
+    <AlertDialog open={isConfirmDeleteOpen} onOpenChange={setIsConfirmDeleteOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Hapus Buku dari Perpustakaan?</AlertDialogTitle>
+          <AlertDialogDescription>
+            Tindakan ini akan menghapus buku <strong>"{book.title}"</strong>, seluruh eksemplar fisik di rak, dan berkas e-book secara permanen dari basis data perpustakaan.
+            <br /><br />
+            <span className="text-destructive font-semibold">Perhatian:</span> Pastikan buku ini tidak sedang dalam masa peminjaman aktif atau reservasi pemustaka. Tindakan ini tidak dapat dibatalkan.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isDeleting}>Batal</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={(e) => {
+              e.preventDefault();
+              handleConfirmDelete();
+            }}
+            disabled={isDeleting}
+            className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold"
+          >
+            {isDeleting ? 'Menghapus...' : 'Ya, Hapus Buku'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  </>
+);
 };
 

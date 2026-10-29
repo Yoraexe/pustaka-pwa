@@ -1,6 +1,6 @@
 /**
  * @file src/client/pages/CatalogPage.tsx
- * @description Halaman katalog buku dengan arsitektur tipografi editorial murni, bebas dari icon dekoratif yang berlebihan dan kurasi palsu.
+ * @description Halaman katalog buku dengan arsitektur tipografi editorial murni, penelusuran, sirkulasi, dan pengelolaan buku (tambah & hapus).
  * @layer Page Component
  * 
  * Tujuan: Menyediakan antarmuka penelusuran, pencarian, dan peminjaman buku sekolah bagi siswa dan guru.
@@ -215,6 +215,23 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
 
 
 
+  const handleDeleteBook = async (book: Book) => {
+    try {
+      await api.deleteBook(book.id);
+      toast.success('Buku Berhasil Dihapus', {
+        description: `Buku "${book.title}" beserta eksemplar dan berkasnya telah dihapus dari perpustakaan.`,
+      });
+      setSelectedDetailBook(null);
+      fetchBooks();
+      await fetchUserBorrows();
+    } catch (err: unknown) {
+      toast.error('Gagal Menghapus Buku', {
+        description: err instanceof Error ? err.message : 'Terjadi kendala saat menghapus buku.',
+      });
+      throw err;
+    }
+  };
+
   const handleOpenQrScanner = async () => {
     if (!isAuthenticated) {
       toast.warning('Akses Dibatasi', {
@@ -396,6 +413,7 @@ export const CatalogPage: React.FC<CatalogPageProps> = ({
             onBorrowPhysical={handleBorrowPhysical}
             onReservePhysical={handleReservePhysical}
             onOpenReader={(b) => setReadingBook(b)}
+            onDeleteBook={handleDeleteBook}
             isDigitalBorrowed={!!digitalLoan}
             isPhysicalBorrowed={!!physicalLoan}
             isPhysicalReserved={!!physicalReservation}

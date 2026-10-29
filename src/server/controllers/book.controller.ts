@@ -1,13 +1,13 @@
 /**
  * @file src/server/controllers/book.controller.ts
- * @description Thin controller untuk penanganan rute katalog buku dan streaming PDF e-book terproteksi.
+ * @description Thin controller untuk penanganan rute katalog buku, upload, streaming PDF e-book terproteksi, dan penghapusan buku.
  * @layer Controller Layer (HTTP Interface)
  * 
- * Tujuan: Menyediakan antarmuka REST API untuk penelusuran katalog, ketersediaan eksemplar, penambahan buku baru, dan streaming PDF e-book berlisensi.
+ * Tujuan: Menyediakan antarmuka REST API untuk penelusuran katalog, ketersediaan eksemplar, penambahan buku baru, streaming PDF e-book, dan penghapusan buku.
  * Caller: src/server/app.ts (mounted at /api/books).
- * Dependensi: express, bookService, circulationService, shared/schemas, auth.middleware, upload.middleware, path, fs.
- * Main Functions: bookRouter (GET /categories, GET /, GET /copies/available, GET /:id, POST /, GET /:id/stream-pdf).
- * Side Effects: Membaca berkas PDF dari sistem penyimpanan lokal dan mengalirkannya ke respons HTTP.
+ * Dependensi: express, bookService, circulationService, shared/schemas, auth.middleware, upload.middleware, storageService, path, fs.
+ * Main Functions: bookRouter (GET /categories, GET /, GET /copies/available, GET /:id, POST /presign-upload, POST /, GET /:id/stream-pdf, DELETE /:id).
+ * Side Effects: Membaca dan menghapus berkas PDF/Cover dari penyimpanan, memanipulasi data buku dan eksemplar di basis data.
  */
 
 import { Router, type Request, type Response, type NextFunction } from 'express';
@@ -268,6 +268,43 @@ bookRouter.get('/:id/stream-pdf', authenticateToken, async (req: Request, res: R
 
     stream.pipe(res);
   } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/books/:id (Librarian / Admin - Hapus Buku beserta Eksemplar dan File Penyimpanan)
+bookRouter.delete('/:id', authenticateToken, requireRole(['LIBRARIAN', 'ADMIN']), async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'INVALID_ID', message: 'ID buku harus berupa bilangan bulat positif.' }
+      });
+      return;
+    }
+
+    const result = await bookService.deleteBook(id);
+    res.json({
+      success: true,
+      message: `Buku "${result.title}" berhasil dihapus dari sistem perpustakaan.`,
+      data: result
+    });
+  } catch (err: any) {
+    if (err.message && err.message.includes('tidak ditemukan')) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: err.message }
+      });
+      return;
+    }
+    if (err.message && err.message.includes('sedang dalam masa peminjaman aktif')) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'ACTIVE_LOAN_CONFLICT', message: err.message }
+      });
+      return;
+    }
     next(err);
   }
 });

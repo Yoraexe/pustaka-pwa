@@ -1,12 +1,18 @@
 /**
  * @file src/server/repositories/book.repository.ts
- * @description Data access layer untuk entitas Buku, Kategori, dan Eksemplar Fisik.
+ * @description Data access layer untuk entitas Buku, Kategori, Eksemplar Fisik, dan Penghapusan Buku.
  * @layer Repository Layer
+ * 
+ * Tujuan: Menyediakan abstraksi akses basis data untuk katalog buku, kategori, eksemplar fisik, pengecekan sirkulasi aktif, dan penghapusan buku.
+ * Caller: src/server/services/book.service.ts, test suites.
+ * Dependensi: src/server/db/index.ts, src/server/db/schema.ts, drizzle-orm, src/shared/types.
+ * Main Functions: findAllCategories, findCategoryBySlug, createCategory, findBooks, findById, findCopiesByBookId, findAvailableCopies, create, createCopy, findFirstAvailableCopy, findCopyByBarcode, updateCopyStatus, updateAvailableCopies, countActiveLoansAndReservations, delete.
+ * Side Effects: Membaca, menulis, memperbarui, dan menghapus data pada tabel books, categories, book_copies, dan loans di basis data SQLite.
  */
 
 import { db } from '../db/index.js';
-import { books, categories, bookCopies, type BookTable } from '../db/schema.js';
-import { eq, and, sql } from 'drizzle-orm';
+import { books, categories, bookCopies, loans, type BookTable } from '../db/schema.js';
+import { eq, and, inArray, sql } from 'drizzle-orm';
 import type { Book, BookCopy, Category, CreateBookInput, BookFilterInput, AvailableCopy } from '../../shared/types/index.js';
 
 export class BookRepository {
@@ -214,6 +220,34 @@ export class BookRepository {
         availablePhysicalCopies: sql`min(${books.totalPhysicalCopies}, max(0, ${books.availablePhysicalCopies} + ${delta}))`
       })
       .where(eq(books.id, bookId));
+  }
+
+  /**
+   * Menghitung total sirkulasi aktif (peminjaman atau reservasi) untuk suatu buku.
+   */
+  async countActiveLoansAndReservations(bookId: number): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(loans)
+      .where(
+        and(
+          eq(loans.bookId, bookId),
+          inArray(loans.status, ['BORROWED', 'RESERVED'])
+        )
+      );
+    return Number(result[0]?.count || 0);
+  }
+
+  /**
+   * Menghapus relasi peminjaman historis (RETURNED/CANCELLED), eksemplar fisik, dan entitas buku.
+   * Harus dipanggil di dalam transaksi atomik SQLite.
+   */
+  async delete(bookId: number): Promise<void> {
+    // 1. Hapus catatan pinjaman lampau yang sudah dikembalikan / dibatalkan
+    await db.delete(loans).where(eq(loans.bookId, bookId));
+    // 2. Hapus seluruh eksemplar fisik buku
+    await db.delete(bookCopies).where(eq(bookCopies.bookId, bookId));
+    // 3. Hapus record buku
+    await db.delete(books).where(eq(books.id, bookId));
   }
 
   private mapToDomain(raw: BookTable, categoryName: string): Book {
