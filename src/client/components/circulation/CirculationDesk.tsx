@@ -17,6 +17,7 @@ import type { Loan, AvailableCopy, User } from '../../../shared/types/index.js';
 import { AddBookModal } from '../catalog/AddBookModal.js';
 import { UserImportModal } from '../admin/UserImportModal.js';
 import { BarcodeScannerModal } from './BarcodeScannerModal.js';
+import { MemberCardModal } from '../member/MemberCardModal.js';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs.js';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../ui/card.js';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '../ui/table.js';
@@ -24,7 +25,7 @@ import { Button } from '../ui/button.js';
 import { Input } from '../ui/input.js';
 import { Label } from '../ui/label.js';
 import { Badge } from '../ui/badge.js';
-import { Camera, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Camera, ChevronLeft, ChevronRight, QrCode } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const CirculationDesk: React.FC = () => {
@@ -37,6 +38,7 @@ export const CirculationDesk: React.FC = () => {
   const paginatedLoans = loans.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const [availableCopies, setAvailableCopies] = useState<AvailableCopy[]>([]);
   const [members, setMembers] = useState<User[]>([]);
+  const [viewingMember, setViewingMember] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isAddBookModalOpen, setIsAddBookModalOpen] = useState<boolean>(false);
   const [isUserImportModalOpen, setIsUserImportModalOpen] = useState<boolean>(false);
@@ -215,6 +217,21 @@ export const CirculationDesk: React.FC = () => {
   const isCheckoutValid = borrowerIdentity.trim().length >= 3 && checkoutBarcode.trim().length >= 3;
   const isClaimValid = claimCode.trim().length >= 3;
   const isReturnValid = returnBarcode.trim().length >= 3;
+
+  // Find active member matching entered borrowerIdentity
+  const matchedMember = members.find(
+    (m) => m.identityNumber.trim().toLowerCase() === borrowerIdentity.trim().toLowerCase()
+  );
+
+  const handleViewMemberByIdentity = (identity?: string) => {
+    if (!identity) return;
+    const found = members.find((m) => m.identityNumber.trim().toLowerCase() === identity.trim().toLowerCase());
+    if (found) {
+      setViewingMember(found);
+    } else {
+      toast.info(`Anggota dengan identitas ${identity} tidak ditemukan di daftar anggota aktif.`);
+    }
+  };
 
   const handleProcessCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -464,6 +481,19 @@ export const CirculationDesk: React.FC = () => {
                       <Camera className="w-4 h-4 text-primary" />
                       <span>Pindai</span>
                     </Button>
+                    {matchedMember && (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => setViewingMember(matchedMember)}
+                        className="h-9 px-3 gap-1.5 text-xs font-semibold shrink-0"
+                        title="Buka Kartu Anggota Digital untuk pemustaka ini"
+                      >
+                        <QrCode className="w-4 h-4 text-primary" />
+                        <span className="hidden sm:inline">Lihat Kartu</span>
+                      </Button>
+                    )}
                   </div>
                   {members.length > 0 && (
                     <div className="mt-2">
@@ -653,7 +683,19 @@ export const CirculationDesk: React.FC = () => {
                                 {r.reservationCode}
                               </TableCell>
                               <TableCell>
-                                <div className="font-semibold text-foreground text-xs">{r.userName || 'Pemustaka'}</div>
+                                <div className="font-semibold text-foreground text-xs flex items-center gap-1.5">
+                                  <span>{r.userName || 'Pemustaka'}</span>
+                                  {r.userIdentity && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleViewMemberByIdentity(r.userIdentity)}
+                                      className="text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                                      title="Buka Kartu Anggota Pemustaka"
+                                    >
+                                      <QrCode size={13} />
+                                    </button>
+                                  )}
+                                </div>
                                 <div className="text-[10px] text-muted-foreground font-mono">{r.userIdentity || '-'}</div>
                               </TableCell>
                               <TableCell className="font-medium text-xs max-w-xs truncate" title={r.bookTitle}>
@@ -840,7 +882,19 @@ export const CirculationDesk: React.FC = () => {
               paginatedLoans.map((l) => (
                 <TableRow key={l.id}>
                   <TableCell>
-                    <div className="font-semibold text-foreground">{l.userName || 'Siswa'}</div>
+                    <div className="font-semibold text-foreground flex items-center gap-1.5">
+                      <span>{l.userName || 'Siswa'}</span>
+                      {l.userIdentity && (
+                        <button
+                          type="button"
+                          onClick={() => handleViewMemberByIdentity(l.userIdentity)}
+                          className="text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                          title="Buka Kartu Anggota Pemustaka"
+                        >
+                          <QrCode size={13} />
+                        </button>
+                      )}
+                    </div>
                     <div className="text-[10px] text-muted-foreground font-mono">{l.userIdentity || '-'}</div>
                   </TableCell>
                   <TableCell className="font-medium max-w-xs truncate" title={l.bookTitle}>
@@ -1037,6 +1091,13 @@ export const CirculationDesk: React.FC = () => {
                 label: l.bookTitle || '',
               }))
         }
+      />
+
+      {/* Modal Kartu Anggota Pemustaka Terbuka di Meja Sirkulasi */}
+      <MemberCardModal
+        isOpen={Boolean(viewingMember)}
+        onClose={() => setViewingMember(null)}
+        user={viewingMember}
       />
     </div>
   );
