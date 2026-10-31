@@ -29,13 +29,15 @@ import {
   AlertDialogAction,
   AlertDialogCancel,
 } from '../components/ui/alert-dialog.js';
+import { QrCode } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface MyBooksPageProps {
   user: User;
+  onOpenMemberCard?: () => void;
 }
 
-export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
+export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user, onOpenMemberCard }) => {
   const [activeLoans, setActiveLoans] = useState<Loan[]>([]);
   const [historyLoans, setHistoryLoans] = useState<Loan[]>([]);
   const [offlineBooks, setOfflineBooks] = useState<Array<{ id: number; title: string; savedAt: string; size: number }>>([]);
@@ -284,7 +286,21 @@ export const MyBooksPage: React.FC<MyBooksPageProps> = ({ user }) => {
       {/* Portfolio Header & Reading Metrics */}
       <div className="bg-card p-6 sm:p-8 rounded-3xl border border-border shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">Rak Buku Saya</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">Rak Buku Saya</h1>
+            {onOpenMemberCard && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onOpenMemberCard}
+                className="h-8 px-2.5 gap-1.5 text-xs font-semibold rounded-xl bg-card hover:bg-muted"
+                title="Buka Kartu Anggota Digital & QR Sirkulasi"
+              >
+                <QrCode size={14} className="text-primary" />
+                <span>Kartu Anggota Digital</span>
+              </Button>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground mt-1 max-w-xl">
             Kelola pinjaman aktif, riwayat bacaan, dan berkas luring.
           </p>

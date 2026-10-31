@@ -20,6 +20,7 @@ import { CatalogPage } from './pages/CatalogPage.js';
 import { MyBooksPage } from './pages/MyBooksPage.js';
 import { CirculationDesk } from './components/circulation/CirculationDesk.js';
 import { SuperAdminPanel } from './components/admin/SuperAdminPanel.js';
+import { MemberCardModal } from './components/member/MemberCardModal.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { Toaster } from './components/ui/sonner.js';
 import { Button } from './components/ui/button.js';
@@ -37,12 +38,14 @@ import { api } from './services/api.js';
 import type { Book, Loan } from '../shared/types/index.js';
 import { BookDetailModal } from './components/catalog/BookDetailModal.js';
 import { PDFReader } from './components/reader/PDFReader.js';
+import { QrCode } from 'lucide-react';
 import { toast } from 'sonner';
 
 export const App: React.FC = () => {
   const { user, isAuthenticated, logout } = useAuth();
   const [currentTab, setCurrentTab] = useState<string>('catalog');
   const [isLoginModalOpen, setIsLoginModalOpen] = useState<boolean>(false);
+  const [isMemberCardOpen, setIsMemberCardOpen] = useState<boolean>(false);
 
   // Command Palette State
   const [isCommandOpen, setIsCommandOpen] = useState<boolean>(false);
@@ -109,6 +112,7 @@ export const App: React.FC = () => {
         onSelectTab={setCurrentTab}
         onOpenLogin={() => setIsLoginModalOpen(true)}
         onOpenCommand={() => setIsCommandOpen(true)}
+        onOpenMemberCard={() => setIsMemberCardOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -123,7 +127,10 @@ export const App: React.FC = () => {
 
         {currentTab === 'my-books' && (
           isAuthenticated && user ? (
-            <MyBooksPage user={user} />
+            <MyBooksPage
+              user={user}
+              onOpenMemberCard={() => setIsMemberCardOpen(true)}
+            />
           ) : (
             <Card className="text-center p-8 max-w-md mx-auto shadow-xs rounded-3xl border-border">
               <CardHeader className="p-0 pb-6">
@@ -206,6 +213,15 @@ export const App: React.FC = () => {
               </div>
 
               <Button
+                variant="default"
+                onClick={() => setIsMemberCardOpen(true)}
+                className="mt-6 w-full text-xs font-semibold gap-2 py-2.5 shadow-xs"
+              >
+                <QrCode size={15} />
+                <span>Buka Kartu Anggota Digital & QR Sirkulasi</span>
+              </Button>
+
+              <Button
                 variant="destructive"
                 onClick={() => {
                   logout();
@@ -214,7 +230,7 @@ export const App: React.FC = () => {
                     description: 'Anda telah keluar dari akun.',
                   });
                 }}
-                className="mt-6 w-full text-xs font-semibold"
+                className="mt-3 w-full text-xs font-semibold"
               >
                 Keluar
               </Button>
@@ -253,14 +269,25 @@ export const App: React.FC = () => {
               <span>Katalog</span>
             </CommandItem>
             {isAuthenticated && (
-              <CommandItem
-                onSelect={() => {
-                  setCurrentTab('my-books');
-                  setIsCommandOpen(false);
-                }}
-              >
-                <span>Rak Buku Saya</span>
-              </CommandItem>
+              <>
+                <CommandItem
+                  onSelect={() => {
+                    setCurrentTab('my-books');
+                    setIsCommandOpen(false);
+                  }}
+                >
+                  <span>Rak Buku Saya</span>
+                </CommandItem>
+                <CommandItem
+                  onSelect={() => {
+                    setIsCommandOpen(false);
+                    setIsMemberCardOpen(true);
+                  }}
+                >
+                  <QrCode className="mr-2 h-4 w-4 text-primary" />
+                  <span>Buka Kartu Anggota Digital (QR Sirkulasi)</span>
+                </CommandItem>
+              </>
             )}
             {isAuthenticated && (user?.role === 'LIBRARIAN' || user?.role === 'ADMIN') && (
               <CommandItem
@@ -408,6 +435,13 @@ export const App: React.FC = () => {
           onClose={() => setReadingBook(null)}
         />
       )}
+
+      {/* Digital Member Card & QR Circulation Modal */}
+      <MemberCardModal
+        isOpen={isMemberCardOpen}
+        onClose={() => setIsMemberCardOpen(false)}
+        user={user}
+      />
     </div>
   );
 };

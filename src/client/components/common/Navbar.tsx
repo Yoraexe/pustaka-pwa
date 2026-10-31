@@ -14,13 +14,14 @@ import React from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
 import { Button } from '../ui/button.js';
 import { Badge } from '../ui/badge.js';
-import { LogOut, Search } from 'lucide-react';
+import { LogOut, Search, QrCode } from 'lucide-react';
 
 interface NavbarProps {
   currentTab: string;
   onSelectTab: (tab: string) => void;
   onOpenLogin: () => void;
   onOpenCommand?: () => void;
+  onOpenMemberCard?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -28,6 +29,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSelectTab,
   onOpenLogin,
   onOpenCommand,
+  onOpenMemberCard,
 }) => {
   const { user, logout, isAuthenticated } = useAuth();
 
@@ -117,7 +119,19 @@ export const Navbar: React.FC<NavbarProps> = ({
           )}
 
           {isAuthenticated && user ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              {onOpenMemberCard && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onOpenMemberCard}
+                  title="Buka Kartu Anggota Digital & QR Sirkulasi"
+                  className="h-8 px-2.5 gap-1.5 text-xs font-semibold rounded-xl bg-card hover:bg-muted"
+                >
+                  <QrCode size={14} className="text-primary" />
+                  <span className="hidden sm:inline">Kartu Anggota</span>
+                </Button>
+              )}
               <div className="hidden sm:block text-right">
                 <div className="text-xs font-bold text-foreground leading-tight">
                   {user.name}
