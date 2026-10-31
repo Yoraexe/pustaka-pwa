@@ -228,6 +228,12 @@
       "timestamp": "2026-10-29T15:52:00+08:00",
       "action": "Conditional Book Deletion with Storage Cleanup and Active Circulation Guard",
       "agent_note": "Implemented end-to-end book deletion: (1) Added StorageService.deleteFile() for local disk and Supabase cloud file cleanup; (2) Added BookRepository countActiveLoansAndReservations() and delete() cascading past returned loans and book copies; (3) Added BookService.deleteBook() wrapped in SQLite BEGIN IMMEDIATE transaction with active loan & reservation guardrail; (4) Exposed DELETE /api/books/:id with LIBRARIAN/ADMIN RBAC protection; (5) Added ApiClient.deleteBook() with local cache invalidation; (6) Integrated destructive AlertDialog confirmation and delete trigger in BookDetailModal.tsx and CatalogPage.tsx; (7) Verified 75/75 Vitest tests passing 100% and 0-error production build."
+    },
+    {
+      "layer": "engineering",
+      "timestamp": "2026-10-31T23:35:00+08:00",
+      "action": "Client-Side Form Isolation & Empty Input Guardrail Enforcement",
+      "agent_note": "Resolved form state leakage and unchecked submissions across 6 components: (1) In LoginPage.tsx, isolated login and signup error states between tabs, enforced trim validation, and reactively disabled submit buttons; (2) In AddBookModal.tsx, sanitized number inputs against zero conversion upon backspace clearing, isolated physical/digital fields upon format switching, added form reset upon modal close, and disabled submission until all conditional requirements are satisfied; (3) In SuperAdminPanel.tsx, enforced password trimming (min 4 chars) and class requirements for students with automatic state reset on close; (4) In CirculationDesk.tsx, cleared cross-tab notices and guarded Checkout, Claim, and Return with reactive button disabling; (5) In UserImportModal.tsx and BarcodeScannerModal.tsx, guarded file, text, and manual input actions. Verified 75/75 Vitest tests passing and 0-error Vite PWA production build."
     }
   ],
   "decisions": [
@@ -306,7 +312,7 @@
       "frontend": "TailwindCSS + PDF.js Canvas Reader"
     },
     "created_at": "2026-09-22T20:13:30+08:00",
-    "last_updated": "2026-10-18T18:16:00+08:00"
+    "last_updated": "2026-10-31T23:35:00+08:00"
   },
   "context_paths": {
     "brd": "./.astesia/brd.md",
