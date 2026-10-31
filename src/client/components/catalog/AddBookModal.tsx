@@ -42,16 +42,16 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
   const [title, setTitle] = useState('');
   const [author, setAuthor] = useState('');
   const [publisher, setPublisher] = useState('');
-  const [publicationYear, setPublicationYear] = useState<number>(new Date().getFullYear());
+  const [publicationYear, setPublicationYear] = useState<number | ''>(new Date().getFullYear());
   const [categoryId, setCategoryId] = useState<number>(1);
   const [isbn, setIsbn] = useState('');
 
   // Physical fields
   const [shelfLocation, setShelfLocation] = useState('');
-  const [totalPhysicalCopies, setTotalPhysicalCopies] = useState<number>(1);
+  const [totalPhysicalCopies, setTotalPhysicalCopies] = useState<number | ''>(1);
 
   // Digital fields
-  const [digitalLicenseCount, setDigitalLicenseCount] = useState<number>(5);
+  const [digitalLicenseCount, setDigitalLicenseCount] = useState<number | ''>(5);
   const [ebookFile, setEbookFile] = useState<File | null>(null);
 
   // Cover fields & Camera capture states
@@ -181,6 +181,21 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
     stopCamera();
   }, [coverPreviewUrl, stopCamera]);
 
+  const resetForm = useCallback(() => {
+    setTitle('');
+    setAuthor('');
+    setPublisher('');
+    setPublicationYear(new Date().getFullYear());
+    setIsbn('');
+    setShelfLocation('');
+    setTotalPhysicalCopies(1);
+    setDigitalLicenseCount(5);
+    setEbookFile(null);
+    handleRemoveCover();
+    setErrorMsg(null);
+    setCreatedResult(null);
+  }, [handleRemoveCover]);
+
   useEffect(() => {
     if (!isOpen) {
       stopCamera();
@@ -189,8 +204,9 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
         setCoverPreviewUrl(null);
         setCoverFile(null);
       }
+      resetForm();
     }
-  }, [isOpen, stopCamera, coverPreviewUrl]);
+  }, [isOpen, stopCamera, coverPreviewUrl, resetForm]);
 
   useEffect(() => {
     return () => {
@@ -222,25 +238,64 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
   const isPhysical = bookType === 'HYBRID' || bookType === 'PHYSICAL_ONLY';
   const isDigital = bookType === 'HYBRID' || bookType === 'DIGITAL_ONLY';
 
+  const isFormValid =
+    title.trim().length > 0 &&
+    author.trim().length > 0 &&
+    publisher.trim().length > 0 &&
+    publicationYear !== '' &&
+    Number(publicationYear) >= 1900 &&
+    Number(publicationYear) <= 2100 &&
+    (!isPhysical || (shelfLocation.trim().length > 0 && totalPhysicalCopies !== '' && Number(totalPhysicalCopies) >= 1)) &&
+    (!isDigital || (Boolean(ebookFile) && digitalLicenseCount !== '' && Number(digitalLicenseCount) >= 1));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
 
-    if (!title.trim() || !author.trim() || !publisher.trim()) {
+    const trimmedTitle = title.trim();
+    const trimmedAuthor = author.trim();
+    const trimmedPublisher = publisher.trim();
+    const trimmedShelf = shelfLocation.trim();
+    const trimmedIsbn = isbn.trim();
+
+    if (!trimmedTitle || !trimmedAuthor || !trimmedPublisher) {
       setErrorMsg('Judul, penulis, dan penerbit buku wajib diisi.');
       return;
     }
-    if (isPhysical && !shelfLocation.trim()) {
-      setErrorMsg('Lokasi rak wajib diisi untuk koleksi fisik atau hybrid.');
+    if (publicationYear === '' || Number(publicationYear) < 1900 || Number(publicationYear) > 2100) {
+      setErrorMsg('Tahun terbit harus berupa angka valid antara tahun 1900 dan 2100.');
       return;
     }
-    if (isDigital && !ebookFile) {
-      setErrorMsg(
-        bookType === 'HYBRID'
-          ? 'Dokumen e-book (format PDF) wajib diunggah untuk buku Hybrid (Fisik + E-Book). Jika tidak ada PDF, pilih format "Buku Fisik".'
-          : 'Dokumen e-book (format PDF) wajib diunggah untuk buku berjenis E-Book.'
-      );
-      return;
+    if (isPhysical) {
+      if (!trimmedShelf) {
+        setErrorMsg('Lokasi rak wajib diisi untuk koleksi fisik atau hybrid.');
+        return;
+      }
+      if (totalPhysicalCopies === '' || Number(totalPhysicalCopies) < 1) {
+        setErrorMsg('Jumlah eksemplar fisik minimal 1.');
+        return;
+      }
+    }
+    if (isDigital) {
+      if (digitalLicenseCount === '' || Number(digitalLicenseCount) < 1) {
+        setErrorMsg('Kuota pinjam simultan minimal 1.');
+        return;
+      }
+      if (!ebookFile) {
+        setErrorMsg(
+          bookType === 'HYBRID'
+            ? 'Dokumen e-book (format PDF) wajib diunggah untuk buku Hybrid (Fisik + E-Book). Jika tidak ada PDF, pilih format "Buku Fisik".'
+            : 'Dokumen e-book (format PDF) wajib diunggah untuk buku berjenis E-Book.'
+        );
+        return;
+      }
+    }
+    if (coverMode === 'url' && coverUrlInput.trim()) {
+      const trimmedUrl = coverUrlInput.trim();
+      if (!/^(https?:\/\/|\/uploads\/covers\/)/i.test(trimmedUrl)) {
+        setErrorMsg('URL sampul harus diawali dengan http://, https://, atau /uploads/covers/');
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -290,16 +345,16 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
       }
 
       const formData = new FormData();
-      formData.append('title', title.trim());
-      formData.append('author', author.trim());
-      formData.append('publisher', publisher.trim());
+      formData.append('title', trimmedTitle);
+      formData.append('author', trimmedAuthor);
+      formData.append('publisher', trimmedPublisher);
       formData.append('publicationYear', String(publicationYear));
       formData.append('categoryId', String(categoryId));
       formData.append('bookType', bookType);
-      if (isbn.trim()) formData.append('isbn', isbn.trim());
+      if (trimmedIsbn) formData.append('isbn', trimmedIsbn);
 
       if (isPhysical) {
-        formData.append('shelfLocation', shelfLocation.trim());
+        formData.append('shelfLocation', trimmedShelf);
         formData.append('totalPhysicalCopies', String(totalPhysicalCopies));
       } else {
         formData.append('totalPhysicalCopies', '0');
@@ -425,10 +480,19 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
                 onValueChange={(val) => {
                   const nextType = val as BookType;
                   setBookType(nextType);
-                  if (nextType === 'DIGITAL_ONLY' && coverMode === 'camera') {
-                    setCoverMode('upload');
-                    stopCamera();
-                  } else if ((nextType === 'HYBRID' || nextType === 'PHYSICAL_ONLY') && !coverPreviewUrl) {
+                  setErrorMsg(null);
+                  if (nextType === 'DIGITAL_ONLY') {
+                    setShelfLocation('');
+                    if (coverMode === 'camera') {
+                      setCoverMode('upload');
+                      stopCamera();
+                    }
+                  } else if (nextType === 'PHYSICAL_ONLY') {
+                    setEbookFile(null);
+                    if (!coverPreviewUrl) {
+                      setCoverMode('camera');
+                    }
+                  } else if (nextType === 'HYBRID' && !coverPreviewUrl) {
                     setCoverMode('camera');
                   }
                 }}
@@ -500,13 +564,16 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
               </div>
 
               <div>
-                <Label htmlFor="publicationYear">Tahun Terbit</Label>
+                <Label htmlFor="publicationYear">Tahun Terbit *</Label>
                 <Input
                   id="publicationYear"
                   type="number"
+                  min={1900}
+                  max={2100}
                   required
                   value={publicationYear}
-                  onChange={(e) => setPublicationYear(Number(e.target.value))}
+                  onChange={(e) => setPublicationYear(e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="Contoh: 2026"
                 />
               </div>
 
@@ -817,14 +884,15 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
                   </div>
 
                   <div>
-                    <Label htmlFor="totalPhysicalCopies">Jumlah Eksemplar</Label>
+                    <Label htmlFor="totalPhysicalCopies">Jumlah Eksemplar *</Label>
                     <Input
                       id="totalPhysicalCopies"
                       type="number"
                       min={1}
                       max={50}
+                      required
                       value={totalPhysicalCopies}
-                      onChange={(e) => setTotalPhysicalCopies(Number(e.target.value))}
+                      onChange={(e) => setTotalPhysicalCopies(e.target.value === '' ? '' : Number(e.target.value))}
                     />
                   </div>
                 </div>
@@ -842,14 +910,15 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <Label htmlFor="digitalLicenseCount">Kuota Pinjam Simultan</Label>
+                    <Label htmlFor="digitalLicenseCount">Kuota Pinjam Simultan *</Label>
                     <Input
                       id="digitalLicenseCount"
                       type="number"
                       min={1}
                       max={100}
+                      required
                       value={digitalLicenseCount}
-                      onChange={(e) => setDigitalLicenseCount(Number(e.target.value))}
+                      onChange={(e) => setDigitalLicenseCount(e.target.value === '' ? '' : Number(e.target.value))}
                     />
                   </div>
 
@@ -879,10 +948,22 @@ export const AddBookModal: React.FC<AddBookModalProps> = ({ isOpen, onClose, onS
 
             {/* Form Footer Actions */}
             <div className="pt-4 border-t border-border flex items-center justify-end gap-2.5">
-              <Button type="button" variant="outline" onClick={onClose} className="text-xs">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  resetForm();
+                  onClose();
+                }}
+                className="text-xs"
+              >
                 Batal
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="text-xs font-semibold px-5">
+              <Button
+                type="submit"
+                disabled={isSubmitting || !isFormValid}
+                className="text-xs font-semibold px-5"
+              >
                 {isSubmitting ? 'Menyimpan...' : 'Simpan Buku'}
               </Button>
             </div>

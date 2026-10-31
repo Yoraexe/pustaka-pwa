@@ -211,6 +211,11 @@ export const CirculationDesk: React.FC = () => {
   // Filter active physical loans with barcodes for quick return picker
   const activePhysicalLoans = loans.filter((l) => l.status === 'BORROWED' && l.loanType === 'PHYSICAL' && !!l.copyBarcode);
 
+  // Form validity computations to prevent empty submission
+  const isCheckoutValid = borrowerIdentity.trim().length >= 3 && checkoutBarcode.trim().length >= 3;
+  const isClaimValid = claimCode.trim().length >= 3;
+  const isReturnValid = returnBarcode.trim().length >= 3;
+
   const handleProcessCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     setCheckoutMsg(null);
@@ -386,7 +391,17 @@ export const CirculationDesk: React.FC = () => {
       </Card>
 
       {/* Tabs Operations */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs
+        value={activeTab}
+        onValueChange={(val) => {
+          setActiveTab(val);
+          setCheckoutMsg(null);
+          setClaimMsg(null);
+          setReturnError(null);
+          setReturnResult(null);
+        }}
+        className="space-y-4"
+      >
         <TabsList className="bg-muted/60 p-1 rounded-2xl h-11 border border-border/80 inline-flex w-full sm:w-auto">
           <TabsTrigger value="checkout" className="rounded-xl px-4 py-1.5 text-xs font-semibold">
             Peminjaman
@@ -539,7 +554,7 @@ export const CirculationDesk: React.FC = () => {
                   )}
                 </div>
 
-                <Button type="submit" className="text-xs font-semibold shadow-xs">
+                <Button type="submit" disabled={!isCheckoutValid} className="text-xs font-semibold shadow-xs">
                   Proses Peminjaman
                 </Button>
               </form>
@@ -598,7 +613,7 @@ export const CirculationDesk: React.FC = () => {
                       <Camera className="w-4 h-4 text-primary" />
                       <span>Pindai QR</span>
                     </Button>
-                    <Button type="submit" className="text-xs font-semibold shrink-0">
+                    <Button type="submit" disabled={!isClaimValid} className="text-xs font-semibold shrink-0">
                       Klaim & Serahkan
                     </Button>
                   </div>
@@ -778,7 +793,7 @@ export const CirculationDesk: React.FC = () => {
                   </Label>
                 </div>
 
-                <Button type="submit" variant="default" className="text-xs font-semibold shadow-xs">
+                <Button type="submit" disabled={!isReturnValid} variant="default" className="text-xs font-semibold shadow-xs">
                   Proses Pengembalian
                 </Button>
               </form>

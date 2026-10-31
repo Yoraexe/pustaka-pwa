@@ -3,7 +3,7 @@
  * @description Dialog autentikasi & registrasi akun mandiri sekolah berbasis Shadcn UI Dialog, Tabs, Input, Label, dan Button.
  * @layer Page Component
  * 
- * Tujuan: Menyediakan antarmuka login NISN/NIP serta pendaftaran akun mandiri bagi Siswa dan Guru yang terintegrasi dengan modal Shadcn.
+ * Tujuan: Menyediakan antarmuka masuk dan pendaftaran akun mandiri dengan isolasi state form antar-tab dan validasi batas ketat anti-data kosong.
  * Caller: src/client/App.tsx
  * Dependensi: react, src/client/hooks/useAuth.tsx, Shadcn UI (Dialog, Tabs, Button, Input, Label), sonner.
  * Main Functions: LoginPage
@@ -37,6 +37,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
   // Login Form State
   const [identityNumber, setIdentityNumber] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [loginErrorMsg, setLoginErrorMsg] = useState<string | null>(null);
 
   // Signup Form State
   const [regIdentity, setRegIdentity] = useState<string>('');
@@ -44,18 +45,41 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
   const [regRole, setRegRole] = useState<'STUDENT' | 'TEACHER'>('STUDENT');
   const [regClassName, setRegClassName] = useState<string>('');
   const [regPassword, setRegPassword] = useState<string>('');
+  const [signupErrorMsg, setSignupErrorMsg] = useState<string | null>(null);
 
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+
+  // Form validity computations to prevent empty submission
+  const isLoginValid = identityNumber.trim().length >= 3 && password.length >= 4;
+  const isSignupValid =
+    regIdentity.trim().length >= 3 &&
+    regName.trim().length >= 2 &&
+    regPassword.length >= 4 &&
+    (regRole !== 'STUDENT' || regClassName.trim().length > 0);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
+    setLoginErrorMsg(null);
+
+    const trimmedIdentity = identityNumber.trim();
+    if (!trimmedIdentity || !password) {
+      setLoginErrorMsg('Nomor Identitas dan Kata Sandi wajib diisi.');
+      return;
+    }
+    if (trimmedIdentity.length < 3) {
+      setLoginErrorMsg('Nomor Identitas/NISN minimal 3 karakter.');
+      return;
+    }
+    if (password.length < 4) {
+      setLoginErrorMsg('Kata sandi minimal 4 karakter.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       await login({
-        identityNumber: identityNumber.trim(),
+        identityNumber: trimmedIdentity,
         password,
       });
       toast.success('Autentikasi Berhasil', {
@@ -65,7 +89,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
       onClose?.();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal melakukan verifikasi akun.';
-      setErrorMsg(msg);
+      setLoginErrorMsg(msg);
       toast.error('Gagal Masuk', { description: msg });
     } finally {
       setIsSubmitting(false);
@@ -74,25 +98,51 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
 
   const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setErrorMsg(null);
+    setSignupErrorMsg(null);
+
+    const trimmedIdentity = regIdentity.trim();
+    const trimmedName = regName.trim();
+    const trimmedClass = regClassName.trim();
+
+    if (!trimmedIdentity || !trimmedName || !regPassword) {
+      setSignupErrorMsg('Nomor Induk, Nama Lengkap, dan Kata Sandi wajib diisi.');
+      return;
+    }
+    if (trimmedIdentity.length < 3) {
+      setSignupErrorMsg('Nomor Induk minimal 3 karakter.');
+      return;
+    }
+    if (trimmedName.length < 2) {
+      setSignupErrorMsg('Nama Lengkap minimal 2 karakter.');
+      return;
+    }
+    if (regRole === 'STUDENT' && !trimmedClass) {
+      setSignupErrorMsg('Kelas / Jurusan wajib diisi untuk akun Siswa.');
+      return;
+    }
+    if (regPassword.length < 4) {
+      setSignupErrorMsg('Kata sandi minimal 4 karakter.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
       await signup({
-        identityNumber: regIdentity.trim(),
-        name: regName.trim(),
+        identityNumber: trimmedIdentity,
+        name: trimmedName,
         role: regRole,
-        className: regClassName.trim() || null,
+        className: trimmedClass || null,
         password: regPassword,
       });
       toast.success('Pendaftaran Akun Berhasil', {
-        description: `Selamat datang, ${regName.trim()}! Akun Anda telah aktif.`,
+        description: `Selamat datang, ${trimmedName}! Akun Anda telah aktif.`,
       });
       onSuccess?.();
       onClose?.();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Gagal mendaftarkan akun baru.';
-      setErrorMsg(msg);
+      setSignupErrorMsg(msg);
       toast.error('Gagal Mendaftar', { description: msg });
     } finally {
       setIsSubmitting(false);
@@ -117,7 +167,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
           value={mode}
           onValueChange={(v) => {
             setMode(v as 'login' | 'signup');
-            setErrorMsg(null);
+            setLoginErrorMsg(null);
+            setSignupErrorMsg(null);
           }}
           className="mt-1"
         >
@@ -130,17 +181,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
             </TabsTrigger>
           </TabsList>
 
-          {errorMsg && (
-            <div className="mt-3 p-3 bg-destructive/10 text-destructive border border-destructive/20 rounded-xl text-xs font-medium">
-              {errorMsg}
-            </div>
-          )}
-
           {/* TAB 1: MASUK */}
           <TabsContent value="login" className="space-y-4 pt-3">
+            {loginErrorMsg && (
+              <div className="p-3 bg-destructive/10 text-destructive border border-destructive/20 rounded-xl text-xs font-medium">
+                {loginErrorMsg}
+              </div>
+            )}
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div>
-                <Label htmlFor="identityNumber">NISN / NIP / ID Pengguna</Label>
+                <Label htmlFor="identityNumber">NISN / NIP / ID Pengguna *</Label>
                 <Input
                   id="identityNumber"
                   type="text"
@@ -153,7 +203,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
               </div>
 
               <div>
-                <Label htmlFor="password">Kata Sandi</Label>
+                <Label htmlFor="password">Kata Sandi *</Label>
                 <Input
                   id="password"
                   type="password"
@@ -166,7 +216,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
 
               <Button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !isLoginValid}
                 className="w-full h-11 text-xs font-semibold shadow-xs"
               >
                 {isSubmitting ? 'Memproses...' : 'Masuk'}
@@ -176,6 +226,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
 
           {/* TAB 2: DAFTAR AKUN BARU */}
           <TabsContent value="signup" className="space-y-3.5 pt-3">
+            {signupErrorMsg && (
+              <div className="p-3 bg-destructive/10 text-destructive border border-destructive/20 rounded-xl text-xs font-medium">
+                {signupErrorMsg}
+              </div>
+            )}
             <form onSubmit={handleSignupSubmit} className="space-y-3.5">
               <div>
                 <Label htmlFor="regRole">Peran Akun</Label>
@@ -194,7 +249,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
 
               <div>
                 <Label htmlFor="regIdentity">
-                  {regRole === 'STUDENT' ? 'Nomor Induk (NISN)' : 'Nomor Induk (NIP / ID Pengguna)'}
+                  {regRole === 'STUDENT' ? 'Nomor Induk Siswa (NISN) *' : 'Nomor Induk Pegawai (NIP / ID) *'}
                 </Label>
                 <Input
                   id="regIdentity"
@@ -208,7 +263,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
               </div>
 
               <div>
-                <Label htmlFor="regName">Nama Lengkap</Label>
+                <Label htmlFor="regName">Nama Lengkap *</Label>
                 <Input
                   id="regName"
                   type="text"
@@ -222,20 +277,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
 
               <div>
                 <Label htmlFor="regClassName">
-                  {regRole === 'STUDENT' ? 'Kelas / Jurusan' : 'Jabatan / Unit Kerja (Opsional)'}
+                  {regRole === 'STUDENT' ? 'Kelas / Jurusan *' : 'Jabatan / Unit Kerja (Opsional)'}
                 </Label>
                 <Input
                   id="regClassName"
                   type="text"
+                  required={regRole === 'STUDENT'}
                   value={regClassName}
                   onChange={(e) => setRegClassName(e.target.value)}
-                  placeholder={regRole === 'STUDENT' ? 'Contoh: X RPL 1' : 'Contoh: Staf Perpustakaan'}
+                  placeholder={regRole === 'STUDENT' ? 'Contoh: X RPL 1' : 'Contoh: Staf Pengajar'}
                   className="text-xs"
                 />
               </div>
 
               <div>
-                <Label htmlFor="regPassword">Buat Kata Sandi</Label>
+                <Label htmlFor="regPassword">Buat Kata Sandi *</Label>
                 <Input
                   id="regPassword"
                   type="password"
@@ -249,7 +305,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
 
               <Button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !isSignupValid}
                 className="w-full h-11 text-xs font-semibold shadow-xs"
               >
                 {isSubmitting ? 'Mendaftarkan...' : 'Daftar & Masuk'}
@@ -261,4 +317,3 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onClose, onSuccess }) => {
     </Dialog>
   );
 };
-

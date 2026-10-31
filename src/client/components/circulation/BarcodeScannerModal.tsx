@@ -331,7 +331,12 @@ export const BarcodeScannerModal: React.FC<BarcodeScannerModalProps> = ({
               placeholder="Atau ketik kode QR/Barcode (contoh: BK-0001-01)"
               className="text-xs font-mono h-9"
             />
-            <Button type="submit" size="sm" className="h-9 text-xs font-semibold px-4 shrink-0">
+            <Button
+              type="submit"
+              size="sm"
+              disabled={!manualCode.trim()}
+              className="h-9 text-xs font-semibold px-4 shrink-0"
+            >
               Gunakan
             </Button>
           </div>

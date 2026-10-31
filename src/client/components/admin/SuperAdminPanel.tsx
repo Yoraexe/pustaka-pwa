@@ -65,6 +65,20 @@ export const SuperAdminPanel: React.FC = () => {
   // Modal Import CSV State
   const [isImportOpen, setIsImportOpen] = useState<boolean>(false);
 
+  const resetCreateForm = useCallback(() => {
+    setNewIdentity('');
+    setNewName('');
+    setNewRole('STUDENT');
+    setNewClassName('');
+    setNewPassword('');
+  }, []);
+
+  const isCreateValid =
+    newIdentity.trim().length >= 3 &&
+    newName.trim().length >= 2 &&
+    newPassword.trim().length >= 4 &&
+    (newRole !== 'STUDENT' || newClassName.trim().length > 0);
+
   const fetchUsers = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -106,32 +120,49 @@ export const SuperAdminPanel: React.FC = () => {
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newIdentity.trim() || !newName.trim() || !newPassword.trim()) {
+    const trimmedIdentity = newIdentity.trim();
+    const trimmedName = newName.trim();
+    const trimmedClass = newClassName.trim();
+    const trimmedPassword = newPassword.trim();
+
+    if (!trimmedIdentity || !trimmedName || !trimmedPassword) {
       toast.warning('Data Belum Lengkap', {
         description: 'NISN/NIP, Nama Lengkap, dan Kata Sandi wajib diisi.',
       });
+      return;
+    }
+    if (trimmedIdentity.length < 3) {
+      toast.warning('Identitas Terlalu Pendek', { description: 'Nomor identitas minimal 3 karakter.' });
+      return;
+    }
+    if (trimmedName.length < 2) {
+      toast.warning('Nama Terlalu Pendek', { description: 'Nama lengkap minimal 2 karakter.' });
+      return;
+    }
+    if (newRole === 'STUDENT' && !trimmedClass) {
+      toast.warning('Kelas Wajib Diisi', { description: 'Bagi akun Siswa, kolom Kelas / Jurusan wajib diisi.' });
+      return;
+    }
+    if (trimmedPassword.length < 4) {
+      toast.warning('Kata Sandi Terlalu Pendek', { description: 'Kata sandi minimal 4 karakter.' });
       return;
     }
 
     setIsSubmittingCreate(true);
     try {
       const created = await api.registerUserByAdmin({
-        identityNumber: newIdentity.trim(),
-        name: newName.trim(),
+        identityNumber: trimmedIdentity,
+        name: trimmedName,
         role: newRole,
-        className: newClassName.trim() || null,
-        password: newPassword,
+        className: trimmedClass || null,
+        password: trimmedPassword,
       });
 
       toast.success('Akun Berhasil Dibuat', {
         description: `[${ROLE_LABELS[created.role]}] ${created.name} (${created.identityNumber}) telah terdaftar.`,
       });
 
-      setNewIdentity('');
-      setNewName('');
-      setNewRole('STUDENT');
-      setNewClassName('');
-      setNewPassword('');
+      resetCreateForm();
       setIsCreateOpen(false);
       fetchUsers();
     } catch (err: unknown) {
@@ -159,16 +190,17 @@ export const SuperAdminPanel: React.FC = () => {
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!resetTarget || resetPasswordValue.length < 4) {
+    const trimmedPassword = resetPasswordValue.trim();
+    if (!resetTarget || trimmedPassword.length < 4) {
       toast.warning('Kata Sandi Terlalu Pendek', {
-        description: 'Kata sandi baru minimal 4 karakter.',
+        description: 'Kata sandi baru minimal 4 karakter (tanpa spasi kosong).',
       });
       return;
     }
 
     setIsSubmittingReset(true);
     try {
-      await api.resetUserPassword(resetTarget.id, resetPasswordValue);
+      await api.resetUserPassword(resetTarget.id, trimmedPassword);
       toast.success('Kata Sandi Direset', {
         description: `Kata sandi untuk ${resetTarget.name} (${resetTarget.identityNumber}) berhasil diperbarui.`,
       });
@@ -426,7 +458,13 @@ export const SuperAdminPanel: React.FC = () => {
       </Card>
 
       {/* Dialog: Buat Akun Baru oleh Superadmin */}
-      <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+      <Dialog
+        open={isCreateOpen}
+        onOpenChange={(open) => {
+          setIsCreateOpen(open);
+          if (!open) resetCreateForm();
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader className="text-left">
             <DialogTitle className="text-lg font-bold">Buat Akun Pengguna Baru</DialogTitle>
@@ -452,7 +490,9 @@ export const SuperAdminPanel: React.FC = () => {
             </div>
 
             <div>
-              <Label htmlFor="newIdentity">Nomor Identitas (NISN / NIP / Username)</Label>
+              <Label htmlFor="newIdentity">
+                {newRole === 'STUDENT' ? 'Nomor Induk Siswa (NISN) *' : 'Nomor Identitas (NIP / Username) *'}
+              </Label>
               <Input
                 id="newIdentity"
                 value={newIdentity}
@@ -464,7 +504,7 @@ export const SuperAdminPanel: React.FC = () => {
             </div>
 
             <div>
-              <Label htmlFor="newName">Nama Lengkap</Label>
+              <Label htmlFor="newName">Nama Lengkap *</Label>
               <Input
                 id="newName"
                 value={newName}
@@ -476,18 +516,21 @@ export const SuperAdminPanel: React.FC = () => {
             </div>
 
             <div>
-              <Label htmlFor="newClassName">Kelas / Jabatan / Unit (Opsional)</Label>
+              <Label htmlFor="newClassName">
+                {newRole === 'STUDENT' ? 'Kelas / Jurusan *' : 'Jabatan / Unit (Opsional)'}
+              </Label>
               <Input
                 id="newClassName"
                 value={newClassName}
                 onChange={(e) => setNewClassName(e.target.value)}
-                placeholder="Contoh: XI RPL 1 atau Staf Perpustakaan"
+                placeholder={newRole === 'STUDENT' ? 'Contoh: XI RPL 1' : 'Contoh: Staf Perpustakaan'}
                 className="text-xs"
+                required={newRole === 'STUDENT'}
               />
             </div>
 
             <div>
-              <Label htmlFor="newPassword">Kata Sandi Awal</Label>
+              <Label htmlFor="newPassword">Kata Sandi Awal *</Label>
               <Input
                 id="newPassword"
                 type="password"
@@ -503,12 +546,19 @@ export const SuperAdminPanel: React.FC = () => {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsCreateOpen(false)}
+                onClick={() => {
+                  resetCreateForm();
+                  setIsCreateOpen(false);
+                }}
                 className="text-xs"
               >
                 Batal
               </Button>
-              <Button type="submit" disabled={isSubmittingCreate} className="text-xs font-semibold">
+              <Button
+                type="submit"
+                disabled={isSubmittingCreate || !isCreateValid}
+                className="text-xs font-semibold"
+              >
                 {isSubmittingCreate ? 'Menyimpan...' : 'Buat Akun'}
               </Button>
             </DialogFooter>
@@ -517,7 +567,15 @@ export const SuperAdminPanel: React.FC = () => {
       </Dialog>
 
       {/* Dialog: Reset Kata Sandi */}
-      <Dialog open={!!resetTarget} onOpenChange={(open) => !open && setResetTarget(null)}>
+      <Dialog
+        open={!!resetTarget}
+        onOpenChange={(open) => {
+          if (!open) {
+            setResetTarget(null);
+            setResetPasswordValue('');
+          }
+        }}
+      >
         <DialogContent className="max-w-sm">
           <DialogHeader className="text-left">
             <DialogTitle className="text-base font-bold">Reset Kata Sandi</DialogTitle>
@@ -528,7 +586,7 @@ export const SuperAdminPanel: React.FC = () => {
 
           <form onSubmit={handleResetPassword} className="space-y-4 my-2">
             <div>
-              <Label htmlFor="resetPasswordInput">Kata Sandi Baru</Label>
+              <Label htmlFor="resetPasswordInput">Kata Sandi Baru *</Label>
               <Input
                 id="resetPasswordInput"
                 type="password"
@@ -544,12 +602,19 @@ export const SuperAdminPanel: React.FC = () => {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setResetTarget(null)}
+                onClick={() => {
+                  setResetTarget(null);
+                  setResetPasswordValue('');
+                }}
                 className="text-xs"
               >
                 Batal
               </Button>
-              <Button type="submit" disabled={isSubmittingReset} className="text-xs font-semibold">
+              <Button
+                type="submit"
+                disabled={isSubmittingReset || resetPasswordValue.trim().length < 4}
+                className="text-xs font-semibold"
+              >
                 {isSubmittingReset ? 'Memperbarui...' : 'Simpan Sandi'}
               </Button>
             </DialogFooter>

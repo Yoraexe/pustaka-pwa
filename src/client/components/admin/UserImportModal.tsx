@@ -119,10 +119,23 @@ export const UserImportModal: React.FC<UserImportModalProps> = ({ isOpen, onClos
     setSelectedFile(null);
     setCsvText('');
     setImportResult(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
+  const isImportValid = (mode === 'file' && Boolean(selectedFile)) || (mode === 'text' && csvText.trim().length > 0);
+
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          handleReset();
+          onClose();
+        }
+      }}
+    >
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto p-6 sm:p-8">
         <DialogHeader className="text-left">
           <div className="flex items-center gap-2 mb-1.5">
@@ -289,10 +302,22 @@ export const UserImportModal: React.FC<UserImportModalProps> = ({ isOpen, onClos
             )}
 
             <div className="pt-3 border-t border-border flex items-center justify-end gap-2.5">
-              <Button type="button" variant="outline" onClick={onClose} className="text-xs">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  handleReset();
+                  onClose();
+                }}
+                className="text-xs"
+              >
                 Batal
               </Button>
-              <Button type="submit" disabled={isSubmitting} className="text-xs font-semibold shadow-xs px-5">
+              <Button
+                type="submit"
+                disabled={isSubmitting || !isImportValid}
+                className="text-xs font-semibold shadow-xs px-5"
+              >
                 {isSubmitting ? 'Memproses Impor...' : 'Mulai Impor Anggota'}
               </Button>
             </div>
