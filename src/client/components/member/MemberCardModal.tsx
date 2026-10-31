@@ -199,9 +199,9 @@ export const MemberCardModal: React.FC<MemberCardModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-w-lg p-6 sm:p-7">
-        <DialogHeader className="text-left pb-2">
-          <div className="flex items-center gap-2 mb-1">
+      <DialogContent className="max-w-md p-4 sm:p-5">
+        <DialogHeader className="text-left pb-1">
+          <div className="flex items-center gap-2 mb-0.5">
             <Badge variant="outline" className="text-[10px] font-mono uppercase tracking-wider">
               {roleLabel}
             </Badge>
@@ -210,52 +210,52 @@ export const MemberCardModal: React.FC<MemberCardModalProps> = ({
               Aktif
             </span>
           </div>
-          <DialogTitle className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-            <QrCode className="w-6 h-6 text-primary" />
+          <DialogTitle className="text-lg sm:text-xl font-bold flex items-center gap-2">
+            <QrCode className="w-5 h-5 text-primary" />
             <span>Kartu Anggota Digital</span>
           </DialogTitle>
-          <DialogDescription className="text-xs text-muted-foreground leading-relaxed">
-            Identitas pemustaka resmi untuk sirkulasi buku fisik dan absensi perpustakaan sekolah.
+          <DialogDescription className="text-[11px] text-muted-foreground leading-relaxed">
+            Identitas resmi untuk sirkulasi buku fisik dan absensi perpustakaan sekolah.
           </DialogDescription>
         </DialogHeader>
 
         {/* Virtual Card Container (WCAG AA compliant, Modern Academic Aesthetic) */}
-        <div className="relative rounded-3xl overflow-hidden border border-border shadow-md bg-card transition-all">
+        <div className="relative rounded-2xl overflow-hidden border border-border shadow-md bg-card transition-all">
           {/* Card Top Brand Strip */}
-          <div className="bg-gradient-to-r from-blue-700 via-primary to-blue-600 p-4 sm:p-5 text-white flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white text-primary flex items-center justify-center font-bold text-lg font-mono shadow-xs">
+          <div className="bg-gradient-to-r from-blue-700 via-primary to-blue-600 px-4 py-3 text-white flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-white text-primary flex items-center justify-center font-bold text-base font-mono shadow-xs">
                 P
               </div>
               <div>
-                <h3 className="font-bold text-sm sm:text-base leading-tight tracking-tight">
+                <h3 className="font-bold text-sm leading-tight tracking-tight">
                   Pustaka Sekolah
                 </h3>
-                <span className="text-[10px] text-blue-100 font-medium block">
+                <span className="text-[9px] text-blue-100 font-medium block">
                   Kartu Anggota Perpustakaan Resmi
                 </span>
               </div>
             </div>
-            <ShieldCheck className="w-6 h-6 text-blue-200 opacity-80" />
+            <ShieldCheck className="w-5 h-5 text-blue-200 opacity-80" />
           </div>
 
           {/* Card Middle: Profile Details & QR Validation */}
-          <div className="p-5 sm:p-6 bg-card flex flex-col sm:flex-row items-center sm:items-start justify-between gap-5">
-            <div className="flex-1 space-y-3.5 text-center sm:text-left">
+          <div className="p-4 bg-card flex flex-col sm:flex-row items-center sm:items-start justify-between gap-4">
+            <div className="flex-1 space-y-2.5 text-center sm:text-left w-full">
               <div>
-                <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground block mb-0.5">
+                <span className="text-[9px] uppercase font-mono tracking-wider text-muted-foreground block">
                   Nama Pemustaka
                 </span>
-                <h4 className="text-base sm:text-lg font-bold text-foreground leading-snug">
+                <h4 className="text-base font-bold text-foreground leading-snug">
                   {user.name}
                 </h4>
               </div>
 
               <div>
-                <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground block mb-0.5">
+                <span className="text-[9px] uppercase font-mono tracking-wider text-muted-foreground block">
                   {user.role === 'STUDENT' ? 'Nomor Induk Siswa (NISN)' : 'Nomor Induk (NIP / ID)'}
                 </span>
-                <div className="flex items-center justify-center sm:justify-start gap-2">
+                <div className="flex items-center justify-center sm:justify-start gap-1.5">
                   <span className="font-mono font-bold text-sm text-primary tracking-wider">
                     {user.identityNumber}
                   </span>
@@ -272,7 +272,7 @@ export const MemberCardModal: React.FC<MemberCardModalProps> = ({
 
               {user.className && (
                 <div>
-                  <span className="text-[10px] uppercase font-mono tracking-wider text-muted-foreground block mb-0.5">
+                  <span className="text-[9px] uppercase font-mono tracking-wider text-muted-foreground block">
                     Kelas / Penugasan
                   </span>
                   <span className="text-xs font-semibold text-foreground">
@@ -283,20 +283,20 @@ export const MemberCardModal: React.FC<MemberCardModalProps> = ({
             </div>
 
             {/* QR Code Identification Display */}
-            <div className="shrink-0 flex flex-col items-center p-3 bg-muted/30 border border-border rounded-2xl">
+            <div className="shrink-0 flex flex-col items-center p-2.5 bg-muted/30 border border-border rounded-xl">
               <QrCodeDisplay
                 value={user.identityNumber}
-                size={110}
+                size={96}
                 showDownload={false}
               />
-              <span className="text-[9px] font-mono text-muted-foreground mt-1.5 font-bold">
+              <span className="text-[8.5px] font-mono text-muted-foreground mt-1 font-bold">
                 Pindai di Meja Sirkulasi
               </span>
             </div>
           </div>
 
           {/* Card Bottom: Verification Status */}
-          <div className="px-5 py-3 bg-muted/40 border-t border-border flex items-center justify-between text-[11px]">
+          <div className="px-4 py-2 bg-muted/40 border-t border-border flex items-center justify-between text-[10.5px]">
             <span className="text-muted-foreground font-mono">
               Peran: <strong className="text-foreground">{roleLabel}</strong>
             </span>
@@ -308,18 +308,19 @@ export const MemberCardModal: React.FC<MemberCardModalProps> = ({
         </div>
 
         {/* Guidance Tip for Physical Library Circulation */}
-        <div className="p-3 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-[11px] text-blue-800 dark:text-blue-300 flex items-start gap-2.5">
-          <QrCode className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+        <div className="p-2.5 bg-blue-500/10 border border-blue-500/20 rounded-xl text-[10.5px] text-blue-800 dark:text-blue-300 flex items-start gap-2">
+          <QrCode className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
           <p className="leading-relaxed">
-            <strong>Cara Pakai di Meja Sirkulasi:</strong> Tunjukkan kode QR di atas kepada pustakawan saat meminjam buku fisik di perpustakaan. Pustakawan akan memindai kartu ini untuk mencatat peminjaman tanpa perlu mengetik NISN/NIP manual.
+            <strong>Cara Pakai di Meja Sirkulasi:</strong> Tunjukkan kode QR di atas kepada pustakawan saat meminjam buku fisik di perpustakaan untuk dipindai otomatis.
           </p>
         </div>
 
         {/* Action Buttons */}
-        <div className="pt-2 flex flex-col sm:flex-row items-center justify-end gap-2.5">
+        <div className="pt-1 flex flex-col sm:flex-row items-center justify-end gap-2">
           <Button
             type="button"
             variant="outline"
+            size="sm"
             onClick={onClose}
             className="w-full sm:w-auto text-xs"
           >
@@ -327,11 +328,12 @@ export const MemberCardModal: React.FC<MemberCardModalProps> = ({
           </Button>
           <Button
             type="button"
+            size="sm"
             onClick={handleDownloadFullCard}
             className="w-full sm:w-auto text-xs font-semibold gap-1.5 shadow-xs"
           >
             <Download size={14} />
-            <span>Unduh Kartu Anggota (PNG)</span>
+            <span>Unduh Kartu (PNG)</span>
           </Button>
         </div>
       </DialogContent>

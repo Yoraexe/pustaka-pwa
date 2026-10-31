@@ -52,35 +52,35 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
 
         {/* Desktop Navigation Links */}
-        <nav className="hidden md:flex items-center gap-1.5">
+        <nav className="hidden md:flex items-center gap-1">
           <button
             onClick={() => onSelectTab('catalog')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+            className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
               currentTab === 'catalog'
                 ? 'bg-primary/10 text-primary'
                 : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
             }`}
           >
-            Katalog Buku
+            Katalog
           </button>
 
           {isAuthenticated && (
             <button
               onClick={() => onSelectTab('my-books')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 currentTab === 'my-books'
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
-              Rak Buku Saya
+              Rak Saya
             </button>
           )}
 
           {isAuthenticated && (
             <button
               onClick={() => onSelectTab('member-card')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 currentTab === 'member-card'
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -93,20 +93,20 @@ export const Navbar: React.FC<NavbarProps> = ({
           {isAuthenticated && (user?.role === 'LIBRARIAN' || user?.role === 'ADMIN') && (
             <button
               onClick={() => onSelectTab('circulation')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 currentTab === 'circulation'
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }`}
             >
-              Meja Sirkulasi
+              Sirkulasi
             </button>
           )}
 
           {isAuthenticated && user?.role === 'ADMIN' && (
             <button
               onClick={() => onSelectTab('users')}
-              className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
                 currentTab === 'users'
                   ? 'bg-primary/10 text-primary'
                   : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -139,7 +139,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   size="sm"
                   onClick={onOpenMemberCard}
                   title="Buka Kartu Anggota Digital & QR Sirkulasi"
-                  className="h-8 px-2.5 gap-1.5 text-xs font-semibold rounded-xl bg-card hover:bg-muted"
+                  className="md:hidden h-8 px-2.5 gap-1.5 text-xs font-semibold rounded-xl bg-card hover:bg-muted"
                 >
                   <QrCode size={14} className="text-primary" />
                   <span className="hidden sm:inline">Kartu Anggota</span>
