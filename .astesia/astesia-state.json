@@ -101,7 +101,8 @@
     "src/server/services/storage.service.ts",
     "vercel.json",
     "tests/integration/book.delete.test.ts",
-    "src/client/components/member/MemberCardModal.tsx"
+    "src/client/components/member/MemberCardModal.tsx",
+    "src/client/pages/MemberCardPage.tsx"
   ],
   "history": [
     {
@@ -247,6 +248,12 @@
       "timestamp": "2026-10-31T23:57:00+08:00",
       "action": "Circulation Desk Direct Member Card Inspection & Verification",
       "agent_note": "Enhanced CirculationDesk with direct member card inspection: added reactive 'Lihat Kartu' button in Checkout form when borrower identity matches an active member, QR code inspection triggers in loans and reservations tables, and mounted MemberCardModal for instant on-desk identity verification and card download."
+    },
+    {
+      "layer": "engineering",
+      "timestamp": "2026-11-01T00:27:00+08:00",
+      "action": "Elevate Member Card to Dedicated Main Navigation Tab & Page View",
+      "agent_note": "Added MemberCardPage component and integrated 'Kartu Anggota' as a prominent top-level menu tab in desktop Navbar and mobile BottomNav for all authenticated roles (Student, Teacher, Admin, Librarian). Maintained seamless dual-access via full page view and quick modal dialog."
     }
   ],
   "decisions": [
@@ -325,7 +332,7 @@
       "frontend": "TailwindCSS + PDF.js Canvas Reader"
     },
     "created_at": "2026-09-22T20:13:30+08:00",
-    "last_updated": "2026-10-31T23:50:00+08:00"
+    "last_updated": "2026-11-01T00:27:00+08:00"
   },
   "context_paths": {
     "brd": "./.astesia/brd.md",
