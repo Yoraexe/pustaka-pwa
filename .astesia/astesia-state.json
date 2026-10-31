@@ -100,7 +100,8 @@
     "api/index.ts",
     "src/server/services/storage.service.ts",
     "vercel.json",
-    "tests/integration/book.delete.test.ts"
+    "tests/integration/book.delete.test.ts",
+    "src/client/components/member/MemberCardModal.tsx"
   ],
   "history": [
     {
@@ -234,6 +235,12 @@
       "timestamp": "2026-10-31T23:35:00+08:00",
       "action": "Client-Side Form Isolation & Empty Input Guardrail Enforcement",
       "agent_note": "Resolved form state leakage and unchecked submissions across 6 components: (1) In LoginPage.tsx, isolated login and signup error states between tabs, enforced trim validation, and reactively disabled submit buttons; (2) In AddBookModal.tsx, sanitized number inputs against zero conversion upon backspace clearing, isolated physical/digital fields upon format switching, added form reset upon modal close, and disabled submission until all conditional requirements are satisfied; (3) In SuperAdminPanel.tsx, enforced password trimming (min 4 chars) and class requirements for students with automatic state reset on close; (4) In CirculationDesk.tsx, cleared cross-tab notices and guarded Checkout, Claim, and Return with reactive button disabling; (5) In UserImportModal.tsx and BarcodeScannerModal.tsx, guarded file, text, and manual input actions. Verified 75/75 Vitest tests passing and 0-error Vite PWA production build."
+    },
+    {
+      "layer": "engineering",
+      "timestamp": "2026-10-31T23:50:00+08:00",
+      "action": "Digital Member Card & Physical Circulation QR Integration (Layar 10)",
+      "agent_note": "Implemented Layar 10 specs: created MemberCardModal with real QR generation, 900x540 PNG card download, and copy ID action. Connected to Navbar, MyBooksPage header, profile view, and Command Palette (Ctrl+K). Verified against CirculationDesk borrower scanner, 75/75 Vitest tests passing, and 0-error Vite production build."
     }
   ],
   "decisions": [
@@ -312,7 +319,7 @@
       "frontend": "TailwindCSS + PDF.js Canvas Reader"
     },
     "created_at": "2026-09-22T20:13:30+08:00",
-    "last_updated": "2026-10-31T23:35:00+08:00"
+    "last_updated": "2026-10-31T23:50:00+08:00"
   },
   "context_paths": {
     "brd": "./.astesia/brd.md",
