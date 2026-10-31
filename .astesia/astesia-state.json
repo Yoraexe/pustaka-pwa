@@ -241,6 +241,12 @@
       "timestamp": "2026-10-31T23:50:00+08:00",
       "action": "Digital Member Card & Physical Circulation QR Integration (Layar 10)",
       "agent_note": "Implemented Layar 10 specs: created MemberCardModal with real QR generation, 900x540 PNG card download, and copy ID action. Connected to Navbar, MyBooksPage header, profile view, and Command Palette (Ctrl+K). Verified against CirculationDesk borrower scanner, 75/75 Vitest tests passing, and 0-error Vite production build."
+    },
+    {
+      "layer": "engineering",
+      "timestamp": "2026-10-31T23:57:00+08:00",
+      "action": "Circulation Desk Direct Member Card Inspection & Verification",
+      "agent_note": "Enhanced CirculationDesk with direct member card inspection: added reactive 'Lihat Kartu' button in Checkout form when borrower identity matches an active member, QR code inspection triggers in loans and reservations tables, and mounted MemberCardModal for instant on-desk identity verification and card download."
     }
   ],
   "decisions": [
