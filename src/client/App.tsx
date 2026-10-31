@@ -21,6 +21,7 @@ import { MyBooksPage } from './pages/MyBooksPage.js';
 import { CirculationDesk } from './components/circulation/CirculationDesk.js';
 import { SuperAdminPanel } from './components/admin/SuperAdminPanel.js';
 import { MemberCardModal } from './components/member/MemberCardModal.js';
+import { MemberCardPage } from './pages/MemberCardPage.js';
 import { LoginPage } from './pages/LoginPage.js';
 import { Toaster } from './components/ui/sonner.js';
 import { Button } from './components/ui/button.js';
@@ -137,6 +138,32 @@ export const App: React.FC = () => {
                 <CardTitle className="text-lg font-bold">Masuk ke Akun</CardTitle>
                 <CardDescription className="text-xs mt-2 leading-relaxed">
                   Masuk menggunakan NISN atau NIP untuk mengakses buku yang dipinjam.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <Button
+                  onClick={() => setIsLoginModalOpen(true)}
+                  className="w-full text-xs font-semibold py-2.5 shadow-xs"
+                >
+                  Masuk
+                </Button>
+              </CardContent>
+            </Card>
+          )
+        )}
+
+        {currentTab === 'member-card' && (
+          isAuthenticated && user ? (
+            <MemberCardPage
+              user={user}
+              onNavigateToCatalog={() => setCurrentTab('catalog')}
+            />
+          ) : (
+            <Card className="text-center p-8 max-w-md mx-auto shadow-xs rounded-3xl border-border">
+              <CardHeader className="p-0 pb-6">
+                <CardTitle className="text-lg font-bold">Masuk ke Akun</CardTitle>
+                <CardDescription className="text-xs mt-2 leading-relaxed">
+                  Silakan masuk menggunakan akun anggota Anda untuk melihat Kartu Anggota Digital.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">

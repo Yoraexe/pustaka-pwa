@@ -77,6 +77,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
 
+          {isAuthenticated && (
+            <button
+              onClick={() => onSelectTab('member-card')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+                currentTab === 'member-card'
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+            >
+              Kartu Anggota
+            </button>
+          )}
+
           {isAuthenticated && (user?.role === 'LIBRARIAN' || user?.role === 'ADMIN') && (
             <button
               onClick={() => onSelectTab('circulation')}

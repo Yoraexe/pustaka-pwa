@@ -12,7 +12,7 @@
 
 import React from 'react';
 import { useAuth } from '../../hooks/useAuth.js';
-import { BookOpen, BookmarkCheck, Layers, ShieldAlert, User as UserIcon } from 'lucide-react';
+import { BookOpen, BookmarkCheck, Layers, ShieldAlert, User as UserIcon, QrCode } from 'lucide-react';
 
 interface BottomNavProps {
   currentTab: string;
@@ -26,8 +26,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab, o
   const isSuperAdmin = user?.role === 'ADMIN';
 
   const gridColsClass = isSuperAdmin
-    ? 'grid-cols-5'
+    ? 'grid-cols-6'
     : isStaff
+    ? 'grid-cols-5'
+    : isAuthenticated
     ? 'grid-cols-4'
     : 'grid-cols-3';
 
@@ -61,6 +63,19 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, onSelectTab, o
           <BookmarkCheck size={20} />
           <span className="text-[10px] sm:text-[11px]">Rak Saya</span>
         </button>
+
+        {/* Tab 3: Kartu Anggota */}
+        {isAuthenticated && (
+          <button
+            onClick={() => onSelectTab('member-card')}
+            className={`flex flex-col items-center justify-center gap-1 transition-all min-h-[44px] ${
+              currentTab === 'member-card' ? 'text-primary font-bold' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            <QrCode size={20} />
+            <span className="text-[10px] sm:text-[11px]">Kartu</span>
+          </button>
+        )}
 
         {/* Tab 3: Sirkulasi (Staff Only) */}
         {isStaff && (
